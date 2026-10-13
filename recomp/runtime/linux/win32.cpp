@@ -511,7 +511,11 @@ DWORD ResumeThread(HANDLE thread)
 void ExitThread(DWORD)
 {
     FinishThread();
-    pthread_exit(nullptr);
+    // Called from deep inside recompiled code. pthread_exit would unwind the
+    // stack through it, which aborts; end just this thread instead. Its stack
+    // stays allocated, which is a few megabytes for each of a handful of threads.
+    syscall(SYS_exit, 0);
+    __builtin_unreachable();
 }
 
 HANDLE OpenProcess(DWORD, BOOL, DWORD)

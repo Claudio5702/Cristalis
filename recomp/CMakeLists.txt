@@ -6,6 +6,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(BUILD_SHARED_LIBS OFF)
 
+if(NOT WIN32)
+    # See the header: keeps the program startable on systems a little older than the build machine.
+    add_compile_options(-include ${CMAKE_CURRENT_SOURCE_DIR}/runtime/linux/glibc_compat.h)
+endif()
+
 set(XENONRECOMP_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../tools/XenonRecomp-main)
 set(THIRDPARTY_ROOT ${XENONRECOMP_ROOT}/thirdparty)
 
@@ -66,7 +71,19 @@ else()
     # which runtime/linux provides the small part it uses, over SDL2 and OpenGL.
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
-    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavcodec libavutil)
+    # CD_FFMPEG_ROOT: a static FFmpeg built with only the XMA decoders, for a
+    # program that does not depend on the system's FFmpeg version (releases).
+    # Without it the system's shared FFmpeg is used.
+    set(CD_FFMPEG_ROOT "" CACHE PATH "Prefix of a static FFmpeg build")
+    if(CD_FFMPEG_ROOT)
+        add_library(cd_ffmpeg INTERFACE)
+        target_include_directories(cd_ffmpeg INTERFACE ${CD_FFMPEG_ROOT}/include)
+        target_link_libraries(cd_ffmpeg INTERFACE ${CD_FFMPEG_ROOT}/lib/libavcodec.a ${CD_FFMPEG_ROOT}/lib/libavutil.a m)
+    else()
+        pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavcodec libavutil)
+        add_library(cd_ffmpeg INTERFACE)
+        target_link_libraries(cd_ffmpeg INTERFACE PkgConfig::FFMPEG)
+    endif()
     find_package(OpenGL REQUIRED)
     find_package(Threads REQUIRED)
 
@@ -74,5 +91,7 @@ else()
         runtime/linux/win32.cpp
         runtime/linux/renderer_sdl.cpp)
     target_include_directories(crystal_defenders BEFORE PRIVATE runtime/linux runtime)
-    target_link_libraries(crystal_defenders PRIVATE ppc XenonUtils PkgConfig::SDL2 PkgConfig::FFMPEG OpenGL::GL Threads::Threads)
+    target_link_libraries(crystal_defenders PRIVATE ppc XenonUtils PkgConfig::SDL2 cd_ffmpeg OpenGL::GL Threads::Threads)
+    # The C++ library is built in, so the program only needs the system's C library, SDL2 and OpenGL.
+    target_link_options(crystal_defenders PRIVATE -static-libstdc++ -static-libgcc)
 endif()

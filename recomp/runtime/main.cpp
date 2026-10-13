@@ -650,7 +650,7 @@ int main(int argc, char* argv[])
         std::filesystem::path folder = std::filesystem::path(program).parent_path();
         SetCurrentDirectoryW(folder.c_str());
         bool found = false;
-        for (const char* candidate : { "game\\default.xex", "default.xex", "..\\..\\extracted\\default.xex" })
+        for (const char* candidate : { "game/default.xex", "default.xex", "../../extracted/default.xex" })
         {
             std::error_code error;
             if (std::filesystem::exists(folder / candidate, error))
@@ -665,7 +665,7 @@ int main(int argc, char* argv[])
         {
             if (!RunFirstTimeSetup(folder))
                 return 0;
-            xexPath = "game\\default.xex";
+            xexPath = "game/default.xex";
         }
     }
     // Relaunched from the settings menu: let the old copy finish first, as it
