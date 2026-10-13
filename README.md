@@ -25,7 +25,7 @@ Known differences from the console:
 
 - No online leaderboards (they needed Xbox LIVE).
 - Music loops are handled by the runtime rather than by the game's original mechanism.
-- Windows only. Steam Deck through Proton is supported in principle but untested.
+- Windows is the complete version; the Linux build is experimental.
 
 ## Features
 
@@ -50,19 +50,21 @@ Instead of step 3, you can drop the console's `CRYSTAL DEFENDERS` (or `58410989`
 folder next to `crystal_defenders.exe` before the first launch: the game is then
 installed from it without any question.
 
-### Steam Deck
+### Linux and Steam Deck
 
-**Untested on a real Steam Deck.** There is no Linux build; the Windows program is
-meant to run through Proton, and adapts itself when it sees it is on a Deck (full
-screen at the Deck's 1280x800, no pause when the window loses focus).
+**Experimental, and untested on a real Steam Deck.**
 
-1. In Desktop Mode, unzip the release and put your `CRYSTAL DEFENDERS` folder
-   inside it, next to `crystal_defenders.exe`.
-2. In Steam: *Add a Non-Steam Game*, browse to `crystal_defenders.exe`.
-3. In the game's *Properties > Compatibility*, force a Proton version.
-4. Launch it. Pressing both sticks opens the settings menu.
+There is a native Linux build (SDL2 and OpenGL 3.3), which so far has only been
+run under WSL on a PC. It plays the game with sound, saves and controllers, but
+does not yet have the settings menu, the high-resolution mode, the achievement
+pop-up or the pause in background, and no ready-made Linux package exists: it
+has to be built on the machine (see below). It installs the game from a
+`CRYSTAL DEFENDERS` folder placed next to the program.
 
-Please report whether it works.
+Alternatively the Windows release runs through Proton: add
+`crystal_defenders.exe` to Steam as a non-Steam game, force a Proton version in
+*Properties > Compatibility*, and put your `CRYSTAL DEFENDERS` folder next to
+it. It switches to full screen by itself on a Deck.
 
 ## Building
 
@@ -77,6 +79,10 @@ LGPL shared build (for XMA audio), and your own `default.xex`.
 4. Configure and build `recomp/` with CMake.
 
 The paths to XenonRecomp and FFmpeg are set at the top of `recomp/CMakeLists.txt`.
+
+On Linux: clang, CMake, Ninja, SDL2, FFmpeg and OpenGL development packages;
+the same steps, and `runtime/linux` supplies the small part of the Windows API
+the runtime is written against.
 
 ## Layout
 

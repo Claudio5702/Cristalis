@@ -186,7 +186,7 @@ static bool ExtractPackage(const std::filesystem::path& path, const std::filesys
             parent = entries[parent].parent;
         }
         // Names come from the package: nothing may land outside the target.
-        if (relative.is_absolute() || relative.native().find(L"..") != std::wstring::npos)
+        if (relative.is_absolute() || relative.generic_string().find("..") != std::string::npos)
             continue;
 
         std::error_code error;
@@ -220,6 +220,7 @@ static bool ExtractPackage(const std::filesystem::path& path, const std::filesys
     return ok;
 }
 
+#ifdef _WIN32
 static std::filesystem::path BrowseForFolder()
 {
     BROWSEINFOW info{};
@@ -234,6 +235,8 @@ static std::filesystem::path BrowseForFolder()
     CoTaskMemFree(item);
     return path;
 }
+
+#endif
 
 bool RunFirstTimeSetup(const std::filesystem::path& programFolder)
 {
@@ -251,6 +254,14 @@ bool RunFirstTimeSetup(const std::filesystem::path& programFolder)
         }
     }
 
+#ifndef _WIN32
+    // No folder dialog here: the game is installed from a folder dropped next
+    // to the program, which is what was just looked for.
+    MessageBoxW(nullptr, Text(L"Le jeu n'est pas install\u00e9.\n\nCopiez le dossier CRYSTAL DEFENDERS (ou 58410989) de votre console \u00e0 c\u00f4t\u00e9 de ce programme, puis relancez-le.",
+        L"The game is not installed.\n\nCopy your console's CRYSTAL DEFENDERS (or 58410989) folder next to this program, then start it again."),
+        L"Crystal Defenders", MB_OK | MB_ICONINFORMATION);
+    return false;
+#else
     // CD_SETUP_SOURCE=<folder>: take the game from there without asking (tests).
     const wchar_t* preset = _wgetenv(L"CD_SETUP_SOURCE");
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -313,4 +324,5 @@ bool RunFirstTimeSetup(const std::filesystem::path& programFolder)
         }
         return true;
     }
+#endif
 }

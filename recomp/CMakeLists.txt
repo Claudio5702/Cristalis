@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(CrystalDefendersRecomp C CXX RC)
+project(CrystalDefendersRecomp C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -25,7 +25,8 @@ target_compile_options(ppc
     # C++ line, whose comment is the original PowerPC instruction.
     PRIVATE -O2 -fno-strict-aliasing -w -gline-tables-only)
 
-add_executable(crystal_defenders
+# Everything that is the same on every system.
+set(RUNTIME_SOURCES
     runtime/main.cpp
     runtime/achievements.cpp
     runtime/config.cpp
@@ -34,25 +35,44 @@ add_executable(crystal_defenders
     runtime/kernel_io.cpp
     runtime/video.cpp
     runtime/gpu.cpp
-    runtime/renderer.cpp
-    runtime/setup.cpp
     runtime/audio.cpp
     runtime/xam.cpp
     runtime/xam_content.cpp
+    runtime/setup.cpp
     runtime/imports.cpp
-    runtime/imports.gen.cpp
-    resources/crystal_defenders.rc)
-# FFmpeg (LGPL, shared build) decodes the game's XMA audio.
-set(FFMPEG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../tools/ffmpeg/ffmpeg-n8.1-latest-win64-lgpl-shared-8.1)
+    runtime/imports.gen.cpp)
 
-target_include_directories(crystal_defenders PRIVATE runtime ${FFMPEG_ROOT}/include)
-target_link_libraries(crystal_defenders PRIVATE ppc XenonUtils winmm d3d11 dxgi dxguid
-    ${FFMPEG_ROOT}/lib/libavcodec.dll.a ${FFMPEG_ROOT}/lib/libavutil.dll.a)
-# -mwindows: a windowed program, so no console window opens next to the game.
-target_link_options(crystal_defenders PRIVATE -static -mwindows)
+if(WIN32)
+    enable_language(RC)
+    add_executable(crystal_defenders ${RUNTIME_SOURCES}
+        runtime/renderer.cpp
+        resources/crystal_defenders.rc)
 
-# The FFmpeg DLLs must sit next to the executable.
-foreach(FFMPEG_DLL avcodec-62.dll avutil-60.dll swresample-6.dll)
-    add_custom_command(TARGET crystal_defenders POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FFMPEG_ROOT}/bin/${FFMPEG_DLL} $<TARGET_FILE_DIR:crystal_defenders>)
-endforeach()
+    # FFmpeg (LGPL, shared build) decodes the game's XMA audio.
+    set(FFMPEG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../tools/ffmpeg/ffmpeg-n8.1-latest-win64-lgpl-shared-8.1)
+    target_include_directories(crystal_defenders PRIVATE runtime ${FFMPEG_ROOT}/include)
+    target_link_libraries(crystal_defenders PRIVATE ppc XenonUtils winmm d3d11 dxgi dxguid
+        ${FFMPEG_ROOT}/lib/libavcodec.dll.a ${FFMPEG_ROOT}/lib/libavutil.dll.a)
+    # -mwindows: a windowed program, so no console window opens next to the game.
+    target_link_options(crystal_defenders PRIVATE -static -mwindows)
+
+    # The FFmpeg DLLs must sit next to the executable.
+    foreach(FFMPEG_DLL avcodec-62.dll avutil-60.dll swresample-6.dll)
+        add_custom_command(TARGET crystal_defenders POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${FFMPEG_ROOT}/bin/${FFMPEG_DLL} $<TARGET_FILE_DIR:crystal_defenders>)
+    endforeach()
+else()
+    # Linux (Steam Deck): the runtime is written against the Windows API, of
+    # which runtime/linux provides the small part it uses, over SDL2 and OpenGL.
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+    pkg_check_modules(FFMPEG REQUIRED IMPORTED_TARGET libavcodec libavutil)
+    find_package(OpenGL REQUIRED)
+    find_package(Threads REQUIRED)
+
+    add_executable(crystal_defenders ${RUNTIME_SOURCES}
+        runtime/linux/win32.cpp
+        runtime/linux/renderer_sdl.cpp)
+    target_include_directories(crystal_defenders BEFORE PRIVATE runtime/linux runtime)
+    target_link_libraries(crystal_defenders PRIVATE ppc XenonUtils PkgConfig::SDL2 PkgConfig::FFMPEG OpenGL::GL Threads::Threads)
+endif()

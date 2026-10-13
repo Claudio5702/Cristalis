@@ -488,6 +488,7 @@ uint32_t GuestCall(uint32_t address, uint32_t r3, uint32_t r4, int processor)
     return ctx.r3.u32;
 }
 
+#ifdef _WIN32
 // CD_SAMPLE=<seconds>: after that delay, log where every guest thread is.
 static void SamplerThread(int seconds)
 {
@@ -617,6 +618,26 @@ static LONG CALLBACK CrashHandler(EXCEPTION_POINTERS* info)
     ExitProcess(3);
 }
 
+#else
+// Linux: no sampler; a bad access is reported with the guest state and ends the game.
+#include <csignal>
+
+static void SamplerThread(int)
+{
+}
+
+static void CrashSignal(int, siginfo_t* info, void*)
+{
+    uintptr_t address = uintptr_t(info->si_addr);
+    if (address >= uintptr_t(g_base) && address < uintptr_t(g_base) + 0x100000000ull)
+        Log("FATAL: access violation on guest address %08X", uint32_t(address - uintptr_t(g_base)));
+    else
+        Log("FATAL: access violation at host address %p", (void*)address);
+    DumpGuestState();
+    _exit(3);
+}
+#endif
+
 int main(int argc, char* argv[])
 {
     // Started without a path (double click on the program): work from the
@@ -688,7 +709,15 @@ int main(int argc, char* argv[])
         Log("Unable to reserve the 4 GB guest address space (error %lu).", GetLastError());
         return 1;
     }
+#ifdef _WIN32
     AddVectoredExceptionHandler(1, CrashHandler);
+#else
+    struct sigaction action{};
+    action.sa_sigaction = CrashSignal;
+    action.sa_flags = SA_SIGINFO;
+    sigaction(SIGSEGV, &action, nullptr);
+    sigaction(SIGBUS, &action, nullptr);
+#endif
 
     // Image, followed by the host function pointer table PPC_LOOKUP_FUNC indexes.
     const uint32_t tableAddress = uint32_t(PPC_IMAGE_BASE + PPC_IMAGE_SIZE);

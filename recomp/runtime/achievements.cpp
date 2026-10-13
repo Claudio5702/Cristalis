@@ -164,6 +164,7 @@ static void SaveUnlocked()
         file << id << "\n";
 }
 
+#ifdef _WIN32
 // ---- Pop-up ----
 
 struct Toast
@@ -269,6 +270,13 @@ static void ShowToast(std::wstring title, std::wstring body)
         DeleteObject(toast.bodyFont);
     }).detach();
 }
+
+#else
+// Linux: no pop-up window yet; the unlock is recorded and logged.
+static void ShowToast(std::wstring, std::wstring)
+{
+}
+#endif
 
 // ---- Entry points ----
 
