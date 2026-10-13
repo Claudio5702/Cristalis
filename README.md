@@ -58,16 +58,15 @@ Steam Deck yet.
 
 A native build (SDL2 and OpenGL 3.3) for x86-64 Linux with glibc 2.35 or newer:
 Ubuntu 22.04, Debian 12, Fedora 36, SteamOS 3.5 and later. It needs SDL2 and
-OpenGL from the system; FFmpeg is built in.
+OpenGL, FreeType and fontconfig from the system; FFmpeg is built in.
 
 1. Unpack the Linux release.
 2. Copy your `CRYSTAL DEFENDERS` (or `58410989`) folder into it.
 3. Run `crystal_defenders.sh`. The game is installed on the first launch.
 
-It has sound, saves, keyboard and controllers, six languages and the
-high-resolution rendering. It does not have the settings menu, the achievement
-pop-up or the pause in background yet: settings are changed in
-`crystal_defenders.ini`.
+It has the same features as the Windows version: sound, saves, keyboard and
+controllers, six languages, high-resolution rendering, the settings menu, the
+pause and local achievements.
 
 On a Steam Deck, add `crystal_defenders.sh` to Steam as a non-Steam game, without
 forcing a compatibility tool. The Windows release also runs through Proton.

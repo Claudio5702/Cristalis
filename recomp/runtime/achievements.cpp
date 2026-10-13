@@ -272,9 +272,12 @@ static void ShowToast(std::wstring title, std::wstring body)
 }
 
 #else
-// Linux: no pop-up window yet; the unlock is recorded and logged.
-static void ShowToast(std::wstring, std::wstring)
+// Linux: the renderer draws the notice over the game's image.
+void LinuxToast(const std::wstring& title, const std::wstring& body);
+
+static void ShowToast(std::wstring title, std::wstring body)
 {
+    LinuxToast(title, body);
 }
 #endif
 

@@ -71,6 +71,7 @@ else()
     # which runtime/linux provides the small part it uses, over SDL2 and OpenGL.
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
+    pkg_check_modules(TEXT REQUIRED IMPORTED_TARGET freetype2 fontconfig)
     # CD_FFMPEG_ROOT: a static FFmpeg built with only the XMA decoders, for a
     # program that does not depend on the system's FFmpeg version (releases).
     # Without it the system's shared FFmpeg is used.
@@ -89,9 +90,10 @@ else()
 
     add_executable(crystal_defenders ${RUNTIME_SOURCES}
         runtime/linux/win32.cpp
+        runtime/linux/overlay.cpp
         runtime/linux/renderer_sdl.cpp)
     target_include_directories(crystal_defenders BEFORE PRIVATE runtime/linux runtime)
-    target_link_libraries(crystal_defenders PRIVATE ppc XenonUtils PkgConfig::SDL2 cd_ffmpeg OpenGL::GL Threads::Threads)
+    target_link_libraries(crystal_defenders PRIVATE ppc XenonUtils PkgConfig::SDL2 PkgConfig::TEXT cd_ffmpeg OpenGL::GL Threads::Threads)
     # The C++ library is built in, so the program only needs the system's C library, SDL2 and OpenGL.
     target_link_options(crystal_defenders PRIVATE -static-libstdc++ -static-libgcc)
 endif()

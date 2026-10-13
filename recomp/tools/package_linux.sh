@@ -39,19 +39,19 @@ Steam choose "Add a Non-Steam Game" and pick crystal_defenders.sh. Do not force
 a compatibility tool: this is a Linux program.
 
 Needs: x86-64 Linux with glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36, SteamOS 3.5 and later), SDL2 and
-OpenGL 3.3.
+OpenGL 3.3, FreeType and fontconfig (all standard on desktop systems).
+
+In the game:
+  F1, right click or both sticks ... settings menu (language, resolution,
+                                     rendering, full screen, volume, ...)
+  F11 or Alt+Enter ................. full screen
+  F12 .............................. screenshot (captures folder)
 
 Keys (change them in crystal_defenders.ini, created on first launch):
   Arrows ............. d-pad          Space or X ......... A (confirm)
   Escape or C ........ B (back)       S / D .............. X / Y
   Enter / Tab ........ Start / Back   Q / E .............. shoulder buttons
-  F11 or Alt+Enter ... full screen
 Any controller SDL2 recognises works.
-
-Not in this build yet: the settings menu and the
-achievement pop-up. Language, volume, keys and rendering are set in
-crystal_defenders.ini
-(section [jeu], langue = fr / en / de / es / it / ja).
 
 Saves and achievements: the userdata folder. Log: crystal_defenders.log.
 
