@@ -249,9 +249,21 @@ static Config Load()
         Log("Config: %s created with the default settings", kFileName);
     }
 
+    if (OnSteamDeck())
+    {
+        config.fullscreen = true;
+        config.pauseInBackground = false;
+        Log("Config: Steam Deck detected, full screen and no background pause");
+    }
     Log("Config: fullscreen %d, sharp %d, volume %d, language %u, vibration %d, %zu key binding(s)", config.fullscreen,
         config.sharp, config.volume, config.language, config.vibration, config.keys.size());
     return config;
+}
+
+bool OnSteamDeck()
+{
+    static const bool deck = [] { const char* value = getenv("SteamDeck"); return value != nullptr && strcmp(value, "1") == 0; }();
+    return deck;
 }
 
 Config& MutableConfig()

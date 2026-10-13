@@ -25,7 +25,7 @@ Known differences from the console:
 
 - No online leaderboards (they needed Xbox LIVE).
 - Music loops are handled by the runtime rather than by the game's original mechanism.
-- Windows only.
+- Windows only. Steam Deck through Proton is supported in principle but untested.
 
 ## Features
 
@@ -45,6 +45,24 @@ Known differences from the console:
    storage, or a folder already holding `default.xex` and `Media`.
 
 Windows 10 or 11, 64-bit, a Direct3D 11 graphics card.
+
+Instead of step 3, you can drop the console's `CRYSTAL DEFENDERS` (or `58410989`)
+folder next to `crystal_defenders.exe` before the first launch: the game is then
+installed from it without any question.
+
+### Steam Deck
+
+**Untested on a real Steam Deck.** There is no Linux build; the Windows program is
+meant to run through Proton, and adapts itself when it sees it is on a Deck (full
+screen at the Deck's 1280x800, no pause when the window loses focus).
+
+1. In Desktop Mode, unzip the release and put your `CRYSTAL DEFENDERS` folder
+   inside it, next to `crystal_defenders.exe`.
+2. In Steam: *Add a Non-Steam Game*, browse to `crystal_defenders.exe`.
+3. In the game's *Properties > Compatibility*, force a Proton version.
+4. Launch it. Pressing both sticks opens the settings menu.
+
+Please report whether it works.
 
 ## Building
 

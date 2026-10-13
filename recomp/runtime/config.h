@@ -27,6 +27,11 @@ struct Config
     std::vector<KeyBinding> keys;
 };
 
+// True on a Steam Deck (the game then runs through Proton, which passes this
+// on from SteamOS). The window fills the screen and nothing depends on which
+// window is active, as the Deck shows one game at a time.
+bool OnSteamDeck();
+
 const Config& GetConfig();
 // For the settings menu: changes the live settings...
 Config& MutableConfig();

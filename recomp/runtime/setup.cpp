@@ -237,6 +237,20 @@ static std::filesystem::path BrowseForFolder()
 
 bool RunFirstTimeSetup(const std::filesystem::path& programFolder)
 {
+    // The console's folder dropped next to the program is installed without a
+    // question: the simplest way on a Steam Deck, where dialogs are awkward.
+    {
+        std::filesystem::path package = FindPackage(programFolder);
+        std::filesystem::path target = programFolder / "game";
+        if (!package.empty())
+        {
+            std::error_code error;
+            std::filesystem::create_directories(target, error);
+            if (ExtractPackage(package, target) && LooksLikeTheGame(target))
+                return true;
+        }
+    }
+
     // CD_SETUP_SOURCE=<folder>: take the game from there without asking (tests).
     const wchar_t* preset = _wgetenv(L"CD_SETUP_SOURCE");
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
