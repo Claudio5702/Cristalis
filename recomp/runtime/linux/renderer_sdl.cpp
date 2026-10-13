@@ -621,6 +621,14 @@ static void PumpEvents()
     sticksHeld = sticks;
 
     // CD_MENU_AT=<tap number>: open the menu at that CD_AUTOPAD tap (tests).
+    // CD_SHOT_AT=<tap number>: as if F12 were pressed at that tap (tests).
+    static const char* shotAt = getenv("CD_SHOT_AT");
+    static bool shotAtDone;
+    if (shotAt != nullptr && !shotAtDone && g_autoPadStep == uint32_t(atoi(shotAt)) + 1)
+    {
+        shotAtDone = true;
+        g_screenshotRequest = true;
+    }
     static const char* menuAt = getenv("CD_MENU_AT");
     static bool menuAtDone;
     if (menuAt != nullptr && !menuAtDone && g_autoPadStep == uint32_t(atoi(menuAt)) + 1)
@@ -1189,9 +1197,17 @@ static void ShowFrame()
     }
 
     // CD_AUTOPAD_SHOTS=1: with the menu open, also keep what the window shows.
+    // CD_WINDOW_SHOTS=1: do so at every tap, and every second while paused in the background.
     static const bool shots = getenv("CD_AUTOPAD_SHOTS") != nullptr;
+    static const bool always = getenv("CD_WINDOW_SHOTS") != nullptr;
     static uint32_t shotStep;
-    if (shots && g_menuOpen && g_autoPadStep != shotStep)
+    static ULONGLONG pauseShot;
+    if (always && g_backgroundPause && GetTickCount64() - pauseShot > 1000)
+    {
+        pauseShot = GetTickCount64();
+        SaveWindow("pause.bmp", width, height);
+    }
+    if (shots && (g_menuOpen || always) && g_autoPadStep != shotStep)
     {
         shotStep = g_autoPadStep;
         char path[64];
@@ -1263,6 +1279,18 @@ void RendererPresent()
         bool focused = (SDL_GetWindowFlags(g_window) & SDL_WINDOW_INPUT_FOCUS) != 0;
         everFocused = everFocused || focused;
         bool background = GetConfig().pauseInBackground && !unattended && !RendererFastStart() && everFocused && !focused;
+
+        // CD_TEST_BACKGROUND=<from>-<to>: behave as if the window were in the
+        // background between those seconds after start (tests).
+        static const char* testBackground = getenv("CD_TEST_BACKGROUND");
+        if (testBackground != nullptr)
+        {
+            static const ULONGLONG start = GetTickCount64();
+            unsigned from = 0, to = 0;
+            sscanf(testBackground, "%u-%u", &from, &to);
+            ULONGLONG seconds = (GetTickCount64() - start) / 1000;
+            background = GetConfig().pauseInBackground && seconds >= from && seconds < to;
+        }
         if (background != g_backgroundPause)
         {
             g_backgroundPause = background;
