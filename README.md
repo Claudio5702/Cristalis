@@ -13,6 +13,15 @@ This project is not affiliated with or endorsed by Square Enix.
 *Portage PC non officiel de Crystal Defenders (Xbox 360). Aucune donnée du jeu
 n'est fournie : il faut votre propre copie.*
 
+## Made with AI
+
+This port was written by an AI: [Claude Code](https://claude.com/claude-code)
+running Claude Opus 5.5, directed and play-tested by the repository's owner. The
+runtime, the tools and this documentation were all produced that way.
+
+*Ce portage a été réalisé par une IA, Claude Code (Claude Opus 5.5), dirigée et
+testée en jeu par le propriétaire du dépôt.*
+
 ## State
 
 Playable from start to finish: graphics, sound, saves, six languages, replays.
@@ -67,6 +76,7 @@ The paths to XenonRecomp and FFmpeg are set at the top of `recomp/CMakeLists.txt
 
 ## Credits
 
+- Written with [Claude Code](https://claude.com/claude-code) (Claude Opus 5.5).
 - [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) by hedge-dev.
 - [FFmpeg](https://ffmpeg.org) for XMA decoding (LGPL).
 - [Xenia](https://xenia.jp) documentation of the Xbox 360, used as reference.
