@@ -1,0 +1,23 @@
+# Allow-list: nothing is tracked unless listed below. The working folder also
+# holds the game's own data, saves, downloaded tools and test material, none of
+# which may be published.
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/recomp/
+
+/recomp/*
+!/recomp/CMakeLists.txt
+!/recomp/config/
+!/recomp/runtime/
+!/recomp/tools/
+!/recomp/resources/
+
+# Generated from the game's executable by XenonRecomp (recomp/ppc), and anything
+# read from the game: build them from your own copy.
+/recomp/ppc/
+/recomp/private/
+/recomp/build/
+/recomp/bin/
+/recomp/run/

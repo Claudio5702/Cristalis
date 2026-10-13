@@ -1,0 +1,70 @@
+[main]
+file_path = "../../extracted/default.xex"
+out_directory_path = "../ppc"
+switch_table_file_path = "switch_tables.toml"
+
+# Compiler helper routines, located by recomp/tools/xex_dump.cpp.
+restgprlr_14_address = 0x82125320
+savegprlr_14_address = 0x821252D0
+restfpr_14_address = 0x8212547C
+savefpr_14_address = 0x82125430
+restvmx_14_address = 0x82394488
+savevmx_14_address = 0x823941F0
+restvmx_64_address = 0x8239451C
+savevmx_64_address = 0x82394284
+
+# Non-code words inside .text, identified with recomp/tools/text_gaps.py.
+# Without these the function scan never advances past them.
+invalid_instructions = [
+    { data = 0x00000000, size = 4 }, # Padding
+    { data = 0x82128220, size = 8 }, # C++ frame handler record
+    { data = 0x8239D2EC, size = 8 }, # C specific handler record
+]
+
+# Leaf functions with no .pdata entry that contain jump tables. Their bounds
+# are computed by recomp/tools/fix_function_bounds.py.
+functions = [
+    { address = 0x820B43F8, size = 0xFC },
+    { address = 0x820B44F8, size = 0x70 },
+    { address = 0x820B4568, size = 0xEC },
+    { address = 0x820B5948, size = 0x1C4 },
+    { address = 0x820C7F60, size = 0xDC },
+    { address = 0x820E8D38, size = 0x9C },
+    { address = 0x8215D1A0, size = 0x114 },
+    { address = 0x821AC000, size = 0x110 },
+    { address = 0x821D9EF8, size = 0x188 },
+    { address = 0x821DED40, size = 0x194 },
+    { address = 0x821E05F0, size = 0x9C },
+    { address = 0x821E8A20, size = 0x80 },
+    { address = 0x8221F390, size = 0x98 },
+    { address = 0x8222DEA8, size = 0x228 },
+    { address = 0x8223AC18, size = 0x68 },
+    { address = 0x822666A8, size = 0x80 },
+    { address = 0x8230A168, size = 0x78 },
+    { address = 0x82352A10, size = 0x68 },
+    { address = 0x82352A78, size = 0x64 },
+    { address = 0x82352AE0, size = 0x5C },
+    { address = 0x82352B40, size = 0x198 },
+    { address = 0x82352CD8, size = 0x16C },
+    { address = 0x8236D5A0, size = 0x330 },
+    { address = 0x8237F2C8, size = 0x100 },
+    { address = 0x82389828, size = 0x80 },
+]
+
+# The game drives the XMA hardware decoder by storing context bit masks to
+# registers at computed addresses. These hooks call the runtime (audio.cpp) right
+# before each store, with the register address in r10 and the mask in r11.
+[[midasm_hook]]
+name = "XmaClearHook"
+address = 0x82201E7C
+registers = ["r10", "r11"]
+
+[[midasm_hook]]
+name = "XmaLockHook"
+address = 0x82202128
+registers = ["r10", "r11"]
+
+[[midasm_hook]]
+name = "XmaKickHook"
+address = 0x82202290
+registers = ["r10", "r11"]
