@@ -1,7 +1,6 @@
 // Linux renderer: an SDL2 window and OpenGL 3.3 drawing what the GPU command
 // processor decodes. The counterpart of renderer.cpp (Direct3D 11) on Windows.
-// Not carried over yet: the settings menu, the sharp high-resolution mode and
-// the pause in background.
+// Not carried over yet: the settings menu and the pause in background.
 #include "renderer.h"
 #include "config.h"
 #include "guest.h"
@@ -27,6 +26,9 @@ static GLuint g_vertexBuffer;
 static GLuint g_frameBuffer;
 static GLuint g_frameTexture;
 static GLuint g_whiteTexture;
+static GLuint g_depthBuffer;
+static GLint g_sharpUniform;
+static uint32_t g_scale; // the frame is 1280x720 times this
 static float g_clearColor[4] = { 0, 0, 0, 1 };
 static uint32_t g_frameNumber = 1;
 static bool g_fullscreen;
@@ -82,6 +84,31 @@ static GLuint Compile(GLenum type, const char* source)
     return shader;
 }
 
+// The frame the game draws into, and its depth buffer, at a multiple of the
+// console's 1280x720.
+static bool CreateFrameTargets(uint32_t scale)
+{
+    g_scale = scale;
+    glBindTexture(GL_TEXTURE_2D, g_frameTexture);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kHostWidth * scale, kHostHeight * scale, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glBindRenderbuffer(GL_RENDERBUFFER, g_depthBuffer);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, kHostWidth * scale, kHostHeight * scale);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_frameBuffer);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_frameTexture, 0);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, g_depthBuffer);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+    {
+        Log("Renderer: the frame buffer is not usable");
+        return false;
+    }
+    glViewport(0, 0, kHostWidth * scale, kHostHeight * scale);
+    return true;
+}
+
 bool RendererInit()
 {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0)
@@ -116,12 +143,24 @@ bool RendererInit()
         "layout(location = 0) in vec4 position; layout(location = 1) in vec2 uv; layout(location = 2) in vec4 color;\n"
         "out vec2 vUv; out vec4 vColor;\n"
         "void main() { gl_Position = vec4(position.xy, (position.z * 2.0 - position.w), position.w); vUv = uv; vColor = color; }\n"));
+    // "sharp": enlarged texels keep hard edges, one screen pixel wide, instead of blurring.
     glAttachShader(g_program, Compile(GL_FRAGMENT_SHADER,
         "#version 330 core\n"
-        "uniform sampler2D tex; in vec2 vUv; in vec4 vColor; out vec4 outColor;\n"
-        "void main() { outColor = texture(tex, vUv) * vColor; }\n"));
+        "uniform sampler2D tex; uniform int sharp; in vec2 vUv; in vec4 vColor; out vec4 outColor;\n"
+        "void main() {\n"
+        "  vec2 uv = vUv;\n"
+        "  if (sharp != 0) {\n"
+        "    vec2 size = vec2(textureSize(tex, 0));\n"
+        "    vec2 texel = uv * size;\n"
+        "    vec2 seam = floor(texel + 0.5);\n"
+        "    texel = seam + clamp((texel - seam) / fwidth(texel), -0.5, 0.5);\n"
+        "    uv = texel / size;\n"
+        "  }\n"
+        "  outColor = texture(tex, uv) * vColor;\n"
+        "}\n"));
     glLinkProgram(g_program);
     glUseProgram(g_program);
+    g_sharpUniform = glGetUniformLocation(g_program, "sharp");
 
     glGenVertexArrays(1, &g_vertexArray);
     glBindVertexArray(g_vertexArray);
@@ -134,27 +173,11 @@ bool RendererInit()
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(HostVertex), (void*)offsetof(HostVertex, u));
     glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(HostVertex), (void*)offsetof(HostVertex, r));
 
-    // The game's 1280x720 frame, with a depth buffer.
     glGenTextures(1, &g_frameTexture);
-    glBindTexture(GL_TEXTURE_2D, g_frameTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kHostWidth, kHostHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    GLuint depth = 0;
-    glGenRenderbuffers(1, &depth);
-    glBindRenderbuffer(GL_RENDERBUFFER, depth);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, kHostWidth, kHostHeight);
+    glGenRenderbuffers(1, &g_depthBuffer);
     glGenFramebuffers(1, &g_frameBuffer);
-    glBindFramebuffer(GL_FRAMEBUFFER, g_frameBuffer);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_frameTexture, 0);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth);
-    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
-    {
-        Log("Renderer: the frame buffer is not usable");
+    if (!CreateFrameTargets(1))
         return false;
-    }
 
     const uint32_t white = 0xFFFFFFFF;
     glGenTextures(1, &g_whiteTexture);
@@ -163,7 +186,7 @@ bool RendererInit()
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-    glViewport(0, 0, kHostWidth, kHostHeight);
+    glBindFramebuffer(GL_FRAMEBUFFER, g_frameBuffer);
     glClearColor(0, 0, 0, 1);
     glClearDepth(1.0);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -325,7 +348,10 @@ void RendererDraw(const HostDraw& draw)
         glDisable(GL_CULL_FACE);
     }
 
-    glScissor(draw.scissor[0], int(kHostHeight) - draw.scissor[3], draw.scissor[2] - draw.scissor[0], draw.scissor[3] - draw.scissor[1]);
+    // Only textures the game wants smoothed need the sharp filter.
+    glUniform1i(g_sharpUniform, g_scale > 1 && draw.texture.present && draw.texture.linear ? 1 : 0);
+    int s = int(g_scale);
+    glScissor(draw.scissor[0] * s, (int(kHostHeight) - draw.scissor[3]) * s, (draw.scissor[2] - draw.scissor[0]) * s, (draw.scissor[3] - draw.scissor[1]) * s);
     glBufferData(GL_ARRAY_BUFFER, GLsizeiptr(draw.vertices.size() * sizeof(HostVertex)), draw.vertices.data(), GL_STREAM_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, GLsizei(draw.vertices.size()));
 }
@@ -524,12 +550,13 @@ static void PumpEvents()
 // Writes the game's frame as a 32-bit BMP (top-down, BGRA).
 static void SaveFrame(const char* path)
 {
-    std::vector<uint32_t> pixels(size_t(kHostWidth) * kHostHeight);
+    const uint32_t frameWidth = kHostWidth * g_scale, frameHeight = kHostHeight * g_scale;
+    std::vector<uint32_t> pixels(size_t(frameWidth) * frameHeight);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, g_frameBuffer);
-    glReadPixels(0, 0, kHostWidth, kHostHeight, GL_BGRA, GL_UNSIGNED_BYTE, pixels.data());
+    glReadPixels(0, 0, frameWidth, frameHeight, GL_BGRA, GL_UNSIGNED_BYTE, pixels.data());
     if (FILE* file = fopen(path, "wb"))
     {
-        const uint32_t dataSize = kHostWidth * kHostHeight * 4;
+        const uint32_t dataSize = frameWidth * frameHeight * 4;
         uint8_t header[54]{};
         auto put = [&header](int offset, uint32_t value) { memcpy(header + offset, &value, 4); };
         header[0] = 'B';
@@ -537,8 +564,8 @@ static void SaveFrame(const char* path)
         put(2, 54 + dataSize);
         put(10, 54);
         put(14, 40);
-        put(18, kHostWidth);
-        put(22, kHostHeight); // bottom-up, as OpenGL returns the rows
+        put(18, frameWidth);
+        put(22, frameHeight); // bottom-up, as OpenGL returns the rows
         header[26] = 1;
         header[28] = 32;
         put(34, dataSize);
@@ -600,13 +627,27 @@ void RendererPresent()
         glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
         glClearColor(0, 0, 0, 1);
         glClear(GL_COLOR_BUFFER_BIT);
-        glBlitFramebuffer(0, 0, kHostWidth, kHostHeight, left, bottom, left + targetWidth, bottom + targetHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
+        glBlitFramebuffer(0, 0, kHostWidth * g_scale, kHostHeight * g_scale, left, bottom, left + targetWidth, bottom + targetHeight, GL_COLOR_BUFFER_BIT, GL_LINEAR);
         SDL_GL_SwapWindow(g_window);
     }
 
     // Back to the game's frame, cleared as the console does after each one.
+    // Draw the next frame at the smallest multiple of 1280x720 that covers the
+    // window, so nothing is enlarged afterwards. CD_SCALE=<n> forces it.
+    uint32_t wanted = 1;
+    if (GetConfig().sharp)
+    {
+        while (wanted < 4 && int(kHostWidth * wanted) < width && int(kHostHeight * wanted) < height)
+            wanted++;
+    }
+    static const char* forced = getenv("CD_SCALE");
+    if (forced != nullptr && atoi(forced) >= 1 && atoi(forced) <= 4)
+        wanted = uint32_t(atoi(forced));
+    if (wanted != g_scale && CreateFrameTargets(wanted))
+        Log("Renderer: drawing at %ux%u", kHostWidth * wanted, kHostHeight * wanted);
+
     glBindFramebuffer(GL_FRAMEBUFFER, g_frameBuffer);
-    glViewport(0, 0, kHostWidth, kHostHeight);
+    glViewport(0, 0, kHostWidth * g_scale, kHostHeight * g_scale);
     glDisable(GL_SCISSOR_TEST);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glDepthMask(GL_TRUE);

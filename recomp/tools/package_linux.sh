@@ -38,7 +38,7 @@ Steam Deck (NOT TESTED on a real Deck): in Desktop Mode do step 1, then in
 Steam choose "Add a Non-Steam Game" and pick crystal_defenders.sh. Do not force
 a compatibility tool: this is a Linux program.
 
-Needs: x86-64 Linux with glibc 2.38 or newer (SteamOS 3.6+), SDL2 and
+Needs: x86-64 Linux with glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36, SteamOS 3.5 and later), SDL2 and
 OpenGL 3.3.
 
 Keys (change them in crystal_defenders.ini, created on first launch):
@@ -48,8 +48,9 @@ Keys (change them in crystal_defenders.ini, created on first launch):
   F11 or Alt+Enter ... full screen
 Any controller SDL2 recognises works.
 
-Not in this build yet: the settings menu, the high-resolution mode, the
-achievement pop-up. Language, volume and keys are set in crystal_defenders.ini
+Not in this build yet: the settings menu and the
+achievement pop-up. Language, volume, keys and rendering are set in
+crystal_defenders.ini
 (section [jeu], langue = fr / en / de / es / it / ja).
 
 Saves and achievements: the userdata folder. Log: crystal_defenders.log.

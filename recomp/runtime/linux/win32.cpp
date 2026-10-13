@@ -13,6 +13,7 @@
 
 #include <atomic>
 #include <cerrno>
+#include <cstdarg>
 #include <chrono>
 #include <condition_variable>
 #include <filesystem>
@@ -890,4 +891,42 @@ UINT waveOutWrite(HWAVEOUT, WAVEHDR* header, UINT)
     g_audioQueued += header->dwBufferLength;
     g_audioPending.push_back({ header, g_audioQueued });
     return MMSYSERR_NOERROR;
+}
+
+// ---- Older C libraries ----
+// A recent compiler calls the C23 variants of these functions, which only exist
+// from glibc 2.38. Supplying them here, on top of the classic ones, lets the
+// program start on older systems. The only difference is the "0b" prefix,
+// which nothing here parses.
+extern "C"
+{
+long ClassicStrtol(const char*, char**, int) __asm__("strtol");
+unsigned long ClassicStrtoul(const char*, char**, int) __asm__("strtoul");
+long long ClassicStrtoll(const char*, char**, int) __asm__("strtoll");
+unsigned long long ClassicStrtoull(const char*, char**, int) __asm__("strtoull");
+int ClassicVsscanf(const char*, const char*, va_list) __asm__("vsscanf");
+
+long __isoc23_strtol(const char* text, char** end, int base) { return ClassicStrtol(text, end, base); }
+unsigned long __isoc23_strtoul(const char* text, char** end, int base) { return ClassicStrtoul(text, end, base); }
+long long __isoc23_strtoll(const char* text, char** end, int base) { return ClassicStrtoll(text, end, base); }
+unsigned long long __isoc23_strtoull(const char* text, char** end, int base) { return ClassicStrtoull(text, end, base); }
+int __isoc23_sscanf(const char* text, const char* format, ...)
+{
+    va_list arguments;
+    va_start(arguments, format);
+    int result = ClassicVsscanf(text, format, arguments);
+    va_end(arguments);
+    return result;
+}
+}
+
+// arc4random only exists from glibc 2.36, and the C++ library asks for it.
+// Supplying it keeps the program startable on glibc 2.35 (Ubuntu 22.04).
+#include <sys/random.h>
+extern "C" uint32_t arc4random()
+{
+    uint32_t value = 0;
+    if (getrandom(&value, sizeof(value), 0) != sizeof(value))
+        value = uint32_t(MonotonicNanos());
+    return value;
 }

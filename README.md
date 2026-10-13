@@ -50,21 +50,27 @@ Instead of step 3, you can drop the console's `CRYSTAL DEFENDERS` (or `58410989`
 folder next to `crystal_defenders.exe` before the first launch: the game is then
 installed from it without any question.
 
-### Linux and Steam Deck
+### Linux
 
-**Experimental, and untested on a real Steam Deck.**
+**Experimental.** So far it has only been run under WSL on a PC, with software
+rendering and no controller; nobody has tried it on a real Linux desktop or a
+Steam Deck yet.
 
-There is a native Linux build (SDL2 and OpenGL 3.3), which so far has only been
-run under WSL on a PC. It plays the game with sound, saves and controllers, but
-does not yet have the settings menu, the high-resolution mode, the achievement
-pop-up or the pause in background, and no ready-made Linux package exists: it
-has to be built on the machine (see below). It installs the game from a
-`CRYSTAL DEFENDERS` folder placed next to the program.
+A native build (SDL2 and OpenGL 3.3) for x86-64 Linux with glibc 2.35 or newer:
+Ubuntu 22.04, Debian 12, Fedora 36, SteamOS 3.5 and later. It needs SDL2 and
+OpenGL from the system; FFmpeg is built in.
 
-Alternatively the Windows release runs through Proton: add
-`crystal_defenders.exe` to Steam as a non-Steam game, force a Proton version in
-*Properties > Compatibility*, and put your `CRYSTAL DEFENDERS` folder next to
-it. It switches to full screen by itself on a Deck.
+1. Unpack the Linux release.
+2. Copy your `CRYSTAL DEFENDERS` (or `58410989`) folder into it.
+3. Run `crystal_defenders.sh`. The game is installed on the first launch.
+
+It has sound, saves, keyboard and controllers, six languages and the
+high-resolution rendering. It does not have the settings menu, the achievement
+pop-up or the pause in background yet: settings are changed in
+`crystal_defenders.ini`.
+
+On a Steam Deck, add `crystal_defenders.sh` to Steam as a non-Steam game, without
+forcing a compatibility tool. The Windows release also runs through Proton.
 
 ## Building
 
