@@ -1,6 +1,6 @@
 # CrystalDefendersRecomp
 
-**Unofficial** native PC port of *Crystal Defenders* (Xbox 360) – portage non officiel.
+**Unofficial** native PC port of *Crystal Defenders* (Xbox 360).
 
 A static recompilation of the Xbox Live Arcade game *Crystal Defenders*
 for Windows. The game's PowerPC code is translated to C++ with
@@ -10,17 +10,11 @@ written for this one game.
 **This repository contains no game data.** You need your own copy of the game.
 This project is not affiliated with or endorsed by Square Enix.
 
-*Portage PC non officiel de Crystal Defenders (Xbox 360). Aucune donnée du jeu
-n'est fournie : il faut votre propre copie.*
-
 ## Made with AI
 
 This port was written by an AI: [Claude Code](https://claude.com/claude-code)
 running Claude Opus 5.5, directed and play-tested by the repository's owner. The
 runtime, the tools and this documentation were all produced that way.
-
-*Ce portage a été réalisé par une IA, Claude Code (Claude Opus 5.5), dirigée et
-testée en jeu par le propriétaire du dépôt.*
 
 ## State
 
