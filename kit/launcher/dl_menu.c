@@ -166,7 +166,7 @@ void dl_menu_finish(void) {
   dl_sec_top = dl_sec_n;
   add_section(SEC_FOLDER, -1, 0xE8B7, dl_texts[T_FOLDER], dl_texts[T_H_FOLDER]);
   add_section(SEC_DEFAULTS, -1, 0xE7A7, dl_texts[T_DEFAULTS], dl_texts[T_H_DEFAULTS]);
-  add_section(SEC_RESET, -1, 0xE72C, dl_texts[T_RESET], dl_texts[T_H_RESET]);
+  if (dl_game->reset) add_section(SEC_RESET, -1, 0xE72C, dl_texts[T_RESET], dl_texts[T_H_RESET]); // a game that cannot restart has no such entry
   add_section(SEC_QUIT, -1, 0xE7E8, dl_texts[T_QUIT], dl_texts[T_H_QUIT]);
 }
 

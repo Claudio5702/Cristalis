@@ -12,7 +12,6 @@
 #include "config.h"
 #include "guest.h"
 #include "xex_header.h"
-#include "project.h" // WINDOW_CLASS
 
 extern "C"
 {
@@ -61,7 +60,6 @@ void (*g_runGuest)();
 int g_scaleSetting = 0;        // 0: 1280 x 720, 1: 2560 x 1440
 int g_languageSetting = 0;     // 0: Windows, then kGameLanguages
 int g_vibration = 1, g_liveNotice = 0, g_storageChoice = 0;
-bool g_relaunch;               // the program starts again once DarkLauncher has closed
 
 // The game's languages: Xbox language ids and their names, each written in itself.
 const struct { uint32_t id; const wchar_t* name; } kGameLanguages[] =
@@ -158,10 +156,10 @@ void ChooseLanguage(int value)
     if (value == g_languageSetting)
         return;
     g_languageSetting = value;
-    // DarkLauncher keeps its settings when it closes; the program then starts again (quit()).
-    g_relaunch = true;
-    if (HWND window = FindWindowW(L"" WINDOW_CLASS, nullptr))
-        PostMessageW(window, WM_CLOSE, 0, 0);
+    // The game reads its language once, at its start: the program starts again, with its settings
+    // kept. The new copy waits for this one to end (CD_WAIT_PID), as it still holds the log.
+    SetEnvironmentVariableA("CD_WAIT_PID", std::to_string(GetCurrentProcessId()).c_str());
+    dl_relaunch();
 }
 
 template <int N> void ChooseLanguageN() { ChooseLanguage(N); }
@@ -333,23 +331,6 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
     return int(count);
 }
 
-void Quit()
-{
-    if (!g_relaunch)
-        return;
-    // Started again with the same arguments; the new copy waits for this one to end (CD_WAIT_PID),
-    // by which time DarkLauncher has written its settings.
-    SetEnvironmentVariableA("CD_WAIT_PID", std::to_string(GetCurrentProcessId()).c_str());
-    std::wstring commandLine = GetCommandLineW();
-    STARTUPINFOW startup{ sizeof(startup) };
-    PROCESS_INFORMATION process{};
-    if (CreateProcessW(nullptr, commandLine.data(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &startup, &process))
-    {
-        CloseHandle(process.hThread);
-        CloseHandle(process.hProcess);
-    }
-}
-
 } // namespace
 
 void DlBridgePresent(const void* pixels, uint32_t width, uint32_t height, uint32_t pitch)
@@ -417,6 +398,5 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.start = Start;
     game.frame = Frame;
     game.setup = Setup;
-    game.quit = Quit;
     return dl_run(&game, argc, argv);
 }

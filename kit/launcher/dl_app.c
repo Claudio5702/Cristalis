@@ -18,6 +18,12 @@ const char *dl_audit_dir;
 static const char *gpu_check_dir;
 static int bench_secs; // --bench N: N seconds of play, then the frame rate and the sound's gaps
 static bool play_now;  // --play: straight into the game, without the setup screen
+static bool relaunch;  // dl_relaunch: started again once closed
+
+void dl_relaunch(void) {
+  relaunch = true;
+  dl_running = false;
+}
 
 // ---------------------------------------------------------------- settings file
 // Each value: its name in the file, its limits, its default, and what "Defaults" does with it
@@ -47,11 +53,27 @@ static void settings_load(void) {
   fclose(f);
 }
 
+static int saved[160]; // the values as last written
+
 static void settings_save(void) {
   FILE *f = fopen(ini_path, "w");
   if (!f) return;
-  for (int k = 0; k < setting_n; k++) fprintf(f, "%s=%d\n", settings[k].name, *settings[k].value);
+  for (int k = 0; k < setting_n; k++) {
+    fprintf(f, "%s=%d\n", settings[k].name, *settings[k].value);
+    saved[k] = *settings[k].value;
+  }
   fclose(f);
+}
+
+// Once a second while the program runs: a setting that changed is written at once, so that nothing
+// is lost if the program does not close normally.
+static void settings_follow(void) {
+  static DWORD at;
+  DWORD t = GetTickCount();
+  if (t - at < 1000) return;
+  at = t;
+  for (int k = 0; k < setting_n; k++)
+    if (saved[k] != *settings[k].value) { settings_save(); return; }
 }
 
 void dl_defaults(bool picture_only) {
@@ -570,6 +592,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   if (game->setup) game->setup();
   dl_menu_finish();
   settings_load();
+  for (int k = 0; k < setting_n; k++) saved[k] = *settings[k].value; // as read: nothing to write yet
 
   // window: where it was last time, otherwise 1280 x 800 in the middle of the screen
   WNDCLASSW wc = {0};
@@ -639,6 +662,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (!dl_running) break;
     dl_pad_poll();
     dl_gpu_follow(false);
+    if (!bench_secs) settings_follow();
     { // a note that has just ended goes away
       static bool noted;
       bool now_noted = dl_note_now() != NULL;
@@ -730,5 +754,16 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   settings_save();
   dl_gpu_stop();
   if (wave_out) { waveOutReset(wave_out); waveOutClose(wave_out); }
+  if (relaunch) { // the same program with the same command line, once this window is gone
+    DestroyWindow(dl_hwnd);
+    wchar_t exe[MAX_PATH];
+    STARTUPINFOW si = {sizeof si};
+    PROCESS_INFORMATION pi;
+    GetModuleFileNameW(NULL, exe, MAX_PATH);
+    if (CreateProcessW(exe, GetCommandLineW(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+      CloseHandle(pi.hThread);
+      CloseHandle(pi.hProcess);
+    }
+  }
   return 0;
 }

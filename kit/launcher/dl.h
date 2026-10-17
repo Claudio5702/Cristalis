@@ -156,7 +156,10 @@ int dl_lang(void);                              // language of the setup screen,
 const wchar_t *dl_tr(const wchar_t *const *t); // a DlText in that language
 void dl_redraw(void);                           // the setup screen has to be drawn again
 void dl_note(const wchar_t *text);              // a few words over the game (or in the pause menu) for a moment
-void dl_restart(void);                          // the game from the beginning ("Restart")
+void dl_restart(void);                          // the game from the beginning ("Restart"; shown only when the game has reset)
+// Closes the program as usual (the session and the settings are kept), then starts it again with the
+// same command line: for a change the game can only take at start (another language of its data...).
+void dl_relaunch(void);
 bool dl_in_game(void);                          // the game is being played (not the setup screen, not the preview before it)
 bool dl_gpu_on(void);                           // the picture goes through the graphics card now
 void dl_open_page(int page);                    // shows a page of the setup screen (from a list, the pause menu...)
