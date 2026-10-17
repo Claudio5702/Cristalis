@@ -679,6 +679,11 @@ int main(int argc, char* argv[])
             installOnly = true;
             i++;
         }
+        else if (strcmp(argv[i], "--ini") == 0 || strcmp(argv[i], "--ui-audit") == 0 || strcmp(argv[i], "--gpu-check") == 0 ||
+            strcmp(argv[i], "--bench") == 0)
+        {
+            i++; // DarkLauncher's options, with their value
+        }
         else if (strncmp(argv[i], "--", 2) != 0 && xexPath.empty())
         {
             xexPath = argv[i];
