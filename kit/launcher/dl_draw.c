@@ -1,0 +1,413 @@
+// Drawing of the setup screen on a logical 640 x 400 canvas, scaled to the window and centred:
+// panels, rows, switches, bars, the project's title and the sky behind them. GDI only.
+#include "dl_int.h"
+#include <math.h>
+
+double ui_s = 1;
+int ui_ox, ui_oy;
+HFONT f_item, f_small, f_help, f_help_small;
+static HFONT f_title, f_title_small;
+static int font_px;
+int dl_audit_issues;
+
+int PX(double v) { return (int)(v * ui_s + 0.5); }
+
+// --ui-audit: a text that does not fit is reported with where it was drawn
+void ui_audit_note(const char *what, const wchar_t *text) {
+  if (!dl_audit_dir) return;
+  printf("lang=%d mode=%d page=%d row=%d %s: %ls\n", dl_cfg.ui_lang, dl_mode, dl_cur, dl_sel, what, text);
+  dl_audit_issues++;
+}
+
+static const wchar_t *face(void) { return dl_cfg.ui_lang == 0 ? L"Yu Gothic UI" : L"Verdana"; }
+
+void ui_fonts(void) {
+  int px = PX(100);
+  static int font_lang = -1;
+  if (px == font_px && font_lang == dl_cfg.ui_lang) return;
+  font_px = px;
+  font_lang = dl_cfg.ui_lang;
+  HFONT *all[] = {&f_title, &f_title_small, &f_item, &f_small, &f_help, &f_help_small};
+  for (int k = 0; k < 6; k++)
+    if (*all[k]) DeleteObject(*all[k]);
+  f_help_small = CreateFontW(-PX(10.5), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
+  // title: a serif face drawn slightly narrow, with a larger initial (see ui_title)
+  f_title = CreateFontW(-PX(43), PX(14.5), 0, 0, FW_BOLD, 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Palatino Linotype");
+  f_title_small = CreateFontW(-PX(33), PX(11.5), 0, 0, FW_BOLD, 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Palatino Linotype");
+  f_item = CreateFontW(-PX(15), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
+  f_small = CreateFontW(-PX(11), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
+  f_help = CreateFontW(-PX(13), 0, 0, 0, FW_NORMAL, dl_cfg.ui_lang != 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
+}
+
+void ui_rect(HDC dc, double x0, double y0, double x1, double y1, COLORREF c) {
+  RECT r = {ui_ox + PX(x0), ui_oy + PX(y0), ui_ox + PX(x1), ui_oy + PX(y1)};
+  HBRUSH b = CreateSolidBrush(c);
+  FillRect(dc, &r, b);
+  DeleteObject(b);
+}
+
+void ui_rect_alpha(HDC dc, double x0, double y0, double x1, double y1, COLORREF c, int alpha) {
+  static HDC src;
+  static u32 *px;
+  if (!src) {
+    BITMAPINFO bi = {0};
+    bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    bi.bmiHeader.biWidth = 1;
+    bi.bmiHeader.biHeight = 1;
+    bi.bmiHeader.biPlanes = 1;
+    bi.bmiHeader.biBitCount = 32;
+    src = CreateCompatibleDC(dc);
+    SelectObject(src, CreateDIBSection(src, &bi, DIB_RGB_COLORS, (void **)&px, NULL, 0));
+  }
+  *px = ((u32)GetRValue(c) << 16) | ((u32)GetGValue(c) << 8) | GetBValue(c);
+  BLENDFUNCTION bf = {AC_SRC_OVER, 0, (BYTE)alpha, 0};
+  int X0 = ui_ox + PX(x0), Y0 = ui_oy + PX(y0);
+  AlphaBlend(dc, X0, Y0, ui_ox + PX(x1) - X0, ui_oy + PX(y1) - Y0, src, 0, 0, 1, 1, bf);
+}
+
+// Filled shape with rounded corners (r in logical units).
+void ui_round(HDC dc, double x0, double y0, double x1, double y1, COLORREF c, double r) {
+  HBRUSH b = CreateSolidBrush(c);
+  HGDIOBJ ob = SelectObject(dc, b), op = SelectObject(dc, GetStockObject(NULL_PEN));
+  int d = PX(r * 2);
+  RoundRect(dc, ui_ox + PX(x0), ui_oy + PX(y0), ui_ox + PX(x1) + 1, ui_oy + PX(y1) + 1, d, d);
+  SelectObject(dc, ob);
+  SelectObject(dc, op);
+  DeleteObject(b);
+}
+
+// A panel: rounded, letting the sky show through a little, with an optional title on its top edge.
+void ui_panel(HDC dc, double x0, double y0, double x1, double y1, COLORREF fill, const wchar_t *tab) {
+  int X0 = ui_ox + PX(x0), Y0 = ui_oy + PX(y0), X1 = ui_ox + PX(x1), Y1 = ui_oy + PX(y1), d = PX(12);
+  if (fill != RGB(0, 0, 0)) {
+    HRGN rg = CreateRoundRectRgn(X0, Y0, X1 + 1, Y1 + 1, d, d);
+    SelectClipRgn(dc, rg);
+    ui_rect_alpha(dc, x0, y0, x1, y1, fill, 205);
+    SelectClipRgn(dc, NULL);
+    DeleteObject(rg);
+  } else ui_round(dc, x0, y0, x1, y1, fill, 6);
+  HPEN pen = CreatePen(PS_SOLID, PX(1) < 1 ? 1 : PX(1), COL_EDGE);
+  HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, GetStockObject(NULL_BRUSH));
+  RoundRect(dc, X0, Y0, X1 + 1, Y1 + 1, d, d);
+  SelectObject(dc, op);
+  SelectObject(dc, ob);
+  DeleteObject(pen);
+  if (tab) {
+    SIZE sz;
+    SelectObject(dc, f_small);
+    GetTextExtentPoint32W(dc, tab, lstrlenW(tab), &sz);
+    double w = sz.cx / ui_s + 12;
+    ui_round(dc, x0 + 12, y0 - 8, x0 + 12 + w, y0 + 7, RGB(176, 206, 250), 4);
+    SetBkMode(dc, TRANSPARENT);
+    SetTextAlign(dc, TA_LEFT | TA_TOP);
+    SetTextColor(dc, RGB(8, 26, 84));
+    TextOutW(dc, ui_ox + PX(x0 + 18), ui_oy + PX(y0 - 7), tab, lstrlenW(tab));
+  }
+}
+
+void ui_text(HDC dc, HFONT f, double x, double y, const wchar_t *s, COLORREF c, UINT align) {
+  SelectObject(dc, f);
+  SetBkMode(dc, TRANSPARENT);
+  SetTextAlign(dc, align | TA_TOP);
+  SetTextColor(dc, c);
+  TextOutW(dc, ui_ox + PX(x), ui_oy + PX(y), s, lstrlenW(s));
+}
+
+// Like ui_text, but the text must fit in max_w logical units: the letters are drawn narrower first
+// (shorter too only below 3/4 of the width), and what still does not fit is clipped.
+void ui_text_fit(HDC dc, double x, double y, const wchar_t *s, COLORREF c, UINT align, double max_w) {
+  SIZE sz;
+  HFONT f = f_item;
+  double dy = 0;
+  SelectObject(dc, f);
+  GetTextExtentPoint32W(dc, s, lstrlenW(s), &sz);
+  HFONT made = NULL;
+  if (sz.cx > PX(max_w) && sz.cx > 0) {
+    TEXTMETRICW tm;
+    GetTextMetricsW(dc, &tm);
+    double ratio = (double)PX(max_w) / sz.cx * 0.98, tall = ratio < 0.75 ? ratio / 0.75 : 1.0;
+    if (ratio < 0.62) ui_audit_note("label squeezed", s);
+    int w = (int)(tm.tmAveCharWidth * (ratio < 0.75 ? 0.75 : ratio) * tall);
+    made = CreateFontW(-(int)(PX(15) * tall), w < 1 ? 1 : w, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
+    if (made) { f = made; dy = 7.5 * (1 - tall); }
+    else { f = f_small; dy = 2.5; }
+  }
+  double left = align == TA_CENTER ? x - max_w / 2 : align == TA_RIGHT ? x - max_w : x;
+  HRGN clip = CreateRectRgn(ui_ox + PX(left), ui_oy + PX(y - 2), ui_ox + PX(left + max_w), ui_oy + PX(y + 20));
+  SelectClipRgn(dc, clip);
+  ui_text(dc, f, x, y + dy, s, c, align);
+  SelectClipRgn(dc, NULL);
+  DeleteObject(clip);
+  if (made) { SelectObject(dc, f_item); DeleteObject(made); }
+}
+
+// ---- the project's name, tall serif capitals with a larger initial, in white with a night-blue edge
+static double title_path(HDC dc, double x, double base) {
+  static const struct { const wchar_t *text; bool big; } part[] = {{L"" PROJECT_LOGO_FIRST, true}, {L"" PROJECT_LOGO_REST, false}};
+  SetBkMode(dc, TRANSPARENT);
+  SetTextAlign(dc, TA_LEFT | TA_BASELINE);
+  SetTextCharacterExtra(dc, PX(2.2));
+  int px = ui_ox + PX(x);
+  BeginPath(dc);
+  for (int k = 0; k < 2; k++) {
+    SIZE sz;
+    int n = lstrlenW(part[k].text);
+    SelectObject(dc, part[k].big ? f_title : f_title_small);
+    TextOutW(dc, px, ui_oy + PX(base), part[k].text, n);
+    GetTextExtentPoint32W(dc, part[k].text, n, &sz);
+    px += sz.cx;
+  }
+  EndPath(dc);
+  SetTextCharacterExtra(dc, 0);
+  return (px - ui_ox) / ui_s;
+}
+
+void ui_title(HDC dc, double x, double base) {
+  // soft shadow, then a dark edge, then the metal
+  HBRUSH shade = CreateSolidBrush(RGB(4, 14, 60)), edge_fill = CreateSolidBrush(RGB(10, 30, 96));
+  HPEN edge = CreatePen(PS_SOLID, PX(3.2) < 2 ? 2 : PX(3.2), RGB(6, 22, 84));
+  HGDIOBJ old_brush = SelectObject(dc, shade), old_pen = SelectObject(dc, GetStockObject(NULL_PEN));
+  title_path(dc, x + 2.2, base + 2.6);
+  FillPath(dc);
+  SelectObject(dc, edge);
+  SelectObject(dc, edge_fill);
+  title_path(dc, x, base);
+  StrokeAndFillPath(dc);
+  double end = title_path(dc, x, base);
+  SelectClipPath(dc, RGN_COPY);
+  // white, with a faint blue towards the foot of the letters
+  int x0 = ui_ox + PX(x - 4), x1 = ui_ox + PX(end + 4), top = ui_oy + PX(base - 34), mid = ui_oy + PX(base - 13), bottom = ui_oy + PX(base + 4);
+  TRIVERTEX v[4] = {{x0, top, 0xFF00, 0xFF00, 0xFF00, 0}, {x1, mid, 0xFF00, 0xFF00, 0xFF00, 0},
+                    {x0, mid, 0xFF00, 0xFF00, 0xFF00, 0}, {x1, bottom, 0xC400, 0xDC00, 0xFF00, 0}};
+  GRADIENT_RECT gr[2] = {{0, 1}, {2, 3}};
+  GradientFill(dc, v, 4, gr, 2, GRADIENT_FILL_RECT_V);
+  SelectClipRgn(dc, NULL);
+  SelectObject(dc, old_brush);
+  SelectObject(dc, old_pen);
+  DeleteObject(shade);
+  DeleteObject(edge_fill);
+  DeleteObject(edge);
+  // thin rule under the name, fading out to the right
+  TRIVERTEX r[2] = {{ui_ox + PX(x), ui_oy + PX(base + 6.5), 0xFF00, 0xFF00, 0xFF00, 0},
+                    {ui_ox + PX(end + 40), ui_oy + PX(base + 6.5) + (PX(1.2) < 1 ? 1 : PX(1.2)), 0x1000, 0x3800, 0xA000, 0}};
+  GRADIENT_RECT rr = {0, 1};
+  GradientFill(dc, r, 2, &rr, 1, GRADIENT_FILL_RECT_H);
+  // beside it: the subtitle in spaced capitals, and what the program is
+  static HFONT f_sub1, f_sub2;
+  static int sub_px = -1, sub_lang = -1;
+  if (sub_px != font_px || sub_lang != dl_cfg.ui_lang) {
+    if (f_sub1) DeleteObject(f_sub1);
+    if (f_sub2) DeleteObject(f_sub2);
+    bool jp = dl_cfg.ui_lang == 0;
+    f_sub1 = CreateFontW(-PX(16), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Palatino Linotype");
+    f_sub2 = CreateFontW(-PX(13), 0, 0, 0, FW_NORMAL, jp ? 0 : 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, jp ? L"Yu Mincho" : L"Palatino Linotype");
+    sub_px = font_px;
+    sub_lang = dl_cfg.ui_lang;
+  }
+  static wchar_t caps[64];
+  if (!caps[0]) { lstrcpynW(caps, L"" PROJECT_SUBTITLE, 64); CharUpperW(caps); }
+  SetTextCharacterExtra(dc, PX(2.0));
+  ui_text(dc, f_sub1, end + 46, base - 30, caps, RGB(4, 14, 60), TA_LEFT);
+  ui_text(dc, f_sub1, end + 45, base - 31, caps, RGB(255, 255, 255), TA_LEFT);
+  SetTextCharacterExtra(dc, 0);
+  if (dl_game && dl_game->subtitle) {
+    const wchar_t *s = dl_tr(dl_game->subtitle);
+    ui_text(dc, f_sub2, end + 46, base - 9, s, RGB(4, 14, 60), TA_LEFT);
+    ui_text(dc, f_sub2, end + 45, base - 10, s, RGB(214, 228, 255), TA_LEFT);
+  }
+}
+
+void ui_bar(HDC dc, double x0, double y, double x1, int value, int max) {
+  double w = (x1 - x0 - 8) / max;
+  for (int k = 0; k < max; k++)
+    ui_rect(dc, x0 + 4 + k * w, y + 5, x0 + 4 + (k + 1) * w - 1.5, y + 13, k < value ? COL_VALUE : RGB(30, 56, 118));
+}
+
+// A row of a page at height y (logical), h high. sw >= 0: a switch (0 off, 1 on); plain: a value that is
+// only shown (no < > arrows); bar_max > 0: a bar.
+void ui_row(HDC dc, double y, double h, bool sel, const wchar_t *label, const wchar_t *value, int sw, bool plain, int bar, int bar_max) {
+  if (y + h > PANEL_BOTTOM + 1) ui_audit_note("row under the panel", label);
+  if (sel) ui_round(dc, ROW_X0, y - 1, ROW_X1, y + h - 2, RGB(34, 84, 184), 4);
+  bool has_value = value || bar_max || sw >= 0;
+  ui_text_fit(dc, ROW_X0 + 9, y, label, sel ? COL_SEL : RGB(240, 242, 255), TA_LEFT,
+              !has_value ? ROW_X1 - ROW_X0 - 16 : sw >= 0 ? ROW_X1 - ROW_X0 - 56 : VAL_X0 - ROW_X0 - 13); // a switch leaves more room
+  if (!has_value) return;
+  if (sw >= 0) { // a pill with a knob on the side of its state
+    double x1 = VAL_X1 - 2, x0 = x1 - 30, cy = y + 8;
+    ui_round(dc, x0, cy - 7, x1, cy + 7, sw ? RGB(240, 246, 255) : RGB(44, 72, 140), 7);
+    double kx = sw ? x1 - 7 : x0 + 7;
+    ui_round(dc, kx - 5, cy - 5, kx + 5, cy + 5, sw ? RGB(12, 40, 110) : RGB(214, 228, 252), 5);
+    return;
+  }
+  ui_round(dc, VAL_X0, y, VAL_X1, y + h - 4, RGB(6, 18, 58), 4);
+  if (bar_max) ui_bar(dc, VAL_X0, y, VAL_X1, bar, bar_max);
+  else ui_text_fit(dc, (VAL_X0 + VAL_X1) / 2, y, value, COL_VALUE, TA_CENTER, sel && !plain ? VAL_W - 30 : VAL_W - 4); // selected: room for < >
+  if (sel && value && !bar_max && !plain) {
+    ui_text(dc, f_item, VAL_X0 + 5, y, L"<", RGB(255, 255, 255), TA_LEFT);
+    ui_text(dc, f_item, VAL_X1 - 5, y, L">", RGB(255, 255, 255), TA_RIGHT);
+  }
+}
+
+// For the game's previews (dl.h).
+void dl_ui_text(void *dc, double x, double y, const wchar_t *s, uint32_t rgb, int align, bool small) {
+  ui_text(dc, small ? f_small : f_item, x, y, s, RGB(rgb >> 16, (rgb >> 8) & 255, rgb & 255), align == 1 ? TA_CENTER : align == 2 ? TA_RIGHT : TA_LEFT);
+}
+void dl_ui_box(void *dc, double x0, double y0, double x1, double y1, uint32_t rgb, double radius) {
+  COLORREF c = RGB(rgb >> 16, (rgb >> 8) & 255, rgb & 255);
+  if (radius > 0) ui_round(dc, x0, y0, x1, y1, c, radius);
+  else ui_rect(dc, x0, y0, x1, y1, c);
+}
+
+// Icons of the navigation bar: the symbol font of Windows 10 and 11, or none.
+HFONT ui_icons(HDC dc) {
+  static HFONT f;
+  static int px = -1, ok = -1;
+  if (px != PX(13)) {
+    if (f) DeleteObject(f);
+    px = PX(13);
+    f = CreateFontW(-px, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Segoe MDL2 Assets");
+    wchar_t got[64] = L"";
+    HGDIOBJ of = SelectObject(dc, f);
+    GetTextFaceW(dc, 64, got);
+    SelectObject(dc, of);
+    ok = !lstrcmpiW(got, L"Segoe MDL2 Assets");
+  }
+  return ok > 0 ? f : NULL;
+}
+
+// ---- the backdrop: a deep blue sky over a sea of clouds, computed (layered value noise)
+static double sky_cell(int x, int y) {
+  u32 h = (u32)x * 374761393u + (u32)y * 668265263u;
+  h = (h ^ (h >> 13)) * 1274126177u;
+  return ((h ^ (h >> 16)) & 0xFFFF) / 65535.0;
+}
+
+static double sky_noise(double x, double y) {
+  int ix = (int)floor(x), iy = (int)floor(y);
+  double fx = x - ix, fy = y - iy;
+  fx = fx * fx * (3 - 2 * fx);
+  fy = fy * fy * (3 - 2 * fy);
+  double a = sky_cell(ix, iy), b = sky_cell(ix + 1, iy), c = sky_cell(ix, iy + 1), d = sky_cell(ix + 1, iy + 1);
+  return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+}
+
+static double sky_clouds(double x, double y) { // 0..1, four layers
+  double sum = 0, amp = 0.5;
+  for (int k = 0; k < 4; k++) { sum += sky_noise(x, y) * amp; x = x * 2.03 + 17.1; y = y * 2.03 + 5.3; amp *= 0.5; }
+  return sum / 0.9375;
+}
+
+static double sky_step(double lo, double hi, double v) {
+  double t = (v - lo) / (hi - lo);
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  return t * t * (3 - 2 * t);
+}
+
+static void sky_pixel(double u, double v, double aspect, double *rgb) {
+  static const double stops[5][4] = { // height in the sky (0 = top, 1 = horizon), colour
+      {0.00, 4, 20, 92}, {0.45, 12, 52, 160}, {0.78, 44, 112, 216}, {0.93, 160, 200, 244}, {1.00, 236, 245, 255}};
+  const double horizon = 0.60, haze[3] = {236, 245, 255};
+  if (v < horizon) {
+    double t = v / horizon;
+    int k = 0;
+    while (k < 3 && t > stops[k + 1][0]) k++;
+    double f = (t - stops[k][0]) / (stops[k + 1][0] - stops[k][0]);
+    for (int c = 0; c < 3; c++) rgb[c] = stops[k][c + 1] + (stops[k + 1][c + 1] - stops[k][c + 1]) * f;
+    // long thin white clouds, denser and brighter towards the horizon
+    double wisp = sky_step(0.50, 0.78, sky_clouds(u * aspect * 2.6, v * 14.0)) * (0.22 + 0.74 * t);
+    static const double lit[3] = {246, 250, 255};
+    for (int c = 0; c < 3; c++) rgb[c] += (lit[c] - rgb[c]) * wisp;
+  } else {
+    // the cloud sea: the same noise laid flat and seen in perspective, fading into the haze
+    double p = (v - horizon) / (1 - horizon), z = 1 / (p + 0.055);
+    double n = sky_clouds((u - 0.5) * aspect * z * 0.55 + 40, z * 0.9);
+    double crest = sky_step(0.38, 0.70, n);
+    static const double deep[3] = {10, 52, 164}, mid[3] = {78, 142, 228}, top[3] = {250, 252, 255};
+    for (int c = 0; c < 3; c++) {
+      double base = deep[c] + (mid[c] - deep[c]) * sky_step(0.25, 0.55, n);
+      rgb[c] = base + (top[c] - base) * crest;
+    }
+    double fog = exp(-p * 7.5);
+    for (int c = 0; c < 3; c++) rgb[c] += (haze[c] - rgb[c]) * fog;
+    double dark = 1 - 0.38 * p * p; // heavier towards the bottom edge
+    for (int c = 0; c < 3; c++) rgb[c] *= dark;
+  }
+}
+
+// The player's own backdrop instead of the sky: launcher_bg.png (or .jpg, .bmp, .gif) next to the
+// program, scaled to cover the window with its proportions kept (made again when the size changes).
+// False when there is none.
+bool backdrop_draw(HDC dc, int cw, int ch) {
+  static bool tried;
+  static HBITMAP pic;
+  static int iw, ih;
+  if (!tried) {
+    tried = true;
+    static const char *const names[] = {"launcher_bg.png", "launcher_bg.jpg", "launcher_bg.bmp", "launcher_bg.gif"};
+    for (int k = 0; k < 4 && !pic; k++) {
+      char p[MAX_PATH];
+      snprintf(p, sizeof p, "%s%s", dl_base_dir, names[k]);
+      if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) pic = dl_picture_load(p, &iw, &ih);
+    }
+  }
+  if (!pic || iw <= 0 || ih <= 0) return false;
+  static HDC cache, src;
+  static HBITMAP cache_bmp;
+  static int cache_w, cache_h;
+  if (!cache) { cache = CreateCompatibleDC(dc); src = CreateCompatibleDC(dc); SelectObject(src, pic); }
+  if (cw != cache_w || ch != cache_h) {
+    HBITMAP nb = CreateCompatibleBitmap(dc, cw, ch);
+    SelectObject(cache, nb);
+    if (cache_bmp) DeleteObject(cache_bmp);
+    cache_bmp = nb;
+    cache_w = cw;
+    cache_h = ch;
+    int sw = iw, sh = (int)((s64)iw * ch / cw); // "cover": the picture cut to the window's proportions
+    if (sh > ih) { sh = ih; sw = (int)((s64)ih * cw / ch); }
+    SetStretchBltMode(cache, HALFTONE);
+    SetBrushOrgEx(cache, 0, 0, NULL);
+    StretchBlt(cache, 0, 0, cw, ch, src, (iw - sw) / 2, (ih - sh) / 2, sw, sh, SRCCOPY);
+  }
+  BitBlt(dc, 0, 0, cw, ch, cache, 0, 0, SRCCOPY);
+  return true;
+}
+
+// Computed at half the window's size when that size changes, then kept.
+void sky_draw(HDC dc, int cw, int ch) {
+  static HDC cache;
+  static HBITMAP cache_bmp;
+  static int cache_w, cache_h;
+  if (!cache) cache = CreateCompatibleDC(dc);
+  if (cw != cache_w || ch != cache_h) {
+    int w = cw / 2 < 320 ? 320 : cw / 2, h = ch / 2 < 200 ? 200 : ch / 2;
+    u32 *px = malloc((size_t)w * (size_t)h * 4);
+    HBITMAP nb = CreateCompatibleBitmap(dc, cw, ch);
+    SelectObject(cache, nb);
+    if (cache_bmp) DeleteObject(cache_bmp);
+    cache_bmp = nb;
+    cache_w = cw;
+    cache_h = ch;
+    if (px) {
+      double aspect = (double)w / h;
+      for (int y = 0; y < h; y++)
+        for (int x = 0; x < w; x++) {
+          double rgb[3];
+          sky_pixel((x + 0.5) / w, (y + 0.5) / h, aspect, rgb);
+          u32 c = 0;
+          for (int k = 0; k < 3; k++) { int q = (int)(rgb[k] + 0.5); c = (c << 8) | (u32)(q < 0 ? 0 : q > 255 ? 255 : q); }
+          px[(size_t)y * (size_t)w + (size_t)x] = c;
+        }
+      BITMAPINFO bi = {0};
+      bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+      bi.bmiHeader.biWidth = w;
+      bi.bmiHeader.biHeight = -h;
+      bi.bmiHeader.biPlanes = 1;
+      bi.bmiHeader.biBitCount = 32;
+      SetStretchBltMode(cache, HALFTONE);
+      SetBrushOrgEx(cache, 0, 0, NULL);
+      StretchDIBits(cache, 0, 0, cw, ch, 0, 0, w, h, px, &bi, DIB_RGB_COLORS, SRCCOPY);
+      free(px);
+    }
+  }
+  BitBlt(dc, 0, 0, cw, ch, cache, 0, 0, SRCCOPY);
+}

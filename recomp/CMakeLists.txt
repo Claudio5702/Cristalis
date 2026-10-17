@@ -51,9 +51,22 @@ set(RUNTIME_SOURCES
 
 if(WIN32)
     enable_language(RC)
-    add_executable(crystal_defenders ${RUNTIME_SOURCES}
-        runtime/renderer.cpp
-        resources/crystal_defenders.rc)
+    # DarkLauncher (kit/launcher, copied from the DarkLauncher kit): the window, the settings screen,
+    # the controls and the sound output of the game; the game's side is runtime/darklauncher.cpp.
+    option(CD_DARKLAUNCHER "Run the game inside DarkLauncher" OFF)
+    set(PLATFORM_SOURCES runtime/renderer.cpp resources/crystal_defenders.rc)
+    if(CD_DARKLAUNCHER)
+        file(GLOB DARKLAUNCHER_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../kit/launcher/*.c)
+        set_source_files_properties(${DARKLAUNCHER_SOURCES} PROPERTIES COMPILE_OPTIONS "-std=c11;-Wno-missing-braces")
+        list(APPEND PLATFORM_SOURCES runtime/darklauncher.cpp ${DARKLAUNCHER_SOURCES})
+    endif()
+    add_executable(crystal_defenders ${RUNTIME_SOURCES} ${PLATFORM_SOURCES})
+    if(CD_DARKLAUNCHER)
+        target_compile_definitions(crystal_defenders PRIVATE CD_DARKLAUNCHER)
+        # dl.h, and the project's project.h at the root of the repository
+        target_include_directories(crystal_defenders PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../kit/launcher ${CMAKE_CURRENT_SOURCE_DIR}/..)
+        target_link_libraries(crystal_defenders PRIVATE dwmapi gdi32 user32 shell32)
+    endif()
 
     # FFmpeg (LGPL, shared build) decodes the game's XMA audio.
     set(FFMPEG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../tools/ffmpeg/ffmpeg-n8.1-latest-win64-lgpl-shared-8.1)

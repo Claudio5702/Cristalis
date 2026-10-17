@@ -1,0 +1,10 @@
+DarkLauncher 81ba96d, copied from C:\Users\darkw\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h 9BBB36B36DB81E0F
+file dl_app.c 2F3F4333AF395421
+file dl_draw.c 48403B24DF2A2FFE
+file dl_gpu.c FAEEDEC64CE08412
+file dl_input.c 1153D2486BD9F864
+file dl_int.h 4DA90A9102B7A03E
+file dl_menu.c 81D6713084BC371D
+file dl_saves.c E19D108C6DBCD178
+file dl_text.c 3336FBE41A1D37B1

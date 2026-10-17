@@ -7,6 +7,9 @@
 //    frame of 5.1 float audio, which it submits back for playback.
 // XMA is decoded with FFmpeg; playback goes through waveOut.
 #include "config.h"
+#ifdef CD_DARKLAUNCHER
+#include "dl_bridge.h"
+#endif
 #include "content.h"
 #include "gpu.h"
 #include "kernel_objects.h"
@@ -649,7 +652,11 @@ static void RenderThread()
     format.nAvgBytesPerSec = 48000 * 4;
 
     HWAVEOUT device = nullptr;
+#ifdef CD_DARKLAUNCHER
+    if (false) // DarkLauncher plays the sound (DlBridgeAudio below)
+#else
     if (waveOutOpen(&device, WAVE_MAPPER, &format, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR)
+#endif
     {
         Log("Audio: no output device, the mixer runs without sound");
         device = nullptr;
@@ -728,6 +735,10 @@ static void RenderThread()
             fflush(dump);
         }
 
+#ifdef CD_DARKLAUNCHER
+        // Waits while enough sound is already waiting: DarkLauncher's playback sets the pace.
+        DlBridgeAudio(storage[next], kFramesPerBuffer * kFrameSamples);
+#else
         if (device != nullptr)
         {
             headers[next].dwFlags &= ~WHDR_DONE;
@@ -737,6 +748,7 @@ static void RenderThread()
         {
             Sleep(kFramesPerBuffer * kFrameSamples * 1000 / 48000);
         }
+#endif
         next = (next + 1) % kBufferCount;
 
         // CD_STATS=1: one line roughly every five seconds.

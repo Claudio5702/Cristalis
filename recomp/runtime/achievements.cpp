@@ -5,6 +5,9 @@
 // descriptions come from the title's own resource data inside the executable.
 #include "achievements.h"
 #include "translations.h"
+#ifdef CD_DARKLAUNCHER
+#include "dl_bridge.h"
+#endif
 #include "content.h"
 #include "guest.h"
 #include "xex_header.h"
@@ -222,6 +225,12 @@ static LRESULT CALLBACK ToastProc(HWND window, UINT message, WPARAM wParam, LPAR
 // the keyboard focus away from the game.
 static void ShowToast(std::wstring title, std::wstring body)
 {
+#ifdef CD_DARKLAUNCHER
+    for (wchar_t& c : body)
+        c = c == L'\n' ? L' ' : c;
+    DlBridgeNote((title + L" : " + body).c_str());
+    return;
+#endif
     std::thread([title = std::move(title), body = std::move(body)]
     {
         static std::mutex oneAtATime;

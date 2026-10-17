@@ -4,6 +4,9 @@
 #include "guest.h"
 #include "launcher.h"
 #include "setup.h"
+#ifdef CD_DARKLAUNCHER
+#include "dl_bridge.h"
+#endif
 #include "xex_header.h"
 
 #include <windows.h>
@@ -642,6 +645,26 @@ static void CrashSignal(int, siginfo_t* info, void*)
 }
 #endif
 
+// The game's main thread: its thread block and the top of its stack, made by main().
+static uint32_t g_mainPcr;
+static uint32_t g_mainStackTop;
+
+// Runs the game's own code from its entry point, on the calling thread.
+static void RunGuest()
+{
+    PPCContext ctx{};
+    // Start from the host MXCSR so floating point exceptions stay masked.
+    ctx.fpscr.loadFromHost();
+    GuestRegisterContext(&ctx);
+    if (const char* sample = getenv("CD_SAMPLE"))
+        std::thread(SamplerThread, atoi(sample)).detach();
+    ctx.r1.u64 = g_mainStackTop - 0x100;
+    ctx.r13.u64 = g_mainPcr;
+    (PPC_LOOKUP_FUNC(g_base, g_xex.entryPoint))(ctx, g_base);
+
+    Log("Guest entry point returned (r3=%08X).", ctx.r3.u32);
+}
+
 int main(int argc, char* argv[])
 {
     // Started without a path (double click on the program): work from the
@@ -822,24 +845,18 @@ int main(int argc, char* argv[])
     Log("Loaded %s: %zu functions, entry point %08X, %zu/%zu imports implemented",
         xexPath.c_str(), functionCount, g_xex.entryPoint, implemented, g_importCount);
 
-    uint32_t stackTop = 0;
-    uint32_t pcr = GuestCreateThreadBlock(g_xex.stackSize, stackTop);
-    if (pcr == 0)
+    g_mainPcr = GuestCreateThreadBlock(g_xex.stackSize, g_mainStackTop);
+    if (g_mainPcr == 0)
     {
         Log("Unable to allocate the main guest thread.");
         return 1;
     }
 
-    PPCContext ctx{};
-    // Start from the host MXCSR so floating point exceptions stay masked.
-    ctx.fpscr.loadFromHost();
-    GuestRegisterContext(&ctx);
-    if (const char* sample = getenv("CD_SAMPLE"))
-        std::thread(SamplerThread, atoi(sample)).detach();
-    ctx.r1.u64 = stackTop - 0x100;
-    ctx.r13.u64 = pcr;
-    (PPC_LOOKUP_FUNC(g_base, g_xex.entryPoint))(ctx, g_base);
-
-    Log("Guest entry point returned (r3=%08X).", ctx.r3.u32);
+#ifdef CD_DARKLAUNCHER
+    // DarkLauncher keeps this thread for its window; the game runs in its own.
+    return DarkLauncherMain(argc, argv, RunGuest);
+#else
+    RunGuest();
     return 0;
+#endif
 }

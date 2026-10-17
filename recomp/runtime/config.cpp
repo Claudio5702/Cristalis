@@ -235,6 +235,7 @@ static Config Load()
     Config config;
     Parse(config, kDefaultFile);
 
+#ifndef CD_DARKLAUNCHER // DarkLauncher keeps the settings in its own file (see darklauncher.cpp)
     std::string text;
     if (FILE* file = fopen(kFileName, "rb"))
     {
@@ -253,6 +254,7 @@ static Config Load()
         fclose(created);
         Log("Config: %s created with the default settings", kFileName);
     }
+#endif
 
     if (OnSteamDeck())
     {
@@ -284,6 +286,10 @@ const Config& GetConfig()
 
 void ConfigSave(const char* section, const char* key, const char* value)
 {
+#ifdef CD_DARKLAUNCHER
+    (void)section, (void)key, (void)value;
+    return; // DarkLauncher writes the settings
+#endif
     std::string text;
     if (FILE* file = fopen(kFileName, "rb"))
     {

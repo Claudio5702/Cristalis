@@ -1,5 +1,8 @@
 #include "renderer.h"
 #include "config.h"
+#ifdef CD_DARKLAUNCHER
+#include "dl_bridge.h"
+#endif
 #include "translations.h"
 #include "guest.h"
 #include "xex_header.h"
@@ -399,6 +402,11 @@ static void WatchMenuButtons(HWND window)
 HostPad RendererPad()
 {
     HostPad pad;
+#ifdef CD_DARKLAUNCHER
+    // DarkLauncher reads the keyboard and the controllers.
+    pad.buttons = DlBridgeButtons();
+    return pad;
+#endif
     pad.buttons = KeyboardButtons();
 
     struct XInputState
@@ -560,6 +568,18 @@ using D3DCompileFunction = HRESULT(WINAPI*)(LPCVOID, SIZE_T, LPCSTR, const void*
 
 bool RendererInit()
 {
+#ifdef CD_DARKLAUNCHER
+    // DarkLauncher has the window: the game draws off screen, and each picture is read back for it.
+    HRESULT result = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &g_device, nullptr,
+        &g_context);
+    if (FAILED(result))
+    {
+        Log("Renderer: D3D11CreateDevice failed (%08lX)", result);
+        return false;
+    }
+    CreateFrameTargets(DlBridgeScale());
+    Log("Renderer: off screen for DarkLauncher, drawing at %ux%u", kHostWidth * g_scale, kHostHeight * g_scale);
+#else
     std::thread(WindowThread).detach();
     while (g_window.load() == nullptr)
         Sleep(1);
@@ -593,6 +613,7 @@ bool RendererInit()
         factory->Release();
     }
     CreateBackBufferView();
+#endif
 
     HMODULE compiler = LoadLibraryW(L"d3dcompiler_47.dll");
     auto compile = compiler ? (D3DCompileFunction)(void*)GetProcAddress(compiler, "D3DCompile") : nullptr;
@@ -1624,8 +1645,59 @@ static void ShowFrame()
     g_swapChain->Present(0, 0);
 }
 
+#ifdef CD_DARKLAUNCHER
+// The picture just drawn goes to DarkLauncher (which waits for it); the game is held there until
+// DarkLauncher asks for the next one.
+static void DarkLauncherPresent()
+{
+    FlushBatch();
+    static ID3D11Texture2D* staging;
+    static uint32_t stagingScale;
+    if (staging == nullptr || stagingScale != g_scale)
+    {
+        if (staging != nullptr)
+            staging->Release();
+        D3D11_TEXTURE2D_DESC desc{};
+        desc.Width = kHostWidth * g_scale;
+        desc.Height = kHostHeight * g_scale;
+        desc.MipLevels = desc.ArraySize = 1;
+        desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.Usage = D3D11_USAGE_STAGING;
+        desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        staging = nullptr;
+        g_device->CreateTexture2D(&desc, nullptr, &staging);
+        stagingScale = g_scale;
+    }
+    D3D11_MAPPED_SUBRESOURCE mapped{};
+    if (staging != nullptr)
+    {
+        g_context->CopyResource(staging, g_frameTexture);
+        if (SUCCEEDED(g_context->Map(staging, 0, D3D11_MAP_READ, 0, &mapped)))
+        {
+            DlBridgePresent(mapped.pData, kHostWidth * g_scale, kHostHeight * g_scale, mapped.RowPitch);
+            g_context->Unmap(staging, 0);
+        }
+    }
+
+    g_context->ClearDepthStencilView(g_depthView, D3D11_CLEAR_DEPTH, 1.0f, 0);
+    uint32_t wanted = DlBridgeScale();
+    if (wanted != g_scale)
+    {
+        CreateFrameTargets(wanted);
+        Log("Renderer: drawing at %ux%u", kHostWidth * wanted, kHostHeight * wanted);
+    }
+    g_context->ClearRenderTargetView(g_frameView, g_clearColor);
+}
+#endif
+
 void RendererPresent()
 {
+#ifdef CD_DARKLAUNCHER
+    if (g_device != nullptr)
+        DarkLauncherPresent();
+    return;
+#endif
     if (g_swapChain == nullptr)
         return;
     FlushBatch();

@@ -7,6 +7,8 @@
 !/LICENSE
 !/build.ps1
 !/recompile.ps1
+!/project.h
+!/kit/
 !/recomp/
 
 /recomp/*

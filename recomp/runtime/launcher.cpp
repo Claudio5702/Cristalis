@@ -13,7 +13,7 @@
 // CD_LAUNCHER_KEYS (up, down, left, right, enter, escape), then quits.
 #include "launcher.h"
 
-#ifndef _WIN32
+#if !defined(_WIN32) || defined(CD_DARKLAUNCHER)
 bool LauncherRun(int, char*[])
 {
     return true;
