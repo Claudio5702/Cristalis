@@ -4,6 +4,7 @@
 // drawing differs (overlay.cpp instead of GDI).
 #include "renderer.h"
 #include "config.h"
+#include "translations.h"
 #include "guest.h"
 #include "overlay.h"
 #include "xex_header.h"
@@ -814,7 +815,7 @@ static struct
 
 static std::wstring MenuText(const wchar_t* french, const wchar_t* english)
 {
-    return GuestLanguage() == 4 ? french : english;
+    return Translate(french, english);
 }
 
 static void WindowSize(int& width, int& height)
@@ -861,7 +862,7 @@ static std::vector<OverlayItem> MenuItems(std::wstring& title, std::wstring& mes
     if (!g_menuOpen)
     {
         // Not the menu: the notice shown while the game waits in the background.
-        title = L"Pause";
+        title = MenuText(L"Pause", L"Pause");
         message = MenuText(L"Le jeu reprendra quand sa fenêtre sera de nouveau active.",
             L"The game will resume when its window is active again.");
         return items;
@@ -916,7 +917,7 @@ static std::vector<OverlayItem> MenuItems(std::wstring& title, std::wstring& mes
         items.push_back({ MenuText(L"Résolution", L"Resolution"), MenuSizeText(width, height) });
         items.push_back({ MenuText(L"Rendu", L"Rendering"), config.sharp ? MenuText(L"Net", L"Sharp") : MenuText(L"Lisse", L"Smooth") });
         items.push_back({ MenuText(L"Plein écran", L"Full screen"), onOff(g_fullscreen) });
-        items.push_back({ L"Volume", std::to_wstring(config.volume) + L" %" });
+        items.push_back({ MenuText(L"Volume", L"Volume"), std::to_wstring(config.volume) + L" %" });
         items.push_back({ MenuText(L"Vibrations", L"Vibration"), onOff(config.vibration) });
         items.push_back({ MenuText(L"Pause en arrière-plan", L"Pause in background"), onOff(config.pauseInBackground) });
         items.push_back({ MenuText(L"Quitter le jeu", L"Quit the game"), L"" });

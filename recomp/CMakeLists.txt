@@ -45,6 +45,7 @@ set(RUNTIME_SOURCES
     runtime/xam_content.cpp
     runtime/setup.cpp
     runtime/launcher.cpp
+    runtime/translations.cpp
     runtime/imports.cpp
     runtime/imports.gen.cpp)
 

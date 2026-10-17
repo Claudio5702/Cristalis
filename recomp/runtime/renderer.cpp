@@ -1,5 +1,6 @@
 #include "renderer.h"
 #include "config.h"
+#include "translations.h"
 #include "guest.h"
 #include "xex_header.h"
 
@@ -1024,7 +1025,7 @@ static struct
 
 static std::wstring MenuText(const wchar_t* french, const wchar_t* english)
 {
-    return GuestLanguage() == 4 ? french : english;
+    return Translate(french, english);
 }
 
 static std::vector<MenuItem> MenuItems(std::wstring& title, std::wstring& message)
@@ -1037,7 +1038,7 @@ static std::vector<MenuItem> MenuItems(std::wstring& title, std::wstring& messag
     if (!g_menuOpen)
     {
         // Not the menu: the notice shown while the game waits in the background.
-        title = L"Pause";
+        title = MenuText(L"Pause", L"Pause");
         message = MenuText(L"Le jeu reprendra quand sa fenêtre sera de nouveau active.",
             L"The game will resume when its window is active again.");
         return items;
@@ -1093,7 +1094,7 @@ static std::vector<MenuItem> MenuItems(std::wstring& title, std::wstring& messag
         items.push_back({ MenuText(L"Résolution", L"Resolution"), MenuSizeText(LONG(g_backWidth), LONG(g_backHeight)) });
         items.push_back({ MenuText(L"Rendu", L"Rendering"), config.sharp ? MenuText(L"Net", L"Sharp") : MenuText(L"Lisse", L"Smooth") });
         items.push_back({ MenuText(L"Plein écran", L"Full screen"), onOff(g_fullscreen) });
-        items.push_back({ L"Volume", std::to_wstring(config.volume) + L" %" });
+        items.push_back({ MenuText(L"Volume", L"Volume"), std::to_wstring(config.volume) + L" %" });
         items.push_back({ MenuText(L"Vibrations", L"Vibration"), onOff(config.vibration) });
         items.push_back({ MenuText(L"Pause en arrière-plan", L"Pause in background"), onOff(config.pauseInBackground) });
         items.push_back({ MenuText(L"Quitter le jeu", L"Quit the game"), L"" });
@@ -1334,9 +1335,11 @@ static void MenuRender(float scale)
     const int hintHeight = px(46);
 
     HDC dc = CreateCompatibleDC(nullptr);
-    HFONT titleFont = CreateFontW(-px(27), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Segoe UI");
-    HFONT itemFont = CreateFontW(-px(22), 0, 0, 0, FW_SEMIBOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Segoe UI");
-    HFONT hintFont = CreateFontW(-px(17), 0, 0, 0, FW_SEMIBOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Segoe UI");
+    // Japanese gets a face made for it rather than Segoe UI's fallback.
+    const wchar_t* face = GuestLanguage() == 2 ? L"Yu Gothic UI" : L"Segoe UI";
+    HFONT titleFont = CreateFontW(-px(27), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face);
+    HFONT itemFont = CreateFontW(-px(22), 0, 0, 0, FW_SEMIBOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face);
+    HFONT hintFont = CreateFontW(-px(17), 0, 0, 0, FW_SEMIBOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face);
 
     int messageHeight = 0;
     if (!message.empty())

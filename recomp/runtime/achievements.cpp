@@ -4,6 +4,7 @@
 // with a small pop-up over the game window for each new one. Names and
 // descriptions come from the title's own resource data inside the executable.
 #include "achievements.h"
+#include "translations.h"
 #include "content.h"
 #include "guest.h"
 #include "xex_header.h"
@@ -29,11 +30,6 @@ struct Achievement
 static std::mutex g_mutex;
 static std::set<uint32_t> g_unlocked;
 static bool g_loaded;
-
-static bool French()
-{
-    return GuestLanguage() == 4;
-}
 
 static std::wstring Wide(const std::string& utf8)
 {
@@ -240,8 +236,9 @@ static void ShowToast(std::wstring title, std::wstring body)
         HDC screen = GetDC(nullptr);
         int dpi = GetDeviceCaps(screen, LOGPIXELSY);
         Toast toast{ title, body };
-        toast.titleFont = CreateFontW(-MulDiv(11, dpi, 72), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
-        toast.bodyFont = CreateFontW(-MulDiv(11, dpi, 72), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, L"Segoe UI");
+        const wchar_t* face = GuestLanguage() == 2 ? L"Yu Gothic UI" : L"Segoe UI";
+        toast.titleFont = CreateFontW(-MulDiv(11, dpi, 72), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, face);
+        toast.bodyFont = CreateFontW(-MulDiv(11, dpi, 72), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, CLEARTYPE_QUALITY, 0, face);
 
         RECT titleRect{ 0, 0, 2000, 0 };
         RECT bodyRect{ 0, 0, 2000, 0 };
@@ -318,8 +315,8 @@ void AchievementsUnlock(const std::vector<uint32_t>& ids)
         Log("Achievements: unlocked %u (%s)", id, Utf8(line).c_str());
         body += (body.empty() ? L"" : L"\n") + line;
     }
-    std::wstring title = fresh.size() == 1 ? (French() ? L"Succès déverrouillé" : L"Achievement unlocked")
-        : std::to_wstring(fresh.size()) + (French() ? L" succès déverrouillés" : L" achievements unlocked");
+    std::wstring title = fresh.size() == 1 ? Translate(L"Succès déverrouillé", L"Achievement unlocked")
+        : std::to_wstring(fresh.size()) + Translate(L" succès déverrouillés", L" achievements unlocked");
     ShowToast(title, body);
 }
 
@@ -345,10 +342,10 @@ std::wstring AchievementsSummary(std::wstring& title)
         text += std::wstring(done ? L"☑  " : L"☐  ") + achievement.name + L"  (" + std::to_wstring(achievement.score) + L" G)\n        " +
             (done ? achievement.description : achievement.howTo) + L"\n\n";
     }
-    title = (French() ? L"Succès : " : L"Achievements: ") + std::to_wstring(count) + L" / " + std::to_wstring(Achievements().size()) +
+    title = Translate(L"Succès : ", L"Achievements: ") + std::to_wstring(count) + L" / " + std::to_wstring(Achievements().size()) +
         L"   -   " + std::to_wstring(earned) + L" / " + std::to_wstring(total) + L" G";
     if (text.empty())
-        text = French() ? L"Aucun succès défini." : L"No achievements defined.";
+        text = Translate(L"Aucun succès défini.", L"No achievements defined.");
     return text;
 }
 

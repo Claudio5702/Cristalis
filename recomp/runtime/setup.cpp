@@ -3,6 +3,7 @@
 // of Crystal Defenders (Xbox 360), which are copied into the "game" folder next
 // to the program.
 #include "setup.h"
+#include "translations.h"
 
 #include <windows.h>
 
@@ -14,14 +15,9 @@
 #include <system_error>
 #include <vector>
 
-static bool French()
-{
-    return PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_FRENCH;
-}
-
 static const wchar_t* Text(const wchar_t* french, const wchar_t* english)
 {
-    return French() ? french : english;
+    return Translate(french, english);
 }
 
 // The folder must hold the game's executable and its data.
