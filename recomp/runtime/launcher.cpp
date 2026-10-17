@@ -1,7 +1,7 @@
 // Start screen shown before the game, after the one of Kahna (Bahamut Lagoon
 // Recomp): the project's name at the top, a bar of sections on the left, the
-// page of the selected section beside it, a line of help underneath, and the
-// language flags at the bottom right. Everything is drawn with GDI into one
+// page of the selected section beside it, and a line of help underneath.
+// Everything is drawn with GDI into one
 // picture the size of the window; nothing is loaded from the game's files but
 // the achievements' names.
 //
@@ -69,7 +69,7 @@ const wchar_t* const kTexts[kLanguageCount][kTextCount] =
         L"Flèches : déplacer     Entrée : choisir     Échap : retour",
         L"Croix : déplacer     A : choisir     B : retour     Start : jouer",
         L"Lance le jeu. En jeu, F1 ou les deux sticks enfoncés ouvrent le menu des réglages.",
-        L"Langue des textes du jeu et de cet écran. Les drapeaux en bas à droite la changent aussi.",
+        L"Langue des textes du jeu et de cet écran.",
         L"Plein écran, taille de la fenêtre et rendu de l'image.",
         L"Volume général. Le jeu a aussi ses propres réglages du son dans Aide et options.",
         L"Vibrations, pause, et ce que le jeu affiche comme sur une console hors ligne.",
@@ -103,7 +103,7 @@ const wchar_t* const kTexts[kLanguageCount][kTextCount] =
         L"Arrows: move     Enter: select     Esc: back",
         L"D-pad: move     A: select     B: back     Start: play",
         L"Starts the game. While playing, F1 or both sticks pressed open the settings menu.",
-        L"Language of the game's text and of this screen. The flags at the bottom right change it too.",
+        L"Language of the game's text and of this screen.",
         L"Full screen, window size and rendering.",
         L"Overall volume. The game also has its own sound settings in Help & Options.",
         L"Vibration, pause, and what the game shows as on an offline console.",
@@ -137,7 +137,7 @@ const wchar_t* const kTexts[kLanguageCount][kTextCount] =
         L"Pfeiltasten: bewegen     Eingabe: wählen     Esc: zurück",
         L"Steuerkreuz: bewegen     A: wählen     B: zurück     Start: spielen",
         L"Startet das Spiel. Im Spiel öffnen F1 oder beide gedrückten Sticks das Einstellungsmenü.",
-        L"Sprache der Spieltexte und dieses Bildschirms. Auch die Flaggen unten rechts ändern sie.",
+        L"Sprache der Spieltexte und dieses Bildschirms.",
         L"Vollbild, Fenstergröße und Darstellung.",
         L"Gesamtlautstärke. Das Spiel hat unter Hilfe und Optionen auch eigene Toneinstellungen.",
         L"Vibration, Pause und was das Spiel wie auf einer Konsole ohne Verbindung zeigt.",
@@ -172,7 +172,7 @@ const wchar_t* const kTexts[kLanguageCount][kTextCount] =
         L"Flechas: mover     Intro: elegir     Esc: volver",
         L"Cruceta: mover     A: elegir     B: volver     Start: jugar",
         L"Inicia el juego. Durante la partida, F1 o pulsar los dos sticks abren el menú de ajustes.",
-        L"Idioma de los textos del juego y de esta pantalla. Las banderas de abajo a la derecha también lo cambian.",
+        L"Idioma de los textos del juego y de esta pantalla.",
         L"Pantalla completa, tamaño de ventana y renderizado.",
         L"Volumen general. El juego también tiene sus propios ajustes de sonido en Ayuda y opciones.",
         L"Vibración, pausa y lo que el juego muestra como en una consola sin conexión.",
@@ -207,7 +207,7 @@ const wchar_t* const kTexts[kLanguageCount][kTextCount] =
         L"Frecce: muovi     Invio: scegli     Esc: indietro",
         L"Croce: muovi     A: scegli     B: indietro     Start: gioca",
         L"Avvia il gioco. Durante la partita, F1 o premere entrambi gli stick aprono il menu delle impostazioni.",
-        L"Lingua dei testi del gioco e di questa schermata. Anche le bandiere in basso a destra la cambiano.",
+        L"Lingua dei testi del gioco e di questa schermata.",
         L"Schermo intero, dimensione della finestra e resa dell'immagine.",
         L"Volume generale. Il gioco ha anche le sue impostazioni audio in Aiuto e opzioni.",
         L"Vibrazione, pausa e ciò che il gioco mostra come su una console non connessa.",
@@ -241,7 +241,7 @@ const wchar_t* const kTexts[kLanguageCount][kTextCount] =
         L"矢印キー：移動　　Enter：決定　　Esc：戻る",
         L"十字キー：移動　　A：決定　　B：戻る　　START：プレイ",
         L"ゲームを開始します。プレイ中は F1 か両スティックの押し込みで設定メニューを開けます。",
-        L"ゲームのテキストとこの画面の言語です。右下の国旗でも変更できます。",
+        L"ゲームのテキストとこの画面の言語です。",
         L"フルスクリーン、ウィンドウサイズ、描画方法。",
         L"全体の音量です。ゲーム内の「ヘルプ＆オプション」にも音の設定があります。",
         L"振動、一時停止、オフラインの本体と同じ表示に関する設定です。",
@@ -268,7 +268,7 @@ const wchar_t* const kTexts[kLanguageCount][kTextCount] =
     },
 };
 
-// Xbox language ids, in the order of the flags (and of kTexts).
+// Xbox language ids, in the order of kTexts.
 constexpr uint32_t kLanguageIds[kLanguageCount] = { 4, 1, 3, 5, 6, 2 };
 constexpr const char* kLanguageCodes[kLanguageCount] = { "fr", "en", "de", "es", "it", "ja" };
 constexpr const wchar_t* kLanguageNames[kLanguageCount] = { L"Français", L"English", L"Deutsch", L"Español", L"Italiano", L"日本語" };
@@ -643,8 +643,6 @@ constexpr double kValueW = 176;
 constexpr int kVisibleRows = 11;
 constexpr double kEntryH = 28; // an achievement: its name, then a line of text
 constexpr int kVisibleEntries = 8;
-constexpr double kFlagW = 22, kFlagH = 14, kFlagY = 379;
-double FlagX(int i) { return 630 - (kLanguageCount - i) * 26.0 + 4; }
 
 const COLORREF kText = RGB(232, 240, 246);
 const COLORREF kTextDim = RGB(170, 196, 212);
@@ -1065,78 +1063,6 @@ void DrawTitle(double x, double baseline)
     WriteFit(g_fonts.subtitle, sub, baseline - 10, T(T_SUBTITLE), RGB(200, 236, 246), TA_LEFT, 630 - sub);
 }
 
-// ---- Flags ----
-
-void FlagLine(double x0, double y0, double x1, double y1, double width, COLORREF color)
-{
-    HPEN pen = CreatePen(PS_SOLID, std::max(1, PX(width)), color);
-    HGDIOBJ old = SelectObject(g_dc, pen);
-    MoveToEx(g_dc, SX(x0), SY(y0), nullptr);
-    LineTo(g_dc, SX(x1), SY(y1));
-    SelectObject(g_dc, old);
-    DeleteObject(pen);
-}
-
-void FlagDisc(double x0, double y0, double x1, double y1, COLORREF color)
-{
-    HBRUSH brush = CreateSolidBrush(color);
-    HGDIOBJ oldBrush = SelectObject(g_dc, brush), oldPen = SelectObject(g_dc, GetStockObject(NULL_PEN));
-    Ellipse(g_dc, SX(x0), SY(y0), SX(x1) + 1, SY(y1) + 1);
-    SelectObject(g_dc, oldBrush);
-    SelectObject(g_dc, oldPen);
-    DeleteObject(brush);
-}
-
-void DrawFlag(int language, double x, double y, bool selected)
-{
-    double w = kFlagW, h = kFlagH;
-    if (selected)
-        Rect(x - 2.5, y - 2.5, x + w + 2.5, y + h + 2.5, RGB(255, 255, 255));
-    else
-        Rect(x - 1, y - 1, x + w + 1, y + h + 1, RGB(6, 24, 36));
-    HRGN clip = CreateRectRgn(SX(x), SY(y), SX(x + w), SY(y + h));
-    SelectClipRgn(g_dc, clip);
-    switch (language)
-    {
-    case kFr:
-        Rect(x, y, x + w / 3, y + h, RGB(0, 38, 153));
-        Rect(x + w / 3, y, x + 2 * w / 3, y + h, RGB(255, 255, 255));
-        Rect(x + 2 * w / 3, y, x + w, y + h, RGB(230, 40, 50));
-        break;
-    case kEn:
-        Rect(x, y, x + w, y + h, RGB(1, 33, 105));
-        FlagLine(x, y, x + w, y + h, 3.0, RGB(255, 255, 255));
-        FlagLine(x, y + h, x + w, y, 3.0, RGB(255, 255, 255));
-        FlagLine(x, y, x + w, y + h, 1.0, RGB(200, 16, 46));
-        FlagLine(x, y + h, x + w, y, 1.0, RGB(200, 16, 46));
-        Rect(x + w / 2 - 2.5, y, x + w / 2 + 2.5, y + h, RGB(255, 255, 255));
-        Rect(x, y + h / 2 - 2.5, x + w, y + h / 2 + 2.5, RGB(255, 255, 255));
-        Rect(x + w / 2 - 1.4, y, x + w / 2 + 1.4, y + h, RGB(200, 16, 46));
-        Rect(x, y + h / 2 - 1.4, x + w, y + h / 2 + 1.4, RGB(200, 16, 46));
-        break;
-    case kDe:
-        Rect(x, y, x + w, y + h / 3, RGB(0, 0, 0));
-        Rect(x, y + h / 3, x + w, y + 2 * h / 3, RGB(221, 0, 0));
-        Rect(x, y + 2 * h / 3, x + w, y + h, RGB(255, 206, 0));
-        break;
-    case kEs:
-        Rect(x, y, x + w, y + h, RGB(198, 11, 30));
-        Rect(x, y + h / 4, x + w, y + 3 * h / 4, RGB(255, 196, 0));
-        break;
-    case kIt:
-        Rect(x, y, x + w / 3, y + h, RGB(0, 146, 70));
-        Rect(x + w / 3, y, x + 2 * w / 3, y + h, RGB(255, 255, 255));
-        Rect(x + 2 * w / 3, y, x + w, y + h, RGB(206, 43, 55));
-        break;
-    default: // Japan
-        Rect(x, y, x + w, y + h, RGB(255, 255, 255));
-        FlagDisc(x + w / 2 - h * 0.3, y + h * 0.2, x + w / 2 + h * 0.3, y + h * 0.8, RGB(188, 0, 45));
-        break;
-    }
-    SelectClipRgn(g_dc, nullptr);
-    DeleteObject(clip);
-}
-
 // ---- Rows ----
 
 double RowY(int row)
@@ -1454,8 +1380,6 @@ void Paint(HDC dc, int width, int height)
 
     Write(g_fonts.small, 18, 380, T(g_padSeen ? T_HINT_PAD : T_HINT_KEYS), RGB(2, 14, 26), TA_LEFT);
     Write(g_fonts.small, 17, 379, T(g_padSeen ? T_HINT_PAD : T_HINT_KEYS), RGB(236, 246, 250), TA_LEFT);
-    for (int i = 0; i < kLanguageCount; i++)
-        DrawFlag(i, FlagX(i), kFlagY, g_language == i);
 }
 
 // ---- Input ----
@@ -1623,17 +1547,10 @@ void Key(int key)
 }
 
 // The bar entry or the page row under the mouse; false when there is none.
-bool HitTest(int mouseX, int mouseY, int& section, int& row, int& flag)
+bool HitTest(int mouseX, int mouseY, int& section, int& row)
 {
     double x = (mouseX - g_originX) / g_scale, y = (mouseY - g_originY) / g_scale;
-    section = row = flag = -1;
-    for (int i = 0; i < kLanguageCount; i++)
-    {
-        if (x >= FlagX(i) - 2 && x <= FlagX(i) + kFlagW + 2 && y >= kFlagY - 2 && y <= kFlagY + kFlagH + 2)
-            flag = i;
-    }
-    if (flag >= 0)
-        return true;
+    section = row = -1;
     if (x >= kSideX0 && x <= kSideX1)
     {
         for (int i = 0; i < kSectionCount; i++)
@@ -1658,15 +1575,9 @@ bool HitTest(int mouseX, int mouseY, int& section, int& row, int& flag)
 
 void Mouse(int x, int y, bool click)
 {
-    int section, row, flag;
-    if (!HitTest(x, y, section, row, flag))
+    int section, row;
+    if (!HitTest(x, y, section, row))
         return;
-    if (flag >= 0)
-    {
-        if (click)
-            SetLanguage(kLanguageIds[flag]);
-        return;
-    }
     if (section >= 0)
     {
         if (section != g.section || g.inPage)
