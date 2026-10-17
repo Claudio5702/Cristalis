@@ -88,14 +88,16 @@ forcing a compatibility tool. The Windows release also runs through Proton.
 Requirements: Windows, clang (MinGW-w64 target), CMake, Ninja, Python 3, an FFmpeg
 LGPL shared build (for XMA audio), and your own `default.xex`.
 
-1. Get XenonRecomp and apply the changes described in
-   [`recomp/tools/README.md`](recomp/tools/README.md).
-2. Run XenonRecomp with `recomp/config/crystal_defenders.toml` on your
-   `default.xex`; it writes the translated code to `recomp/ppc`.
-3. Generate the import stubs with `recomp/tools/gen_imports.py`.
-4. Configure and build `recomp/` with CMake.
+1. Get XenonRecomp, apply the changes described in
+   [`recomp/tools/README.md`](recomp/tools/README.md) and build it into
+   `tools/build-xenonrecomp` (or pass its path with `-XenonRecomp`).
+2. Run `.\recompile.ps1 -Xex <your default.xex>`. It translates the game's code
+   into `recomp/ppc`, generates the import table, then builds.
+3. After a change to the runtime, `.\build.ps1` rebuilds what changed
+   (`-Clean` rebuilds everything).
 
-The paths to XenonRecomp and FFmpeg are set at the top of `recomp/CMakeLists.txt`.
+The program lands in `build\`, with the FFmpeg DLLs, and can be started from
+there. The path to FFmpeg is set in `recomp/CMakeLists.txt`.
 `recomp/tools/make_installer.ps1` then packs the build into an installer
 (`dist/Crystal Defenders - Setup.exe`).
 

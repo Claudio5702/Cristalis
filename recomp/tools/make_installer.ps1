@@ -1,4 +1,4 @@
-# Builds "dist\Crystal Defenders - Setup.exe" from the built game (recomp\build), after the installer
+# Builds "dist\Crystal Defenders - Setup.exe" from the built game (build\, see build.ps1), after the installer
 # of Kahna (Bahamut Lagoon Recomp).
 #
 # The installer holds the program, the FFmpeg DLLs and the read-me files. It never holds the game's
@@ -7,7 +7,7 @@
 param([string]$Output = (Join-Path (Split-Path (Split-Path $PSScriptRoot)) 'dist'))
 $ErrorActionPreference = 'Stop'
 $recomp = Split-Path $PSScriptRoot -Parent
-$build = Join-Path $recomp 'build'
+$build = Join-Path (Split-Path $recomp) 'build'
 $ffmpeg = Join-Path (Split-Path $recomp) 'tools\ffmpeg\ffmpeg-n8.1-latest-win64-lgpl-shared-8.1'
 New-Item -ItemType Directory -Force $Output | Out-Null
 

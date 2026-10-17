@@ -4,7 +4,7 @@
 # Usage: share.ps1
 $ErrorActionPreference = 'Stop'
 $root = Split-Path (Split-Path $PSScriptRoot)
-$build = Join-Path $root 'recomp\build'
+$build = Join-Path $root 'build'
 $ffmpeg = Join-Path $root 'tools\ffmpeg\ffmpeg-n8.1-latest-win64-lgpl-shared-8.1'
 $name = 'Crystal Defenders (PC) - a partager'
 $destination = Join-Path $root $name

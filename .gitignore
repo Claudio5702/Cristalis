@@ -5,6 +5,8 @@
 !/.gitignore
 !/README.md
 !/LICENSE
+!/build.ps1
+!/recompile.ps1
 !/recomp/
 
 /recomp/*
