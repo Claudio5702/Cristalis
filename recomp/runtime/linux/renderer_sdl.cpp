@@ -133,6 +133,8 @@ static bool CreateFrameTargets(uint32_t scale)
     return true;
 }
 
+static void AttachTestPad();
+
 bool RendererInit()
 {
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0)
@@ -238,6 +240,15 @@ bool RendererInit()
     glEnable(GL_SCISSOR_TEST);
     Log("Renderer: OpenGL %s on %s, %dx%d window ready", (const char*)glGetString(GL_VERSION), (const char*)glGetString(GL_RENDERER),
         width, height);
+    for (int display = 0; display < SDL_GetNumVideoDisplays(); display++)
+    {
+        SDL_Rect bounds{};
+        SDL_DisplayMode mode{};
+        SDL_GetDisplayBounds(display, &bounds);
+        SDL_GetDesktopDisplayMode(display, &mode);
+        Log("Renderer: display %d: bounds %d,%d %dx%d, desktop mode %dx%d", display, bounds.x, bounds.y, bounds.w, bounds.h, mode.w, mode.h);
+    }
+    AttachTestPad();
     return true;
 }
 
@@ -505,6 +516,57 @@ void RendererRumble(uint16_t left, uint16_t right)
         SDL_GameControllerRumble(controller, left, right, 5000);
 }
 
+// CD_TEST_PAD=<hex buttons>,...: a virtual controller that taps the next entry
+// every two seconds, like CD_AUTOPAD, but through SDL's controller path, to test
+// it without a real controller (tests). Bit 0x0400 pushes the left stick up.
+// Starts after CD_AUTOPAD_START seconds.
+static SDL_Joystick* g_testPad;
+
+static void AttachTestPad()
+{
+    if (getenv("CD_TEST_PAD") == nullptr)
+        return;
+    int index = SDL_JoystickAttachVirtual(SDL_JOYSTICK_TYPE_GAMECONTROLLER, SDL_CONTROLLER_AXIS_MAX, SDL_CONTROLLER_BUTTON_MAX, 0);
+    g_testPad = index >= 0 ? SDL_JoystickOpen(index) : nullptr;
+    Log("Renderer: virtual test controller %s", g_testPad ? "attached" : SDL_GetError());
+}
+
+static void DriveTestPad()
+{
+    static const char* script = getenv("CD_TEST_PAD");
+    if (g_testPad == nullptr || script == nullptr)
+        return;
+    static const ULONGLONG start = GetTickCount64() +
+        (getenv("CD_AUTOPAD_START") ? strtoul(getenv("CD_AUTOPAD_START"), nullptr, 10) * 1000ull : 0);
+    ULONGLONG now = GetTickCount64();
+    uint16_t bits = 0;
+    if (now >= start && (now - start) % 2000 < 120)
+    {
+        const char* entry = script;
+        for (ULONGLONG i = 0; i < (now - start) / 2000; i++)
+        {
+            const char* comma = strchr(entry, ',');
+            if (comma == nullptr)
+                break;
+            entry = comma + 1;
+        }
+        bits = uint16_t(strtoul(entry, nullptr, 16));
+    }
+    static const struct { uint16_t bit; SDL_GameControllerButton button; } map[] =
+    {
+        { 0x0001, SDL_CONTROLLER_BUTTON_DPAD_UP }, { 0x0002, SDL_CONTROLLER_BUTTON_DPAD_DOWN },
+        { 0x0004, SDL_CONTROLLER_BUTTON_DPAD_LEFT }, { 0x0008, SDL_CONTROLLER_BUTTON_DPAD_RIGHT },
+        { 0x0010, SDL_CONTROLLER_BUTTON_START }, { 0x0020, SDL_CONTROLLER_BUTTON_BACK },
+        { 0x0040, SDL_CONTROLLER_BUTTON_LEFTSTICK }, { 0x0080, SDL_CONTROLLER_BUTTON_RIGHTSTICK },
+        { 0x0100, SDL_CONTROLLER_BUTTON_LEFTSHOULDER }, { 0x0200, SDL_CONTROLLER_BUTTON_RIGHTSHOULDER },
+        { 0x1000, SDL_CONTROLLER_BUTTON_A }, { 0x2000, SDL_CONTROLLER_BUTTON_B },
+        { 0x4000, SDL_CONTROLLER_BUTTON_X }, { 0x8000, SDL_CONTROLLER_BUTTON_Y },
+    };
+    for (auto& entry : map)
+        SDL_JoystickSetVirtualButton(g_testPad, entry.button, (bits & entry.bit) ? 1 : 0);
+    SDL_JoystickSetVirtualAxis(g_testPad, SDL_CONTROLLER_AXIS_LEFTY, (bits & 0x0400) ? -32768 : 0);
+}
+
 // Every connected controller drives player one.
 static void ReadControllers()
 {
@@ -554,6 +616,7 @@ static void ToggleFullscreen()
 
 static void PumpEvents()
 {
+    DriveTestPad();
     SDL_Event event;
     while (SDL_PollEvent(&event))
     {
@@ -1197,6 +1260,29 @@ static void ShowFrame()
     }
 
     // CD_AUTOPAD_SHOTS=1: with the menu open, also keep what the window shows.
+    // CD_WINDOW_SHOTS=1: the first frames after the window changes size (tests).
+    {
+        static int lastWidth, lastHeight, afterResize;
+        static uint32_t resizes;
+        if (getenv("CD_WINDOW_SHOTS") != nullptr)
+        {
+            if (lastWidth != 0 && (width != lastWidth || height != lastHeight))
+            {
+                afterResize = 4;
+                resizes++;
+            }
+            if (afterResize > 0)
+            {
+                char path[64];
+                snprintf(path, sizeof(path), "resize_%u_%d.bmp", resizes, 4 - afterResize);
+                SaveWindow(path, width, height);
+                afterResize--;
+            }
+        }
+        lastWidth = width;
+        lastHeight = height;
+    }
+
     // CD_WINDOW_SHOTS=1: do so at every tap, and every second while paused in the background.
     static const bool shots = getenv("CD_AUTOPAD_SHOTS") != nullptr;
     static const bool always = getenv("CD_WINDOW_SHOTS") != nullptr;

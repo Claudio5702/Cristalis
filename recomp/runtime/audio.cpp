@@ -720,6 +720,14 @@ static void RenderThread()
                 sample = int16_t(sample * volume / 100);
         }
 
+        // CD_AUDIO_DUMP=<file>: also keep everything played, raw 48 kHz stereo 16-bit (tests).
+        static FILE* dump = getenv("CD_AUDIO_DUMP") ? fopen(getenv("CD_AUDIO_DUMP"), "wb") : nullptr;
+        if (dump != nullptr)
+        {
+            fwrite(storage[next], 1, sizeof(storage[next]), dump);
+            fflush(dump);
+        }
+
         if (device != nullptr)
         {
             headers[next].dwFlags &= ~WHDR_DONE;

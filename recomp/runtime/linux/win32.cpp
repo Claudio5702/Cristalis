@@ -889,6 +889,7 @@ UINT waveOutWrite(HWAVEOUT, WAVEHDR* header, UINT)
         return 1;
     }
     g_audioQueued += header->dwBufferLength;
+
     g_audioPending.push_back({ header, g_audioQueued });
     return MMSYSERR_NOERROR;
 }
