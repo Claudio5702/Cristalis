@@ -49,12 +49,29 @@ static bool silent, no_system; // no_system: leave shortcuts and the Windows ent
 
 #include "setup_text.h"
 
+// A line in the terminal the installer was started from: written as text of the console itself, so
+// that accents and other scripts come out right whatever its code page; UTF-8 when redirected.
+static void say(HANDLE out, const wchar_t *text) {
+  DWORD mode, done;
+  if (!out || out == INVALID_HANDLE_VALUE) // attached to the parent's console without standard handles
+    out = CreateFileW(L"CONOUT$", GENERIC_READ | GENERIC_WRITE, FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, NULL);
+  if (out == INVALID_HANDLE_VALUE) return;
+  if (GetConsoleMode(out, &mode)) {
+    WriteConsoleW(out, text, (DWORD)wcslen(text), &done, NULL);
+    WriteConsoleW(out, L"\n", 1, &done, NULL);
+    return;
+  }
+  char utf8[4096];
+  int n = WideCharToMultiByte(CP_UTF8, 0, text, -1, utf8, sizeof utf8 - 1, NULL, NULL);
+  if (n > 0) { utf8[n - 1] = '\n'; WriteFile(out, utf8, (DWORD)n, &done, NULL); }
+}
+
 // Message box with the text `id`, formatted with a path (unused when the text has none).
 static int box(int title, int id, UINT flags, const char *path) {
   wchar_t text[2048];
   _snwprintf(text, 2047, T(id), path ? path : "");
   text[2047] = 0;
-  if (silent) { fwprintf(stderr, L"%ls\n", text); return IDYES; }
+  if (silent) { say(GetStdHandle(STD_ERROR_HANDLE), text); return IDYES; }
   return MessageBoxW(NULL, text, T(title), flags);
 }
 
@@ -455,7 +472,12 @@ static int uninstall(const char *self, const char *dir, bool all) {
     remove_shortcuts();
     RegDeleteKeyA(HKEY_CURRENT_USER, UNINST_KEY);
   }
-  if (silent) printf("uninstalled: %d files removed from %s (personal data %s)\n", removed, d, all ? "removed" : "kept");
+  if (silent) {
+    wchar_t line[1024];
+    _snwprintf(line, 1023, L"uninstalled: %d files removed from %hs (personal data %hs)", removed, d, all ? "removed" : "kept");
+    line[1023] = 0;
+    say(GetStdHandle(STD_OUTPUT_HANDLE), line);
+  }
   else box(T_TITLE_UNINSTALL, all ? T_UN_DONE : T_UN_DONE_KEPT, MB_ICONINFORMATION, NULL);
   // This program cannot erase its own file while it runs. Once it has ended, a hidden helper erases it
   // (it tries again every second for up to 30 seconds), then removes the folder if nothing is left in
@@ -488,10 +510,7 @@ int main(int argc, char **argv) {
   }
   { // window program: print to the terminal it was started from, if any
     HANDLE ho = GetStdHandle(STD_OUTPUT_HANDLE);
-    if ((!ho || ho == INVALID_HANDLE_VALUE || GetFileType(ho) == FILE_TYPE_UNKNOWN) && AttachConsole(ATTACH_PARENT_PROCESS)) {
-      freopen("CONOUT$", "w", stdout);
-      freopen("CONOUT$", "w", stderr);
-    }
+    if (!ho || ho == INVALID_HANDLE_VALUE || GetFileType(ho) == FILE_TYPE_UNKNOWN) AttachConsole(ATTACH_PARENT_PROCESS);
   }
   pick_language(forced_lang);
   GetModuleFileNameA(NULL, self, sizeof self);
@@ -623,7 +642,10 @@ int main(int argc, char **argv) {
   if (!ready && copy[0]) ready = install_game_data(dest, copy);
 
   if (silent) {
-    printf("installed %u files to %s (game data %s)\n", count, dest, ready ? "ready" : "missing");
+    wchar_t line[1024];
+    _snwprintf(line, 1023, L"installed %u files to %hs (game data %hs)", count, dest, ready ? "ready" : "missing");
+    line[1023] = 0;
+    say(GetStdHandle(STD_OUTPUT_HANDLE), line);
     return 0;
   }
   // ---- result: start the game when it is ready to run, otherwise ask for the player's copy; the

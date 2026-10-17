@@ -958,8 +958,8 @@ void DrawBackdrop(int width, int height)
         cache = CreateCompatibleDC(g_dc);
     if (width != cacheWidth || height != cacheHeight)
     {
-        // computed at half the size, then enlarged smoothly
-        int w = std::max(320, width / 2), h = std::max(200, height / 2);
+        // computed at half the size (at most 1280 wide: it is soft anyway), then enlarged smoothly
+        int w = std::clamp(width / 2, 320, 1280), h = std::max(200, height * w / std::max(1, width));
         std::vector<uint32_t> pixels(size_t(w) * size_t(h));
         for (int y = 0; y < h; y++)
         {
@@ -1914,6 +1914,8 @@ bool SaveShot(const char* path)
                 if (name == entry.name)
                     Key(entry.key);
             }
+            if (name.size() == 1 && isalnum((unsigned char)name[0])) // a letter or digit key
+                Key(toupper((unsigned char)name[0]));
             position = end + 1;
         }
     }
@@ -1929,8 +1931,13 @@ bool SaveShot(const char* path)
     HDC dc = CreateCompatibleDC(nullptr);
     HBITMAP bitmap = CreateDIBSection(dc, &info, DIB_RGB_COLORS, &bits, nullptr, 0);
     SelectObject(dc, bitmap);
+    ULONGLONG start = GetTickCount64();
     Paint(dc, width, height);
     GdiFlush();
+    ULONGLONG first = GetTickCount64();
+    Paint(dc, width, height);
+    GdiFlush();
+    Log("Launcher: %dx%d drawn in %llu ms, then %llu ms", width, height, first - start, GetTickCount64() - first);
     bool saved = false;
     if (FILE* file = fopen(path, "wb"))
     {
