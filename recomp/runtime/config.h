@@ -24,6 +24,7 @@ struct Config
     bool pauseInBackground = true; // hold the game while its window is not the active one
     bool storageDialog = false; // let the game ask which storage device to use
     bool liveWarning = false; // show the game's "not connected to Xbox LIVE" dialog
+    bool launcher = true;     // show the start screen before the game
     std::vector<KeyBinding> keys;
 };
 

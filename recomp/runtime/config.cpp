@@ -47,6 +47,9 @@ static const char kDefaultFile[] =
     "; 1 = le jeu demande au demarrage ou enregistrer, comme sur la console.\n"
     "; 0 = il utilise directement le dossier userdata.\n"
     "choix_stockage = 0\n"
+    "; 1 = ecran de lancement avant le jeu (reglages, succes, captures).\n"
+    "; 0 = le jeu demarre directement.\n"
+    "lanceur = 1\n"
     "\n"
     "[clavier]\n"
     "; Une ou plusieurs touches par bouton de la manette, separees par un espace.\n"
@@ -155,6 +158,8 @@ static void Apply(Config& config, const std::string& section, const std::string&
         config.liveWarning = atoi(value.c_str()) != 0;
     else if (section == "jeu" && key == "choix_stockage")
         config.storageDialog = atoi(value.c_str()) != 0;
+    else if (section == "jeu" && key == "lanceur")
+        config.launcher = atoi(value.c_str()) != 0;
     else if (section == "jeu" && key == "langue")
     {
         static const struct { const char* name; uint32_t id; } languages[] =

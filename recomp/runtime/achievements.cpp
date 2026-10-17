@@ -88,50 +88,57 @@ static uint32_t FindEntry(uint32_t xdbf, uint16_t space, uint64_t id, uint32_t& 
     return 0;
 }
 
+// The achievements the game defines, with their texts in the given language.
+static std::vector<Achievement> ReadAchievements(uint32_t language)
+{
+    std::vector<Achievement> result;
+    uint32_t xdbf = FindTitleData();
+    if (xdbf == 0)
+        return result;
+
+    // String table of that language, English if the game has none for it.
+    std::map<uint16_t, std::wstring> strings;
+    uint32_t length = 0;
+    uint32_t table = FindEntry(xdbf, 3, language, length);
+    if (table == 0)
+        table = FindEntry(xdbf, 3, 1, length);
+    if (table != 0 && memcmp(g_base + table, "XSTR", 4) == 0)
+    {
+        uint32_t count = Load16(table + 12);
+        uint32_t cursor = table + 14;
+        for (uint32_t i = 0; i < count && cursor + 4 <= table + length; i++)
+        {
+            uint16_t id = Load16(cursor);
+            uint16_t size = Load16(cursor + 2);
+            strings[id] = Wide(std::string((const char*)g_base + cursor + 4, size));
+            cursor += 4 + size;
+        }
+    }
+
+    uint32_t list = FindEntry(xdbf, 1, 0x58414348, length); // 'XACH'
+    if (list != 0 && memcmp(g_base + list, "XACH", 4) == 0)
+    {
+        uint32_t count = Load16(list + 12);
+        for (uint32_t i = 0; i < count && list + 14 + (i + 1) * 0x24 <= list + length; i++)
+        {
+            uint32_t entry = list + 14 + i * 0x24;
+            Achievement achievement;
+            achievement.id = Load16(entry);
+            achievement.name = strings[Load16(entry + 2)];
+            achievement.description = strings[Load16(entry + 4)];
+            achievement.howTo = strings[Load16(entry + 6)];
+            achievement.score = Load16(entry + 12);
+            result.push_back(achievement);
+        }
+    }
+    return result;
+}
+
 static const std::vector<Achievement>& Achievements()
 {
     static const std::vector<Achievement> list = []
     {
-        std::vector<Achievement> result;
-        uint32_t xdbf = FindTitleData();
-        if (xdbf == 0)
-            return result;
-
-        // String table of the game's language, English if it has none.
-        std::map<uint16_t, std::wstring> strings;
-        uint32_t length = 0;
-        uint32_t table = FindEntry(xdbf, 3, GuestLanguage(), length);
-        if (table == 0)
-            table = FindEntry(xdbf, 3, 1, length);
-        if (table != 0 && memcmp(g_base + table, "XSTR", 4) == 0)
-        {
-            uint32_t count = Load16(table + 12);
-            uint32_t cursor = table + 14;
-            for (uint32_t i = 0; i < count && cursor + 4 <= table + length; i++)
-            {
-                uint16_t id = Load16(cursor);
-                uint16_t size = Load16(cursor + 2);
-                strings[id] = Wide(std::string((const char*)g_base + cursor + 4, size));
-                cursor += 4 + size;
-            }
-        }
-
-        uint32_t list = FindEntry(xdbf, 1, 0x58414348, length); // 'XACH'
-        if (list != 0 && memcmp(g_base + list, "XACH", 4) == 0)
-        {
-            uint32_t count = Load16(list + 12);
-            for (uint32_t i = 0; i < count && list + 14 + (i + 1) * 0x24 <= list + length; i++)
-            {
-                uint32_t entry = list + 14 + i * 0x24;
-                Achievement achievement;
-                achievement.id = Load16(entry);
-                achievement.name = strings[Load16(entry + 2)];
-                achievement.description = strings[Load16(entry + 4)];
-                achievement.howTo = strings[Load16(entry + 6)];
-                achievement.score = Load16(entry + 12);
-                result.push_back(achievement);
-            }
-        }
+        std::vector<Achievement> result = ReadAchievements(GuestLanguage());
         Log("Achievements: %zu defined by the title", result.size());
         return result;
     }();
@@ -343,4 +350,21 @@ std::wstring AchievementsSummary(std::wstring& title)
     if (text.empty())
         text = French() ? L"Aucun succès défini." : L"No achievements defined.";
     return text;
+}
+
+std::vector<AchievementEntry> AchievementsList()
+{
+    std::set<uint32_t> unlocked;
+    {
+        std::lock_guard lock(g_mutex);
+        LoadUnlocked();
+        unlocked = g_unlocked;
+    }
+    std::vector<AchievementEntry> entries;
+    for (auto& achievement : ReadAchievements(GuestLanguage()))
+    {
+        bool done = unlocked.count(achievement.id) != 0;
+        entries.push_back({ achievement.name, done ? achievement.description : achievement.howTo, achievement.score, done });
+    }
+    return entries;
 }

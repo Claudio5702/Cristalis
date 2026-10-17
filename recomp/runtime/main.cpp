@@ -2,10 +2,14 @@
 // recompiled function table and starts the game's entry point on a guest thread.
 #include "gpu.h"
 #include "guest.h"
+#include "launcher.h"
 #include "setup.h"
 #include "xex_header.h"
 
 #include <windows.h>
+#ifdef _WIN32
+#include <shellapi.h>
+#endif
 
 #include <filesystem>
 
@@ -642,9 +646,47 @@ int main(int argc, char* argv[])
 {
     // Started without a path (double click on the program): work from the
     // program's own folder and look for the game data next to it.
-    std::string xexPath = argc > 1 ? argv[1] : "default.xex";
-    if (argc <= 1)
+    // (Arguments starting with "--" are options, such as --no-launcher.)
+    std::string xexPath;
+    bool installOnly = false;
+    for (int i = 1; i < argc; i++)
     {
+        if (strcmp(argv[i], "--install-from") == 0)
+        {
+            installOnly = true;
+            i++;
+        }
+        else if (strncmp(argv[i], "--", 2) != 0 && xexPath.empty())
+        {
+            xexPath = argv[i];
+        }
+    }
+#ifdef _WIN32
+    // --install-from <folder>: installs the game's data from the player's copy
+    // next to the program, then ends (used by the installer). The folder is
+    // read from the wide command line, as it may hold any character.
+    if (installOnly)
+    {
+        int count = 0;
+        wchar_t** wide = CommandLineToArgvW(GetCommandLineW(), &count);
+        for (int i = 1; wide != nullptr && i + 1 < count; i++)
+        {
+            if (wcscmp(wide[i], L"--install-from") == 0)
+                _wputenv_s(L"CD_SETUP_SOURCE", wide[i + 1]);
+        }
+        LocalFree(wide);
+        wchar_t program[MAX_PATH]{};
+        GetModuleFileNameW(nullptr, program, MAX_PATH);
+        std::filesystem::path folder = std::filesystem::path(program).parent_path();
+        SetCurrentDirectoryW(folder.c_str());
+        return RunFirstTimeSetup(folder) ? 0 : 2;
+    }
+#else
+    (void)installOnly;
+#endif
+    if (xexPath.empty())
+    {
+        xexPath = "default.xex";
         wchar_t program[MAX_PATH]{};
         GetModuleFileNameW(nullptr, program, MAX_PATH);
         std::filesystem::path folder = std::filesystem::path(program).parent_path();
@@ -757,6 +799,10 @@ int main(int argc, char* argv[])
 
     ResolveImports();
     SetGameRoot(xexPath.c_str());
+    // The start screen comes once the game's files are known (it lists the
+    // achievements they define) and before the game's window opens.
+    if (!LauncherRun(argc, argv))
+        return 0;
     if (!VideoInit())
     {
         Log("Unable to map the GPU register block.");

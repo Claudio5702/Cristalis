@@ -29,6 +29,10 @@ Known differences from the console:
 
 ## Features
 
+- A start screen before the game, after the one of
+  Kahna (Bahamut Lagoon Recomp): language, picture, sound,
+  options, keyboard keys, the achievements earned and the screenshots taken, in six
+  languages, with the keyboard, a controller or the mouse.
 - Renders at the window's resolution (up to 4K), or the original 1280×720.
 - In-game settings menu (F1, right click, or both sticks): language, resolution,
   rendering, full screen, volume, vibration, pause in background.
@@ -37,6 +41,14 @@ Known differences from the console:
 - F12 screenshot, Alt+Enter / F11 full screen.
 
 ## Playing
+
+With the installer: put your own copy of the game, the `CRYSTAL DEFENDERS` (or
+`58410989`) folder as copied from the console's storage, next to
+`Crystal Defenders - Setup.exe` and run it. The game is installed from that folder,
+with shortcuts and an entry in Windows' list of applications (which uninstalls it).
+Without the folder, the last window of the installer asks for it.
+
+Without the installer:
 
 1. Download a release and unzip it.
 2. Run `crystal_defenders.exe`.
@@ -84,6 +96,8 @@ LGPL shared build (for XMA audio), and your own `default.xex`.
 4. Configure and build `recomp/` with CMake.
 
 The paths to XenonRecomp and FFmpeg are set at the top of `recomp/CMakeLists.txt`.
+`recomp/tools/make_installer.ps1` then packs the build into an installer
+(`dist/Crystal Defenders - Setup.exe`).
 
 On Linux: clang, CMake, Ninja, SDL2, FFmpeg and OpenGL development packages;
 the same steps, and `runtime/linux` supplies the small part of the Windows API

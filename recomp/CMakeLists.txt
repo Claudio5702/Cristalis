@@ -44,6 +44,7 @@ set(RUNTIME_SOURCES
     runtime/xam.cpp
     runtime/xam_content.cpp
     runtime/setup.cpp
+    runtime/launcher.cpp
     runtime/imports.cpp
     runtime/imports.gen.cpp)
 
@@ -56,7 +57,7 @@ if(WIN32)
     # FFmpeg (LGPL, shared build) decodes the game's XMA audio.
     set(FFMPEG_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/../tools/ffmpeg/ffmpeg-n8.1-latest-win64-lgpl-shared-8.1)
     target_include_directories(crystal_defenders PRIVATE runtime ${FFMPEG_ROOT}/include)
-    target_link_libraries(crystal_defenders PRIVATE ppc XenonUtils winmm d3d11 dxgi dxguid
+    target_link_libraries(crystal_defenders PRIVATE ppc XenonUtils winmm d3d11 dxgi dxguid msimg32
         ${FFMPEG_ROOT}/lib/libavcodec.dll.a ${FFMPEG_ROOT}/lib/libavutil.dll.a)
     # -mwindows: a windowed program, so no console window opens next to the game.
     target_link_options(crystal_defenders PRIVATE -static -mwindows)

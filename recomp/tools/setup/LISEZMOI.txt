@@ -1,0 +1,37 @@
+Crystal Defenders - CrystalDefendersRecomp
+Portage natif non officiel pour Windows. Ecrit par une IA (Claude Code, Claude Opus 5.5).
+Sans lien avec Square Enix. Les donnees du jeu ne sont pas fournies : il faut
+votre propre copie du jeu (Xbox 360, Xbox Live Arcade).
+
+LANCER
+  Raccourci "Crystal Defenders" (Bureau ou menu Demarrer), ou crystal_defenders.exe.
+  Un ecran de lancement s'ouvre d'abord : Jouer, Langue, Image, Son, Options,
+  Commandes, Succes, Captures, Dossier du jeu, Quitter. Il se manie au clavier,
+  a la manette ou a la souris. Start sur la manette lance directement le jeu.
+  Pour demarrer sans lui : lanceur = 0 dans crystal_defenders.ini.
+
+EN JEU
+  F1, ou les deux sticks enfonces ..... menu des reglages (le jeu est en pause)
+  F11 ou Alt+Entree ................... plein ecran
+  F12 ................................. capture d'ecran (dossier captures)
+
+CLAVIER (par defaut, modifiable dans l'ecran de lancement, page Commandes)
+  Fleches ............ croix directionnelle
+  Espace ou X ........ A (confirmer)        Echap ou C ......... B (retour)
+  S / D .............. X / Y                Entree / Tab ....... Start / Back
+  Q / E .............. gachettes hautes
+  Toute manette XInput (type Xbox) fonctionne sans reglage.
+
+FICHIERS
+  userdata\ ................ sauvegardes et succes
+  captures\ ................ captures d'ecran
+  crystal_defenders.ini .... reglages
+  crystal_defenders.log .... journal (la session precedente : crystal_defenders.prev.log)
+  game\ .................... donnees du jeu, extraites de votre copie
+
+DESINSTALLER
+  Parametres de Windows > Applications, ou Uninstall.exe dans ce dossier.
+  Les sauvegardes et les donnees du jeu sont gardees, sauf si vous cochez la case.
+
+Le decodage audio utilise FFmpeg (https://ffmpeg.org), LGPL, voir FFmpeg-LICENSE.txt.
+Code source : https://github.com/Claudio5702/CrystalDefendersRecomp
