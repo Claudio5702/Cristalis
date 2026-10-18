@@ -1,5 +1,5 @@
-DarkLauncher 1.17 (commit fa7af27), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h F3ED0D21464D7AF3
+DarkLauncher 1.18 (commit cc775f6), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h 19101ED7E4767827
 file dl_achieve.c BE8376E324B02072
 file dl_app.c 2E0DA934EE96BDCA
 file dl_draw.c 5D10309DEC48C32D
