@@ -130,8 +130,44 @@ static const char gpu_hlsl_tail[] =
     "  for (int k = 0; k < 4; k++) { s += vnoise(p) * amp; p = p * 2.03 + float2(17.1, 5.3); amp *= 0.5; }\n"
     "  return s / 0.9375;\n"
     "}\n"
-    "float4 ps_sky(V v) : SV_Target {\n"
-    "  float time = origin.x, aspect = origin.y, u = v.uv.x, y = v.uv.y;\n"
+    // the theme's colour (DlTheme): hue turned by game[0].x, strength scaled by game[0].y, lightness kept,
+    // when game[0].w is 1 (dl_draw.c does the same for GDI)
+    "float3 dl_to_hsl(float3 c) {\n"
+    "  float hi = max(c.r, max(c.g, c.b)), lo = min(c.r, min(c.g, c.b)), d = hi - lo, l = (hi + lo) * 0.5;\n"
+    "  if (d <= 0) return float3(0, 0, l);\n"
+    "  float s = l > 0.5 ? d / (2 - hi - lo) : d / (hi + lo);\n"
+    "  float h = hi == c.r ? (c.g - c.b) / d + (c.g < c.b ? 6 : 0) : hi == c.g ? (c.b - c.r) / d + 2 : (c.r - c.g) / d + 4;\n"
+    "  return float3(h / 6, s, l);\n"
+    "}\n"
+    "float dl_hue_part(float p, float q, float t) { t = frac(t); return t < 1.0 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2.0 / 3 ? p + (q - p) * (2.0 / 3 - t) * 6 : p; }\n"
+    "float3 dl_tint(float3 c) {\n"
+    "  if (game[0].w < 0.5) return c;\n"
+    "  float3 h = dl_to_hsl(saturate(c));\n"
+    "  h.x = frac(h.x + game[0].x); h.y = min(h.y * game[0].y, 1);\n"
+    "  if (h.y <= 0) return h.zzz;\n"
+    "  float q = h.z < 0.5 ? h.z * (1 + h.y) : h.z + h.y - h.z * h.y, p = 2 * h.z - q;\n"
+    "  return float3(dl_hue_part(p, q, h.x + 1.0 / 3), dl_hue_part(p, q, h.x), dl_hue_part(p, q, h.x - 1.0 / 3));\n"
+    "}\n"
+    // the other skies of the theme (game[0].z: DL_SKY_*), as sky_other in dl_draw.c, animated
+    "float3 sky_other(float style, float2 uv, float time, float aspect) {\n"
+    "  const float3 c0 = float3(4, 20, 92) / 255.0, c1 = float3(12, 52, 160) / 255.0, c2 = float3(44, 112, 216) / 255.0, c3 = float3(160, 200, 244) / 255.0;\n"
+    "  if (style < 1.5) {\n"
+    "    float2 d = float2((uv.x - 0.8) * aspect, uv.y - 0.1);\n"
+    "    return lerp(c0, c2, pow(uv.y, 1.3)) + c3 * 0.25 * exp(-dot(d, d) * 3);\n"
+    "  }\n"
+    "  float neb = smoothstep(0.45, 0.80, clouds(float2(uv.x * aspect * 3 + time * 0.004, uv.y * 3))) * 0.25;\n"
+    "  float3 col = lerp(lerp(c0 * 0.5, c1 * 0.7, uv.y), c2, neb);\n"
+    "  float2 g = uv * float2(aspect * 90, 90);\n"
+    "  int2 i = int2(floor(g));\n"
+    "  float r = cell(i + int2(7, 7));\n"
+    "  if (r > 0.93) {\n"
+    "    float2 s = g - float2(i) - 0.5 - (float2(cell(i + int2(11, 11)), cell(i + int2(23, 23))) - 0.5) * 0.6;\n"
+    "    col = lerp(col, float3(1, 1, 1), (r - 0.93) / 0.07 * (0.75 + 0.25 * sin(time * 2 + r * 50)) * smoothstep(0.18, 0.0, length(s)));\n"
+    "  }\n"
+    "  return col;\n"
+    "}\n"
+    "float3 sky_clouds(float2 uv, float time, float aspect) {\n"
+    "  float u = uv.x, y = uv.y;\n"
     "  const float horizon = 0.60;\n"
     "  const float3 haze = float3(236, 245, 255) / 255.0;\n"
     "  float3 col;\n"
@@ -149,7 +185,22 @@ static const char gpu_hlsl_tail[] =
     "    col = lerp(col, haze, exp(-p * 7.5));\n"
     "    col *= 1 - 0.38 * p * p;\n"
     "  }\n"
-    "  return float4(outc(col), 1);\n"
+    "  return col;\n"
+    "}\n"
+    "float4 ps_sky(V v) : SV_Target {\n"
+    "  float time = origin.x, aspect = origin.y, style = game[0].z, grain = -1;\n"
+    "  float2 uv = v.uv;\n"
+    "  if (style > 2.5) {\n" // big pixels, few colours with an ordered dither
+    "    float2 n = float2(aspect * 120, 120);\n"
+    "    int2 b = int2(floor(uv * n));\n"
+    "    uv = (float2(b) + 0.5) / n;\n"
+    "    grain = (((b.x & 1) * 2 + (b.y & 1) * 3) % 4 + 0.5) / 4;\n"
+    "  }\n"
+    "  float3 col;\n"
+    "  if (style > 0.5 && style < 2.5) col = sky_other(style, uv, time, aspect);\n"
+    "  else col = sky_clouds(uv, time, aspect);\n"
+    "  if (grain >= 0) col = floor(col * 10 + grain) / 10;\n"
+    "  return float4(outc(dl_tint(col)), 1);\n"
     "}\n";
 
 typedef struct { float tex_size[2], out_size[2], origin[2], filt, scan, crt, hdr, src_size[2], game[32]; } GpuConsts;
@@ -686,6 +737,8 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
       QueryPerformanceCounter(&now);
       GpuConsts sky = {{1, 1}, {(float)cw, (float)ch}, {(float)((double)(now.QuadPart - t0.QuadPart) / (double)fq.QuadPart), (float)cw / (float)ch}};
       sky.hdr = hdr_chain ? hdr_white : 0;
+      sky.game[2] = (float)ui_sky_style();
+      if (ui_theme_hsl(&sky.game[0], &sky.game[1])) sky.game[3] = 1;
       gpu_consts(&sky);
       gpu_quad(0, 0, cw, ch, gpu.ps_sky, -1, false);
       gpu_quad(0, 0, cw, ch, gpu.ps_ui, GT_MENU, true);

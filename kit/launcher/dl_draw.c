@@ -94,6 +94,27 @@ COLORREF ui_tint(COLORREF c) {
   return RGB(q[0], q[1], q[2]);
 }
 
+bool ui_theme_hsl(float *turn_out, float *strength_out) {
+  if (!theme_colours()) return false;
+  *turn_out = (float)hue_turn;
+  *strength_out = (float)strength;
+  return true;
+}
+
+static int frame_style(void) { return theme() ? theme()->frame : DL_FRAME_ROUND; }
+static int title_style(void) { return theme() ? theme()->title : DL_TITLE_METAL; }
+int ui_sky_style(void) { return theme() ? theme()->sky : DL_SKY_CLOUDS; }
+
+// A corner of r logical pixels in the theme's frame style.
+static double ui_corner(double r) {
+  switch (frame_style()) {
+    case DL_FRAME_SQUARE: return 0;
+    case DL_FRAME_DOUBLE: return r < 1.5 ? r : 1.5;
+    case DL_FRAME_SOFT: return r * 2;
+    default: return r;
+  }
+}
+
 COLORREF ui_value(void) {
   if (theme() && theme()->value) { u32 v = theme()->value; return RGB(v >> 16 & 255, v >> 8 & 255, v & 255); }
   return ui_tint(RGB(130, 214, 255));
@@ -251,8 +272,9 @@ void ui_fonts(void) {
     if (*all[k]) DeleteObject(*all[k]);
   f_help_small = CreateFontW(-PX(10.5), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
   // title: a serif face drawn slightly narrow, with a larger initial (see ui_title)
-  f_title = CreateFontW(-PX(43), PX(14.5), 0, 0, FW_BOLD, 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
-  f_title_small = CreateFontW(-PX(33), PX(11.5), 0, 0, FW_BOLD, 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
+  bool slant = title_style() != DL_TITLE_FLAT;
+  f_title = CreateFontW(-PX(43), PX(14.5), 0, 0, FW_BOLD, slant, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
+  f_title_small = CreateFontW(-PX(33), PX(11.5), 0, 0, FW_BOLD, slant, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
   f_item = CreateFontW(-PX(15), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
   f_small = CreateFontW(-PX(11), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
   f_help = CreateFontW(-PX(13), 0, 0, 0, FW_NORMAL, dl_cfg.ui_lang != 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
@@ -295,28 +317,60 @@ void ui_round(HDC dc, double x0, double y0, double x1, double y1, COLORREF c, do
   DeleteObject(b);
 }
 
-// A panel: rounded, letting the sky show through a little, with an optional title on its top edge.
+void ui_box(HDC dc, double x0, double y0, double x1, double y1, COLORREF c, double r) { ui_round(dc, x0, y0, x1, y1, c, ui_corner(r)); }
+
+// The selected row, in the theme's cursor style.
+void ui_cursor(HDC dc, double x0, double y0, double x1, double y1) {
+  int st = theme() ? theme()->cursor : DL_CURSOR_BAR;
+  if (st == DL_CURSOR_ARROW) { // a faint bar and a pointer at its start
+    ui_box(dc, x0, y0, x1, y1, ui_tint(RGB(22, 50, 118)), 4);
+    double cy = (y0 + y1) / 2;
+    POINT p[3] = {{ui_ox + PX(x0 + 1.5), ui_oy + PX(cy - 4.5)}, {ui_ox + PX(x0 + 1.5), ui_oy + PX(cy + 4.5)}, {ui_ox + PX(x0 + 7), ui_oy + PX(cy)}};
+    HBRUSH b = CreateSolidBrush(ui_value());
+    HGDIOBJ ob = SelectObject(dc, b), op = SelectObject(dc, GetStockObject(NULL_PEN));
+    Polygon(dc, p, 3);
+    SelectObject(dc, ob);
+    SelectObject(dc, op);
+    DeleteObject(b);
+  } else if (st == DL_CURSOR_OUTLINE) {
+    HPEN pen = CreatePen(PS_SOLID, PX(1.5) < 1 ? 1 : PX(1.5), ui_value());
+    HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, GetStockObject(NULL_BRUSH));
+    int d = PX(ui_corner(4) * 2);
+    RoundRect(dc, ui_ox + PX(x0), ui_oy + PX(y0), ui_ox + PX(x1) + 1, ui_oy + PX(y1) + 1, d, d);
+    SelectObject(dc, op);
+    SelectObject(dc, ob);
+    DeleteObject(pen);
+  } else ui_box(dc, x0, y0, x1, y1, ui_tint(RGB(34, 84, 184)), 4);
+}
+
+// A panel letting the sky show through a little, in the theme's frame style (rounded with a line by
+// default), with an optional title on its top edge.
 void ui_panel(HDC dc, double x0, double y0, double x1, double y1, COLORREF fill, const wchar_t *tab) {
-  int X0 = ui_ox + PX(x0), Y0 = ui_oy + PX(y0), X1 = ui_ox + PX(x1), Y1 = ui_oy + PX(y1), d = PX(12);
+  int st = frame_style();
+  double rad = st == DL_FRAME_SQUARE ? 0 : st == DL_FRAME_DOUBLE ? 3 : st == DL_FRAME_SOFT ? 16 : 6;
+  int X0 = ui_ox + PX(x0), Y0 = ui_oy + PX(y0), X1 = ui_ox + PX(x1), Y1 = ui_oy + PX(y1), d = PX(rad * 2);
   if (fill != RGB(0, 0, 0)) {
     HRGN rg = CreateRoundRectRgn(X0, Y0, X1 + 1, Y1 + 1, d, d);
     SelectClipRgn(dc, rg);
-    ui_rect_alpha(dc, x0, y0, x1, y1, fill, 205);
+    ui_rect_alpha(dc, x0, y0, x1, y1, fill, st == DL_FRAME_DOUBLE ? 235 : st == DL_FRAME_SOFT ? 180 : 205);
     SelectClipRgn(dc, NULL);
     DeleteObject(rg);
-  } else ui_round(dc, x0, y0, x1, y1, fill, 6);
-  HPEN pen = CreatePen(PS_SOLID, PX(1) < 1 ? 1 : PX(1), COL_EDGE);
-  HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, GetStockObject(NULL_BRUSH));
-  RoundRect(dc, X0, Y0, X1 + 1, Y1 + 1, d, d);
-  SelectObject(dc, op);
-  SelectObject(dc, ob);
-  DeleteObject(pen);
+  } else ui_round(dc, x0, y0, x1, y1, fill, rad);
+  for (int k = 0; k < (st == DL_FRAME_SOFT ? 0 : st == DL_FRAME_DOUBLE ? 2 : 1); k++) { // the edge; a second line inside it
+    HPEN pen = CreatePen(PS_SOLID, PX(1) < 1 ? 1 : PX(1), k ? ui_tint(RGB(176, 206, 250)) : COL_EDGE);
+    HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, GetStockObject(NULL_BRUSH));
+    int in = k * PX(3);
+    RoundRect(dc, X0 + in, Y0 + in, X1 + 1 - in, Y1 + 1 - in, d, d);
+    SelectObject(dc, op);
+    SelectObject(dc, ob);
+    DeleteObject(pen);
+  }
   if (tab) {
     SIZE sz;
     SelectObject(dc, f_small);
     GetTextExtentPoint32W(dc, tab, lstrlenW(tab), &sz);
     double w = sz.cx / ui_s + 12;
-    ui_round(dc, x0 + 12, y0 - 8, x0 + 12 + w, y0 + 7, ui_tint(RGB(176, 206, 250)), 4);
+    ui_box(dc, x0 + 12, y0 - 8, x0 + 12 + w, y0 + 7, ui_tint(RGB(176, 206, 250)), 4);
     SetBkMode(dc, TRANSPARENT);
     SetTextAlign(dc, TA_LEFT | TA_TOP);
     SetTextColor(dc, ui_tint(RGB(8, 26, 84)));
@@ -394,6 +448,26 @@ void ui_title(HDC dc, double x, double base) {
     title_extra(dc, end, base);
     return;
   }
+  if (title_style() == DL_TITLE_FLAT) { // a shadow, the letters in the value colour, a rule of that colour
+    HBRUSH shadow = CreateSolidBrush(ui_tint(RGB(4, 14, 60))), face = CreateSolidBrush(ui_value());
+    HGDIOBJ ob = SelectObject(dc, shadow), op = SelectObject(dc, GetStockObject(NULL_PEN));
+    title_path(dc, x + 2, base + 2);
+    FillPath(dc);
+    SelectObject(dc, face);
+    double end = title_path(dc, x, base);
+    FillPath(dc);
+    SelectObject(dc, ob);
+    SelectObject(dc, op);
+    DeleteObject(shadow);
+    DeleteObject(face);
+    COLORREF v = ui_value(), fade = ui_tint(RGB(0x10, 0x38, 0xA0));
+    TRIVERTEX r[2] = {{ui_ox + PX(x), ui_oy + PX(base + 6.5), GetRValue(v) << 8, GetGValue(v) << 8, GetBValue(v) << 8, 0},
+                      {ui_ox + PX(end + 40), ui_oy + PX(base + 6.5) + (PX(1.5) < 1 ? 1 : PX(1.5)), GetRValue(fade) << 8, GetGValue(fade) << 8, GetBValue(fade) << 8, 0}};
+    GRADIENT_RECT rr = {0, 1};
+    GradientFill(dc, r, 2, &rr, 1, GRADIENT_FILL_RECT_H);
+    title_extra(dc, end, base);
+    return;
+  }
   // soft shadow, then a dark edge, then the metal
   HBRUSH shade = CreateSolidBrush(ui_tint(RGB(4, 14, 60))), edge_fill = CreateSolidBrush(ui_tint(RGB(10, 30, 96)));
   HPEN edge = CreatePen(PS_SOLID, PX(3.2) < 2 ? 2 : PX(3.2), ui_tint(RGB(6, 22, 84)));
@@ -464,7 +538,7 @@ void ui_bar(HDC dc, double x0, double y, double x1, int value, int max) {
 // only shown (no < > arrows); bar_max > 0: a bar.
 void ui_row(HDC dc, double y, double h, bool sel, const wchar_t *label, const wchar_t *value, int sw, bool plain, int bar, int bar_max) {
   if (y + h > PANEL_BOTTOM + 1) ui_audit_note("row under the panel", label);
-  if (sel) ui_round(dc, ROW_X0, y - 1, ROW_X1, y + h - 2, ui_tint(RGB(34, 84, 184)), 4);
+  if (sel) ui_cursor(dc, ROW_X0, y - 1, ROW_X1, y + h - 2);
   bool has_value = value || bar_max || sw >= 0;
   ui_text_fit(dc, ROW_X0 + 9, y, label, sel ? COL_SEL : ui_tint(RGB(240, 242, 255)), TA_LEFT,
               !has_value ? ROW_X1 - ROW_X0 - 16 : sw >= 0 ? ROW_X1 - ROW_X0 - 56 : VAL_X0 - ROW_X0 - 13); // a switch leaves more room
@@ -476,7 +550,7 @@ void ui_row(HDC dc, double y, double h, bool sel, const wchar_t *label, const wc
     ui_round(dc, kx - 5, cy - 5, kx + 5, cy + 5, sw ? ui_tint(RGB(12, 40, 110)) : ui_tint(RGB(214, 228, 252)), 5);
     return;
   }
-  ui_round(dc, VAL_X0, y, VAL_X1, y + h - 4, ui_tint(RGB(6, 18, 58)), 4);
+  ui_box(dc, VAL_X0, y, VAL_X1, y + h - 4, ui_tint(RGB(6, 18, 58)), 4);
   if (bar_max) ui_bar(dc, VAL_X0, y, VAL_X1, bar, bar_max);
   else ui_text_fit(dc, (VAL_X0 + VAL_X1) / 2, y, value, COL_VALUE, TA_CENTER, sel && !plain ? VAL_W - 30 : VAL_W - 4); // selected: room for < >
   if (sel && value && !bar_max && !plain) {
@@ -571,6 +645,30 @@ static void sky_pixel(double u, double v, double aspect, double *rgb) {
   }
 }
 
+// The other skies of DlTheme.sky (the same as ps_sky in dl_gpu.c, still: the graphics card animates them).
+static void sky_other(int style, double u, double v, double aspect, double *rgb) {
+  static const double c0[3] = {4, 20, 92}, c1[3] = {12, 52, 160}, c2[3] = {44, 112, 216}, c3[3] = {160, 200, 244};
+  if (style == DL_SKY_GRADIENT) { // deep at the top, lighter below, a glow in the upper right
+    double t = pow(v, 1.3), dx = (u - 0.8) * aspect, dy = v - 0.1, glow = 0.25 * exp(-(dx * dx + dy * dy) * 3);
+    for (int c = 0; c < 3; c++) rgb[c] = c0[c] + (c2[c] - c0[c]) * t + c3[c] * glow;
+    return;
+  }
+  // a starry night: a dark gradient, faint clouds of light, stars on a grid of cells
+  double neb = sky_step(0.45, 0.80, sky_clouds(u * aspect * 3, v * 3)) * 0.25;
+  for (int c = 0; c < 3; c++) {
+    double b = c0[c] * 0.5 + (c1[c] * 0.7 - c0[c] * 0.5) * v;
+    rgb[c] = b + (c2[c] - b) * neb;
+  }
+  double gx = u * aspect * 90, gy = v * 90;
+  int ix = (int)floor(gx), iy = (int)floor(gy);
+  double r = sky_cell(ix + 7, iy + 7);
+  if (r > 0.93) {
+    double sx = gx - ix - 0.5 - (sky_cell(ix + 11, iy + 11) - 0.5) * 0.6, sy = gy - iy - 0.5 - (sky_cell(ix + 23, iy + 23) - 0.5) * 0.6;
+    double lit = (r - 0.93) / 0.07 * (0.75 + 0.25 * sin(r * 50)) * sky_step(0.18, 0.0, sqrt(sx * sx + sy * sy));
+    for (int c = 0; c < 3; c++) rgb[c] += (255 - rgb[c]) * lit;
+  }
+}
+
 // The player's own backdrop instead of the sky: launcher_bg.png (or .jpg, .bmp, .gif) next to the
 // program; otherwise the theme's. Scaled to cover the window with its proportions kept (made again when
 // the size changes). False when there is none.
@@ -638,8 +736,19 @@ void sky_draw(HDC dc, int cw, int ch) {
       double aspect = (double)w / h;
       for (int y = 0; y < h; y++)
         for (int x = 0; x < w; x++) {
-          double rgb[3];
-          sky_pixel((x + 0.5) / w, (y + 0.5) / h, aspect, rgb);
+          double rgb[3], u = (x + 0.5) / w, v = (y + 0.5) / h, grain = -1;
+          int st = ui_sky_style();
+          if (st == DL_SKY_PIXEL) { // blocks 1/120 of the height, few colours with an ordered dither
+            double nx = aspect * 120;
+            int bx = (int)(u * nx), by = (int)(v * 120);
+            u = (bx + 0.5) / nx;
+            v = (by + 0.5) / 120;
+            grain = (((bx & 1) * 2 + (by & 1) * 3) % 4 + 0.5) / 4;
+          }
+          if (st == DL_SKY_GRADIENT || st == DL_SKY_STARS) sky_other(st, u, v, aspect, rgb);
+          else sky_pixel(u, v, aspect, rgb);
+          if (grain >= 0)
+            for (int k = 0; k < 3; k++) rgb[k] = floor(rgb[k] / 255 * 10 + grain) / 10 * 255;
           if (theme_colours()) tint3(rgb);
           u32 c = 0;
           for (int k = 0; k < 3; k++) { int q = (int)(rgb[k] + 0.5); c = (c << 8) | (u32)(q < 0 ? 0 : q > 255 ? 255 : q); }

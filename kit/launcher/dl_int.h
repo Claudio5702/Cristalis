@@ -223,6 +223,10 @@ bool backdrop_draw(HDC dc, int cw, int ch); // the player's launcher_bg.*, or th
 // ---- the game's theme (DlTheme, dl_draw.c)
 COLORREF ui_tint(COLORREF c); // one of DarkLauncher's colours in the theme's hue and strength (c itself without one)
 COLORREF ui_value(void);      // the colour of values and bars
+bool ui_theme_hsl(float *turn, float *strength); // the theme's colour as dl_gpu.c's sky needs it; false: none
+int ui_sky_style(void);       // DL_SKY_*
+void ui_box(HDC dc, double x0, double y0, double x1, double y1, COLORREF c, double r); // ui_round in the theme's frame style
+void ui_cursor(HDC dc, double x0, double y0, double x1, double y1);                   // the selected row
 bool ui_theme_icon(HDC dc, unsigned icon, double x0, double y0, double x1, double y1); // false: the theme has none
 void ui_window_icon(void);    // the theme's icon 0 on the window, if any
 // The theme's sound for dl_beep (kind 0 moving, 1 choosing) as a WAV in memory at that volume (0-10); NULL: none.

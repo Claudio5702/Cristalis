@@ -290,22 +290,38 @@ void dl_restart(void) {
   if (dl_started) dl_play();
 }
 
-// Short sounds of the setup screen (made once per volume): a tick when moving, two notes when choosing.
+// Short sounds of the setup screen (made once per volume): a tick when moving, two notes when choosing,
+// in the theme's kind (DL_BEEP_*).
 void dl_beep(int kind) {
-  static u8 wav[2][44 + 2 * 1400];
+  static u8 wav[2][44 + 2 * 6000];
   static int made_for = -1;
   if (!dl_cfg.menu_sound || !dl_cfg.volume || dl_audit_dir) return;
   const void *own = ui_theme_sound(kind, dl_cfg.volume); // the game's own, if its theme has them
   if (own) { PlaySoundA(own, NULL, SND_MEMORY | SND_ASYNC | SND_NODEFAULT); return; }
   if (made_for != dl_cfg.volume) {
     made_for = dl_cfg.volume;
+    int style = dl_game->theme ? dl_game->theme->beep : DL_BEEP_BELL;
     for (int w = 0; w < 2; w++) {
-      const int rate = 22050, n = w ? 1400 : 700;
+      const int rate = 22050;
+      int n = style == DL_BEEP_CHIP ? (w ? 2400 : 900) : style == DL_BEEP_SOFT ? (w ? 1800 : 700) : style == DL_BEEP_CRYSTAL ? (w ? 6000 : 2600) : (w ? 1400 : 700);
       u32 hd[11] = {0x46464952, 36 + (u32)n * 2, 0x45564157, 0x20746D66, 16, 0x00010001, (u32)rate, (u32)rate * 2, 0x00100002, 0x61746164, (u32)n * 2};
       memcpy(wav[w], hd, 44);
       for (int k = 0; k < n; k++) {
-        double env = 1.0 - (double)k / n, f = w ? (k < n / 2 ? 990.0 : 1320.0) : 880.0;
-        s16 v = (s16)(sin(k * 6.283185307 * f / rate) * env * env * 420 * dl_cfg.volume);
+        double env = 1.0 - (double)k / n, s;
+        if (style == DL_BEEP_CHIP) { // square wave
+          double f = w ? (k < n / 2 ? 784.0 : 1175.0) : 1568.0;
+          s = (fmod(k * f / rate, 1.0) < 0.5 ? 0.6 : -0.6) * env;
+        } else if (style == DL_BEEP_SOFT) { // low triangle, quickly gone
+          double f = w ? (k < n / 2 ? 523.0 : 659.0) : 440.0, ph = fmod(k * f / rate, 1.0);
+          s = (ph < 0.5 ? 4 * ph - 1 : 3 - 4 * ph) * env * env * env * 1.4;
+        } else if (style == DL_BEEP_CRYSTAL) { // high chime with overtones, a long ring
+          double f = w ? (k < n / 3 ? 1760.0 : 2637.0) : 2093.0, t = k * 6.283185307 * f / rate;
+          s = (sin(t) + 0.3 * sin(2 * t) + 0.15 * sin(3.01 * t)) * exp(-5.0 * k / n) * 0.8;
+        } else {
+          double f = w ? (k < n / 2 ? 990.0 : 1320.0) : 880.0;
+          s = sin(k * 6.283185307 * f / rate) * env * env;
+        }
+        s16 v = (s16)(s * 420 * dl_cfg.volume);
         memcpy(wav[w] + 44 + k * 2, &v, 2);
       }
     }

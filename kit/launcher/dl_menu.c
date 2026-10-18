@@ -369,10 +369,10 @@ static void draw_pause(HDC dc, int cw, int ch) {
     bool sel = dl_sel == r, slot_row = it == PA_SAVE || it == PA_LOAD;
     const wchar_t *label = it >= PA_COUNT ? dl_tr(dl_funcs[it - PA_COUNT].label) : it == PA_RESUME ? TX(T_RESUME) : it == PA_SAVE ? TX(T_HK_SAVE)
                          : it == PA_LOAD ? TX(T_HK_LOAD) : it == PA_SHOT ? TX(T_HK_SHOT) : it == PA_SETTINGS ? TX(T_PA_SETTINGS) : TX(T_QUIT);
-    if (sel) ui_round(dc, PA_X0 + 3, y - 1, PA_X1 - 3, y + ROW_H - 2, ui_tint(RGB(34, 84, 184)), 4);
+    if (sel) ui_cursor(dc, PA_X0 + 3, y - 1, PA_X1 - 3, y + ROW_H - 2);
     ui_text_fit(dc, PA_X0 + 12, y, label, sel ? COL_SEL : ui_tint(RGB(240, 242, 255)), TA_LEFT, (slot_row ? PA_VAL0 : PA_X1 - 6) - PA_X0 - 16);
     if (slot_row) { // the slot, changed with Left and Right
-      ui_round(dc, PA_VAL0, y, PA_X1 - 8, y + ROW_H - 4, ui_tint(RGB(6, 18, 58)), 4);
+      ui_box(dc, PA_VAL0, y, PA_X1 - 8, y + ROW_H - 4, ui_tint(RGB(6, 18, 58)), 4);
       wsprintfW(num, L"%d", dl_slot);
       ui_text(dc, f_item, (PA_VAL0 + PA_X1 - 8) / 2, y, num, COL_VALUE, TA_CENTER);
       if (sel) {
@@ -454,11 +454,11 @@ static void draw_side(HDC dc) {
   for (int k = 0; k < dl_sec_n; k++) {
     double y = side_y(k);
     bool focus = dl_mode == M_SIDE && dl_side == k, here = !focus && dl_secs[k].kind == SEC_PAGE && dl_side == k;
-    if (focus) ui_round(dc, SIDE_X0, y - 1, SIDE_X1, y + ROW_H - 2, ui_tint(RGB(34, 84, 184)), 4);
-    else if (here) ui_round(dc, SIDE_X0, y - 1, SIDE_X1, y + ROW_H - 2, ui_tint(RGB(22, 50, 118)), 4);
+    if (focus) ui_cursor(dc, SIDE_X0, y - 1, SIDE_X1, y + ROW_H - 2);
+    else if (here) ui_box(dc, SIDE_X0, y - 1, SIDE_X1, y + ROW_H - 2, ui_tint(RGB(22, 50, 118)), 4);
     COLORREF c = focus ? COL_SEL : here ? RGB(255, 255, 255) : ui_tint(RGB(196, 212, 244));
     double lx = SIDE_X0 + 8;
-    if (dl_secs[k].icon && ui_theme_icon(dc, dl_secs[k].icon, SIDE_X0 + 5, y, SIDE_X0 + 21, y + 16)) lx = SIDE_X0 + 28;
+    if (dl_secs[k].icon && ui_theme_icon(dc, dl_secs[k].icon, SIDE_X0 + 7, y, SIDE_X0 + 23, y + 16)) lx = SIDE_X0 + 28;
     else if (icons && dl_secs[k].icon) {
       wchar_t g[2] = {(wchar_t)dl_secs[k].icon, 0};
       ui_text(dc, icons, SIDE_X0 + 8, y + 2, g, c, TA_LEFT);

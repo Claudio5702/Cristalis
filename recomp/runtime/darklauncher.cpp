@@ -264,6 +264,21 @@ void Setup()
     dl_setting("storage_choice", &g_storageChoice, 0, 1, false);
 }
 
+// ---- Theme: the settings screen after the game's art direction, drawn by DarkLauncher ----
+// Nothing is taken from the game's files. The game's menus are windows of a deep petrol blue with
+// rounded corners and a bright rim, the choice lit by a bar; its backdrops are luminous veils over
+// dark blue; its logo is tall upright serif capitals; the texts of its menus a narrow sans serif; its
+// world is one of crystals. So: that blue, the cream gold of its crystals for the values, rounded
+// frames, a bar for the selection, a gradient with a glow behind, an upright title, a crystal chime.
+const DlTheme kTheme = {
+    0x32617F,                     // colour: the blue of the game's windows
+    0xDFD296,                     // value: the cream gold of its crystals and gold windows
+    L"Constantia",                // title_font: upright serif capitals, as the logo
+    L"Bahnschrift SemiCondensed", // text_font: a narrow sans serif, as the texts of its menus
+    nullptr, nullptr, nullptr, nullptr,
+    DL_FRAME_ROUND, DL_CURSOR_BAR, DL_SKY_GRADIENT, DL_TITLE_FLAT, DL_BEEP_CRYSTAL,
+};
+
 // ---- The game ----
 
 DWORD WINAPI GuestThread(void*)
@@ -398,5 +413,10 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.start = Start;
     game.frame = Frame;
     game.setup = Setup;
+    // --no-theme: DarkLauncher's own look (to compare)
+    bool themed = true;
+    for (int i = 1; i < argc; i++)
+        themed = themed && strcmp(argv[i], "--no-theme") != 0;
+    game.theme = themed ? &kTheme : nullptr;
     return dl_run(&game, argc, argv);
 }

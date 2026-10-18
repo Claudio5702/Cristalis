@@ -28,11 +28,20 @@ typedef struct { uint32_t buttons; } DlInput;
 // already multiplied by their opacity, at x,y in the window.
 typedef struct { const uint32_t *pixels; int x, y, w, h; } DlOverlay;
 
-// The look of the setup screen taken from the game (DlGame.theme; NULL: DarkLauncher's own night
-// blue). Every field may be 0 or NULL, and a function returning NULL leaves DarkLauncher's own.
-// Pictures are w x h pixels 0xAARRGGBB, colours already multiplied by their opacity (as overlays): they
-// come from the player's own copy of the game, are asked for once start() has run, and must stay valid
-// while the program runs. Nothing of the game goes into the project's files.
+// Styles of DlTheme: what DarkLauncher draws itself, chosen to match the game's art direction. 0 is
+// always DarkLauncher's own.
+enum { DL_FRAME_ROUND, DL_FRAME_SQUARE, DL_FRAME_DOUBLE, DL_FRAME_SOFT };  // panels: rounded with a line; square; a double line (an RPG window); very round without a line
+enum { DL_CURSOR_BAR, DL_CURSOR_ARROW, DL_CURSOR_OUTLINE };               // selection: a filled bar; a pointer before a faint bar; an outline
+enum { DL_SKY_CLOUDS, DL_SKY_GRADIENT, DL_SKY_STARS, DL_SKY_PIXEL };      // behind the menus: sky and sea of clouds; a plain gradient with a glow; a starry night; the clouds in big pixels with few colours
+enum { DL_TITLE_METAL, DL_TITLE_FLAT };                                   // the project's name: slanted metal letters; upright letters in the value colour
+enum { DL_BEEP_BELL, DL_BEEP_CHIP, DL_BEEP_SOFT, DL_BEEP_CRYSTAL };       // menu sounds: soft bell; square wave of old consoles; low muffled click; bright chime
+
+// The look of the setup screen fitted to the game's art direction (DlGame.theme; NULL: DarkLauncher's
+// own night blue): its colours, fonts and styles, which DarkLauncher draws itself. Every field may be
+// 0 or NULL, and a function returning NULL leaves DarkLauncher's own. The pictures and sounds are for
+// art made for the port by the project (drawn or computed), not for files taken from the game: w x h
+// pixels 0xAARRGGBB, colours already multiplied by their opacity (as overlays), asked for once start()
+// has run, valid while the program runs.
 typedef struct DlTheme {
   // 0xRRGGBB, from the game's logo or its own menus (0: DarkLauncher's blue): the panels, the selection,
   // the sky and the edges take its hue and strength, each keeping how light DarkLauncher makes it, so
@@ -50,6 +59,7 @@ typedef struct DlTheme {
   const uint32_t *(*icon)(unsigned icon, int *w, int *h);
   // The menus' sounds (kind 0 moving, 1 choosing): n mono 16-bit samples, rate per second.
   const int16_t *(*sound)(int kind, int *n, int *rate);
+  int frame, cursor, sky, title, beep; // DL_FRAME_*, DL_CURSOR_*, DL_SKY_*, DL_TITLE_*, DL_BEEP_*
 } DlTheme;
 
 typedef struct DlGame {
