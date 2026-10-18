@@ -352,8 +352,6 @@ void dl_gpu_stop(void) {
   if (gl.tried && gl_load()) gl_shutdown();
 }
 void dl_gpu_follow(bool now) { (void)now; } // no HDR yet on Linux
-bool dl_windows_hdr(void) { return false; }
-const wchar_t *dl_hdr_value(int v) { (void)v; return TX(T_NO); }
 
 // Texture 'which' at the given size and format, filled (format: DL_TEX_*).
 static bool upload_as(int which, int format, const void *data, int w, int h) {

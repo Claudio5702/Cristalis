@@ -85,8 +85,10 @@ static void full_changed(void) { dl_toggle_fullscreen(); }
 static void try_it(void) { dl_mode = M_TRY; }
 static void picture_defaults(void) { dl_defaults(true); }
 static void gpu_changed(void) { dl_gpu_restart(); }
+#ifdef _WIN32 // HDR: Windows only; on Linux the desktop shows the picture on an HDR screen itself
 static void hdr_changed(void) { dl_gpu_follow(true); }
 static const wchar_t *hdr_more(void) { return dl_windows_hdr() ? TX(T_HDR_WIN_ON) : TX(T_HDR_WIN_OFF); }
+#endif
 // The speed is 0 (max), 2 or 4, as in Kahna's settings file: the odd values are stepped over, in the
 // direction of the change (the value before it is the one last shown).
 static int turbo_shown;
@@ -111,7 +113,9 @@ static const DlRow image_rows[] = {
     {DL_CHOICE, dl_texts[T_FILTER], dl_texts[T_H_FILTER], &dl_cfg.smooth, 2, filter_names},
     {DL_BAR, dl_texts[T_SCAN], dl_texts[T_H_SCAN], &dl_cfg.scanlines, 4},
     {DL_CHOICE, dl_texts[T_CRT], dl_texts[T_H_CRT], &dl_cfg.crt, 2, crt_names},
+#ifdef _WIN32
     {DL_CHOICE, dl_texts[T_HDR], dl_texts[T_H_HDR], &dl_cfg.hdr, 4, NULL, dl_hdr_value, hdr_changed, 0, hdr_more},
+#endif
     {DL_SWITCH, dl_texts[T_VSYNC], dl_texts[T_H_VSYNC], &dl_cfg.vsync, 1},
     {DL_SWITCH, dl_texts[T_FPS], dl_texts[T_H_FPS], &dl_cfg.show_fps, 1},
     {DL_ACTION, dl_texts[T_TRY], dl_texts[T_H_TRY], NULL, 0, NULL, NULL, try_it},
