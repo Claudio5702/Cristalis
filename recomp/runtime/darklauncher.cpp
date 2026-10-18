@@ -419,5 +419,17 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     for (int i = 1; i < argc; i++)
         themed = themed && strcmp(argv[i], "--no-theme") != 0;
     game.theme = themed ? &kTheme : nullptr;
+    // CD_THEME=<frame>,<cursor>,<sky>,<title>,<beep>[,<colour hex>]: other styles for a moment, to
+    // compare them (tests); the numbers are DarkLauncher's DL_FRAME_*, DL_CURSOR_*... in order.
+    static DlTheme tried = kTheme;
+    if (const char* styles = getenv("CD_THEME"); themed && styles != nullptr)
+    {
+        unsigned colour = tried.colour;
+        if (sscanf(styles, "%d,%d,%d,%d,%d,%x", &tried.frame, &tried.cursor, &tried.sky, &tried.title, &tried.beep, &colour) >= 5)
+        {
+            tried.colour = colour;
+            game.theme = &tried;
+        }
+    }
     return dl_run(&game, argc, argv);
 }
