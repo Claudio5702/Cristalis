@@ -32,6 +32,8 @@ struct GdiObj {
   int x0, y0, x1, y1, corner; // region: a rectangle, or a rounded one (corner: its corners' size)
   FT_Face face, fall[FALLBACKS]; // font: its face, then faces for the characters it lacks
   bool fall_tried;
+  const struct Palt *palt[1 + FALLBACKS]; // the proportional widths of face and fall[] (NULL: none)
+  bool palt_tried[1 + FALLBACKS];
   int em, ascent, descent, avg;
   double sx;                     // horizontal scale (a width asked for), 1 otherwise
   bool bold, italic, fake_bold, fake_italic, icons;
@@ -614,7 +616,8 @@ HFONT CreateFontW(int height, int width, int escapement, int orientation, int we
     TT_OS2 *os2 = FT_Get_Sfnt_Table(o->face, FT_SFNT_OS2);
     double avg = os2 && os2->xAvgCharWidth > 0 ? os2->xAvgCharWidth * (double)o->em / o->face->units_per_EM : o->em * 0.5;
     o->sx = width / avg;
-  } else if (jp) o->sx = 0.86; // Yu Gothic UI's characters are narrower than Noto Sans CJK's: the texts were fitted to them
+  } else if (jp) o->sx = 0.85; // Yu Gothic UI's characters are narrower than Noto Sans CJK's (its kana proportional too: 'palt'
+                               // below): the texts were fitted to them, so that no text is wider than on Windows, bold too
   else o->sx = wide;
   o->ascent = (int)ceil(o->face->size->metrics.ascender / 64.0);
   o->descent = (int)ceil(-o->face->size->metrics.descender / 64.0);
@@ -625,6 +628,94 @@ HFONT CreateFontW(int height, int width, int escapement, int orientation, int we
   TT_OS2 *os2 = FT_Get_Sfnt_Table(o->face, FT_SFNT_OS2);
   o->avg = (int)((os2 && os2->xAvgCharWidth > 0 ? os2->xAvgCharWidth * (double)o->em / o->face->units_per_EM : o->em * 0.5) * o->sx + 0.5);
   return o;
+}
+
+// ---- proportional kana: Yu Gothic UI's kana and punctuation are narrower than its kanji; Noto Sans
+// CJK draws them on full squares, and gives their proportional widths in its 'palt' feature (GPOS
+// single adjustments). FreeType does not apply it, so it is read here: for each glyph, how far it moves
+// and how much its advance changes (font units). Kept for every face that has one, by its names.
+typedef struct Palt { char key[96]; int n; int16_t (*adj)[2]; } Palt;
+static Palt palts[8];
+static int npalts;
+
+static unsigned be16(const uint8_t *t, size_t len, size_t at) { return at + 2 <= len ? (unsigned)(t[at] << 8 | t[at + 1]) : 0; }
+static unsigned long be32(const uint8_t *t, size_t len, size_t at) { return at + 4 <= len ? (unsigned long)be16(t, len, at) << 16 | be16(t, len, at + 2) : 0; }
+
+// A single adjustment subtable (format 1 or 2) into p.
+static void palt_single(Palt *p, const uint8_t *t, size_t len, size_t st) {
+  unsigned format = be16(t, len, st), cov = (unsigned)st + be16(t, len, st + 2), vf = be16(t, len, st + 4);
+  int size = 0;
+  for (int b = 0; b < 8; b++) size += (vf >> b & 1) * 2;
+  if ((format != 1 && format != 2) || !(vf & 5)) return;
+  // the value record of the k-th covered glyph: x placement, x advance
+  #define PALT_VALUE(at, dx, dadv) do { size_t v_ = (at); int o_ = 0; dx = dadv = 0; \
+    if (vf & 1) { dx = (int16_t)be16(t, len, v_); o_ += 2; } if (vf & 2) o_ += 2; \
+    if (vf & 4) dadv = (int16_t)be16(t, len, v_ + o_); } while (0)
+  size_t values = format == 1 ? st + 6 : st + 8;
+  unsigned cf = be16(t, len, cov), count = be16(t, len, cov + 2);
+  for (unsigned i = 0; i < count; i++) {
+    unsigned first, last, index;
+    if (cf == 1) first = last = be16(t, len, cov + 4 + 2 * i), index = i;
+    else if (cf == 2) first = be16(t, len, cov + 4 + 6 * i), last = be16(t, len, cov + 6 + 6 * i), index = be16(t, len, cov + 8 + 6 * i);
+    else return;
+    for (unsigned g = first; g <= last && g < (unsigned)p->n; g++, index++) {
+      int dx, dadv;
+      PALT_VALUE(format == 1 ? values : values + (size_t)index * size, dx, dadv);
+      if (!p->adj[g][0] && !p->adj[g][1]) p->adj[g][0] = (int16_t)dx, p->adj[g][1] = (int16_t)dadv;
+    }
+  }
+  #undef PALT_VALUE
+}
+
+static const Palt *palt_for(FT_Face face) {
+  char key[96];
+  snprintf(key, sizeof key, "%s|%s|%ld", face->family_name ? face->family_name : "", face->style_name ? face->style_name : "", face->num_glyphs);
+  for (int i = 0; i < npalts; i++)
+    if (!strcmp(palts[i].key, key)) return palts[i].n ? &palts[i] : NULL;
+  if (npalts == (int)(sizeof palts / sizeof *palts)) return NULL;
+  Palt *p = &palts[npalts++];
+  snprintf(p->key, sizeof p->key, "%s", key);
+  FT_ULong len = 0;
+  if (FT_Load_Sfnt_Table(face, FT_MAKE_TAG('G', 'P', 'O', 'S'), 0, NULL, &len) || len < 10) return NULL;
+  uint8_t *t = malloc(len);
+  if (!t || FT_Load_Sfnt_Table(face, FT_MAKE_TAG('G', 'P', 'O', 'S'), 0, t, &len)) { free(t); return NULL; }
+  size_t features = be16(t, len, 6), lookups = be16(t, len, 8);
+  p->n = (int)face->num_glyphs;
+  p->adj = calloc((size_t)p->n, sizeof *p->adj);
+  bool any = false;
+  for (unsigned f = 0, nf = be16(t, len, features); p->adj && f < nf; f++) {
+    size_t rec = features + 2 + 6 * f;
+    if (rec + 6 > len || memcmp(t + rec, "palt", 4)) continue;
+    size_t feat = features + be16(t, len, rec + 4);
+    for (unsigned l = 0, nl = be16(t, len, feat + 2); l < nl; l++) {
+      size_t lk = lookups + be16(t, len, lookups + 2 + 2 * be16(t, len, feat + 4 + 2 * l));
+      unsigned type = be16(t, len, lk);
+      for (unsigned k = 0, nk = be16(t, len, lk + 4); k < nk; k++) {
+        size_t st = lk + be16(t, len, lk + 6 + 2 * k);
+        if (type == 9 && be16(t, len, st + 2) == 1) palt_single(p, t, len, st + be32(t, len, st + 4)), any = true; // an extension
+        else if (type == 1) palt_single(p, t, len, st), any = true;
+      }
+    }
+  }
+  free(t);
+  if (!any || !p->adj) { free(p->adj); p->adj = NULL; p->n = 0; return NULL; }
+  return p;
+}
+
+// How far the glyph just loaded in face moves, and how much its advance changes, in pixels.
+static void palt_adjust(HGDIOBJ f, FT_Face face, double *dx, double *dadv) {
+  *dx = *dadv = 0;
+  int slot = face == f->face ? 0 : -1;
+  for (int k = 0; slot < 0 && k < FALLBACKS; k++)
+    if (face == f->fall[k]) slot = 1 + k;
+  if (slot < 0) return;
+  if (!f->palt_tried[slot]) f->palt_tried[slot] = true, f->palt[slot] = palt_for(face);
+  const Palt *p = f->palt[slot];
+  unsigned g = face->glyph->glyph_index;
+  if (!p || g >= (unsigned)p->n) return;
+  double scale = (double)f->em / face->units_per_EM * f->sx;
+  *dx = p->adj[g][0] * scale;
+  *dadv = p->adj[g][1] * scale;
 }
 
 // The face that has character c: the font's own, then Japanese, then symbols.
@@ -643,8 +734,9 @@ static FT_Face face_with(HGDIOBJ f, unsigned c) {
   return f->face;
 }
 
-// One glyph rendered: its coverage, where it goes from the pen, its advance.
-static FT_GlyphSlot glyph(HGDIOBJ f, wchar_t ch) {
+// One glyph rendered: its coverage, where it goes from the pen, its advance (and its proportional
+// adjustment: *dx, *dadv).
+static FT_GlyphSlot glyph(HGDIOBJ f, wchar_t ch, double *dx, double *dadv) {
   unsigned c = (unsigned)ch;
   FT_Face face = face_with(f, c);
   if (!face) return NULL;
@@ -652,6 +744,7 @@ static FT_GlyphSlot glyph(HGDIOBJ f, wchar_t ch) {
   FT_Set_Transform(face, &m, NULL);
   if (FT_Load_Char(face, c, FT_LOAD_NO_BITMAP | FT_LOAD_TARGET_NORMAL)) return NULL;
   if (f->fake_bold) FT_GlyphSlot_Embolden(face->glyph);
+  palt_adjust(f, face, dx, dadv);
   if (FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL)) return NULL;
   return face->glyph;
 }
@@ -665,7 +758,9 @@ static double advance(HGDIOBJ f, wchar_t ch) {
   FT_Set_Transform(face, &m, NULL);
   if (FT_Load_Char(face, c, FT_LOAD_NO_BITMAP | FT_LOAD_TARGET_NORMAL)) return 0;
   if (f->fake_bold) FT_GlyphSlot_Embolden(face->glyph);
-  return face->glyph->advance.x / 64.0;
+  double dx, dadv;
+  palt_adjust(f, face, &dx, &dadv);
+  return face->glyph->advance.x / 64.0 + dadv;
 }
 
 // ---- text
@@ -720,9 +815,10 @@ static void text_draw(HDC dc, double x, int base, const wchar_t *s, int n, const
       if (dl_icon_draw((unsigned)s[k], (int)floor(x + 0.5), base - f->em + f->em / 12, f->em, icon_plot, &to)) x += f->em + dc->extra; // a little low, as the font's own
       continue;
     }
-    FT_GlyphSlot g = glyph(f, s[k]);
+    double dx, dadv;
+    FT_GlyphSlot g = glyph(f, s[k], &dx, &dadv);
     if (!g) continue;
-    int gx = (int)floor(x + 0.5) + g->bitmap_left, gy = base - g->bitmap_top;
+    int gx = (int)floor(x + dx + 0.5) + g->bitmap_left, gy = base - g->bitmap_top;
     for (unsigned r = 0; r < g->bitmap.rows; r++)
       for (unsigned c = 0; c < g->bitmap.width; c++) {
         int a = g->bitmap.buffer[r * g->bitmap.pitch + c], px = gx + (int)c, py = gy + (int)r;
@@ -737,7 +833,7 @@ static void text_draw(HDC dc, double x, int base, const wchar_t *s, int n, const
           if (py > dc->py1) dc->py1 = py;
         } else put(dc, px, py, dc->text, a);
       }
-    x += g->advance.x / 64.0 + dc->extra;
+    x += g->advance.x / 64.0 + dadv + dc->extra;
   }
 }
 
