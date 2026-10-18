@@ -37,7 +37,7 @@ static void active_update(void) {
   for (int k = 0; k < pk_n; k++) {
     if (!pk[k].on) continue;
     wchar_t w[MAX_PATH];
-    _snwprintf(w, MAX_PATH - 1, L"%ls\\%ls", pk_dir, pk[k].name);
+    _snwprintf(w, MAX_PATH - 1, L"%ls" DL_SEP_W L"%ls", pk_dir, pk[k].name);
     w[MAX_PATH - 1] = 0;
     WideCharToMultiByte(CP_ACP, 0, w, -1, act_path[act_n], MAX_PATH, NULL, NULL);
     act_n++;
@@ -63,7 +63,7 @@ static bool rescan(bool from_file) {
   Pack found[PK_MAX], list[PK_MAX];
   int n = 0, m = 0;
   wchar_t pat[MAX_PATH];
-  _snwprintf(pat, MAX_PATH - 1, L"%ls\\*", pk_dir);
+  _snwprintf(pat, MAX_PATH - 1, L"%ls" DL_SEP_W L"*", pk_dir);
   pat[MAX_PATH - 1] = 0;
   WIN32_FIND_DATAW fd;
   HANDLE h = FindFirstFileW(pat, &fd);
@@ -167,9 +167,9 @@ static bool pk_preview(void *dcv, int k, double x0, double y0, double x1, double
     static const wchar_t *const names[] = {L"preview.png", L"cover.png", L"icon.png", L"preview.jpg", L"cover.jpg"};
     for (int i = 0; i < (pk[k].dir ? 5 : 2) && !pic; i++) {
       wchar_t w[MAX_PATH];
-      if (pk[k].dir) _snwprintf(w, MAX_PATH - 1, L"%ls\\%ls\\%ls", pk_dir, pk[k].name, names[i]);
+      if (pk[k].dir) _snwprintf(w, MAX_PATH - 1, L"%ls" DL_SEP_W L"%ls" DL_SEP_W L"%ls", pk_dir, pk[k].name, names[i]);
       else {
-        _snwprintf(w, MAX_PATH - 1, L"%ls\\%ls", pk_dir, pk[k].name);
+        _snwprintf(w, MAX_PATH - 1, L"%ls" DL_SEP_W L"%ls", pk_dir, pk[k].name);
         wchar_t *dot = wcsrchr(w, L'.');
         if (dot) lstrcpyW(dot, i ? L".jpg" : L".png");
       }
@@ -219,7 +219,7 @@ int dl_packs(const DlPacks *p) {
   pcfg = p;
   wchar_t f[MAX_PATH];
   MultiByteToWideChar(CP_UTF8, 0, p->folder, -1, f, MAX_PATH);
-  if (f[0] && f[1] == L':') lstrcpynW(pk_dir, f, MAX_PATH); // a full path
+  if ((f[0] && f[1] == L':') || f[0] == L'/') lstrcpynW(pk_dir, f, MAX_PATH); // a full path
   else {
     wchar_t base[MAX_PATH];
     MultiByteToWideChar(CP_ACP, 0, dl_base_dir, -1, base, MAX_PATH);

@@ -837,7 +837,7 @@ int dl_audit(void) {
       dl_draw_menu(wdc);
       if (k == 0 && dl_menu_bits) {
         GetClientRect(dl_hwnd, &rc);
-        snprintf(path, sizeof path, "%s\\%d_home.png", dl_audit_dir, l);
+        snprintf(path, sizeof path, "%s" DL_SEP "%d_home.png", dl_audit_dir, l);
         dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
       }
     }
@@ -848,7 +848,7 @@ int dl_audit(void) {
       dl_draw_menu(wdc);
       if (dl_menu_bits) {
         GetClientRect(dl_hwnd, &rc);
-        snprintf(path, sizeof path, "%s\\%d_home_%s.png", dl_audit_dir, l, kinds[kind]);
+        snprintf(path, sizeof path, "%s" DL_SEP "%d_home_%s.png", dl_audit_dir, l, kinds[kind]);
         dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
       }
     }
@@ -862,7 +862,7 @@ int dl_audit(void) {
         dl_draw_menu(wdc);
         if (r == 0 && dl_menu_bits) {
           GetClientRect(dl_hwnd, &rc);
-          snprintf(path, sizeof path, "%s\\%d_page%02d.png", dl_audit_dir, l, p);
+          snprintf(path, sizeof path, "%s" DL_SEP "%d_page%02d.png", dl_audit_dir, l, p);
           dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
         }
       }
@@ -874,7 +874,7 @@ int dl_audit(void) {
       dl_draw_menu(wdc);
       if (r == 1 && dl_menu_bits) {
         GetClientRect(dl_hwnd, &rc);
-        snprintf(path, sizeof path, "%s\\%d_pause.png", dl_audit_dir, l);
+        snprintf(path, sizeof path, "%s" DL_SEP "%d_pause.png", dl_audit_dir, l);
         dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
       }
     }

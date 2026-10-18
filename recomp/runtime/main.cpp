@@ -667,6 +667,14 @@ static void RunGuest()
 
 int main(int argc, char* argv[])
 {
+#ifdef CD_DARKLAUNCHER
+    // --version is DarkLauncher's, answered before anything else (no game needed).
+    for (int i = 1; i < argc; i++)
+    {
+        if (strcmp(argv[i], "--version") == 0)
+            return DarkLauncherMain(argc, argv, nullptr);
+    }
+#endif
     // Started without a path (double click on the program): work from the
     // program's own folder and look for the game data next to it.
     // (Arguments starting with "--" are options, such as --no-launcher.)

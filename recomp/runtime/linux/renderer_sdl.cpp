@@ -10,7 +10,14 @@
 #include "xex_header.h"
 
 #define GL_GLEXT_PROTOTYPES
+#ifdef CD_DARKLAUNCHER
+// DarkLauncher (kit/launcher, on SDL3) has the window: the game draws in an OpenGL context of its own,
+// without a window (EGL), and each picture is read back for DarkLauncher (dl_bridge.h).
+#include <EGL/egl.h>
+#include "dl_bridge.h"
+#else
 #include <SDL2/SDL.h>
+#endif
 #include <GL/gl.h>
 #include <GL/glext.h>
 
@@ -26,8 +33,12 @@
 #include <string>
 #include <vector>
 
+#ifdef CD_DARKLAUNCHER
+static EGLContext g_gl; // the game's own context, current on its thread
+#else
 static SDL_Window* g_window;
 static SDL_GLContext g_gl;
+#endif
 static GLuint g_programs[2]; // plain, sharp
 static GLuint g_vertexArray;
 static GLuint g_vertexBuffer;
@@ -35,7 +46,9 @@ static GLuint g_frameBuffer;
 static GLuint g_frameTexture;
 static GLuint g_whiteTexture;
 static GLuint g_depthBuffer;
-static uint32_t g_scale; // the frame is 1280x720 times this
+static uint32_t g_halves; // the frame is 1280x720 times this, counted in halves (2: 1280x720, 3: 1920x1080...)
+static uint32_t FrameWidth() { return kHostWidth * g_halves / 2; }
+static uint32_t FrameHeight() { return kHostHeight * g_halves / 2; }
 static float g_clearColor[4] = { 0, 0, 0, 1 };
 static uint32_t g_frameNumber = 1;
 static bool g_fullscreen;
@@ -53,7 +66,9 @@ static std::atomic<uint16_t> g_keyButtons;
 static std::atomic<uint16_t> g_padButtons;
 static std::atomic<int> g_padAxes[4];
 static std::atomic<int> g_padTriggers[2];
+#ifndef CD_DARKLAUNCHER
 static std::vector<SDL_GameController*> g_controllers;
+#endif
 
 // After a relaunch from the settings menu, this many frames are run as fast as
 // possible without being shown or heard: the logos before the title screen.
@@ -111,17 +126,17 @@ static GLuint Compile(GLenum type, const char* source)
 
 // The frame the game draws into, and its depth buffer, at a multiple of the
 // console's 1280x720.
-static bool CreateFrameTargets(uint32_t scale)
+static bool CreateFrameTargets(uint32_t halves)
 {
-    g_scale = scale;
+    g_halves = halves;
     glBindTexture(GL_TEXTURE_2D, g_frameTexture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, kHostWidth * scale, kHostHeight * scale, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, FrameWidth(), FrameHeight(), 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glBindRenderbuffer(GL_RENDERBUFFER, g_depthBuffer);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, kHostWidth * scale, kHostHeight * scale);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT32F, FrameWidth(), FrameHeight());
     glBindFramebuffer(GL_FRAMEBUFFER, g_frameBuffer);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, g_frameTexture, 0);
     glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, g_depthBuffer);
@@ -130,7 +145,7 @@ static bool CreateFrameTargets(uint32_t scale)
         Log("Renderer: the frame buffer is not usable");
         return false;
     }
-    glViewport(0, 0, kHostWidth * scale, kHostHeight * scale);
+    glViewport(0, 0, FrameWidth(), FrameHeight());
     return true;
 }
 
@@ -138,6 +153,36 @@ static void AttachTestPad();
 
 bool RendererInit()
 {
+#ifdef CD_DARKLAUNCHER
+    EGLDisplay display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    EGLint major = 0, minor = 0;
+    if (display == EGL_NO_DISPLAY || !eglInitialize(display, &major, &minor) || !eglBindAPI(EGL_OPENGL_API))
+    {
+        Log("Renderer: no EGL display for OpenGL (error %x)", eglGetError());
+        return false;
+    }
+    const EGLint configAttributes[] = { EGL_SURFACE_TYPE, EGL_PBUFFER_BIT, EGL_RENDERABLE_TYPE, EGL_OPENGL_BIT, EGL_RED_SIZE, 8,
+        EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8, EGL_NONE };
+    EGLConfig eglConfig{};
+    EGLint configs = 0;
+    const EGLint contextAttributes[] = { EGL_CONTEXT_MAJOR_VERSION, 3, EGL_CONTEXT_MINOR_VERSION, 3, EGL_CONTEXT_OPENGL_PROFILE_MASK,
+        EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT, EGL_NONE };
+    const EGLint surfaceAttributes[] = { EGL_WIDTH, 16, EGL_HEIGHT, 16, EGL_NONE }; // drawn into frame buffers, never shown
+    EGLContext context = EGL_NO_CONTEXT;
+    EGLSurface surface = EGL_NO_SURFACE;
+    if (eglChooseConfig(display, configAttributes, &eglConfig, 1, &configs) && configs > 0)
+    {
+        context = eglCreateContext(display, eglConfig, EGL_NO_CONTEXT, contextAttributes);
+        surface = eglCreatePbufferSurface(display, eglConfig, surfaceAttributes);
+    }
+    if (context == EGL_NO_CONTEXT || surface == EGL_NO_SURFACE || !eglMakeCurrent(display, surface, surface, context))
+    {
+        Log("Renderer: no OpenGL 3.3 context without a window (EGL %d.%d, error %x)", major, minor, eglGetError());
+        return false;
+    }
+    g_gl = context;
+    int width = 0, height = 0; // no window of its own
+#else
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_EVENTS) != 0)
     {
         Log("Renderer: SDL_Init failed: %s", SDL_GetError());
@@ -176,6 +221,7 @@ bool RendererInit()
     }
     SDL_GL_SetSwapInterval(0); // paced by the limiter in RendererPresent
     SDL_ShowCursor(SDL_DISABLE);
+#endif
 
     // Depth arrives in Direct3D's 0..1 range.
     // Two programs: the plain one, and the "sharp" one where enlarged texels keep
@@ -224,8 +270,13 @@ bool RendererInit()
     glGenTextures(1, &g_frameTexture);
     glGenRenderbuffers(1, &g_depthBuffer);
     glGenFramebuffers(1, &g_frameBuffer);
-    if (!CreateFrameTargets(1))
+#ifdef CD_DARKLAUNCHER
+    if (!CreateFrameTargets(DlBridgeHalves()))
         return false;
+#else
+    if (!CreateFrameTargets(2))
+        return false;
+#endif
 
     const uint32_t white = 0xFFFFFFFF;
     glGenTextures(1, &g_whiteTexture);
@@ -241,6 +292,7 @@ bool RendererInit()
     glEnable(GL_SCISSOR_TEST);
     Log("Renderer: OpenGL %s on %s, %dx%d window ready", (const char*)glGetString(GL_VERSION), (const char*)glGetString(GL_RENDERER),
         width, height);
+#ifndef CD_DARKLAUNCHER
     for (int display = 0; display < SDL_GetNumVideoDisplays(); display++)
     {
         SDL_Rect bounds{};
@@ -249,6 +301,7 @@ bool RendererInit()
         SDL_GetDesktopDisplayMode(display, &mode);
         Log("Renderer: display %d: bounds %d,%d %dx%d, desktop mode %dx%d", display, bounds.x, bounds.y, bounds.w, bounds.h, mode.w, mode.h);
     }
+#endif
     AttachTestPad();
     return true;
 }
@@ -406,12 +459,17 @@ void RendererDraw(const HostDraw& draw)
     }
 
     // Only textures the game wants smoothed need the sharp filter.
-    UseProgram(g_scale > 1 && draw.texture.present && draw.texture.linear);
-    int s = int(g_scale);
-    glScissor(draw.scissor[0] * s, (int(kHostHeight) - draw.scissor[3]) * s, (draw.scissor[2] - draw.scissor[0]) * s, (draw.scissor[3] - draw.scissor[1]) * s);
+    UseProgram(g_halves > 2 && draw.texture.present && draw.texture.linear);
+    // the scissor in frame pixels (its far edges round up at one and a half times)
+    auto scaled = [](int value) { return (value * int(g_halves) + 1) / 2; };
+    int left = scaled(draw.scissor[0]), right = scaled(draw.scissor[2]);
+    int bottom = scaled(int(kHostHeight) - draw.scissor[3]), top = scaled(int(kHostHeight) - draw.scissor[1]);
+    glScissor(left, bottom, right - left, top - bottom);
     glBufferData(GL_ARRAY_BUFFER, GLsizeiptr(draw.vertices.size() * sizeof(HostVertex)), draw.vertices.data(), GL_STREAM_DRAW);
     glDrawArrays(GL_TRIANGLES, 0, GLsizei(draw.vertices.size()));
 }
+
+#ifndef CD_DARKLAUNCHER // the SDL2 window, its input, menus and presenting
 
 // ---- Input ----
 
@@ -707,7 +765,7 @@ static void PumpEvents()
 // Writes the game's frame as a 32-bit BMP (top-down, BGRA).
 static void SaveFrame(const char* path)
 {
-    const uint32_t frameWidth = kHostWidth * g_scale, frameHeight = kHostHeight * g_scale;
+    const uint32_t frameWidth = FrameWidth(), frameHeight = FrameHeight();
     std::vector<uint32_t> pixels(size_t(frameWidth) * frameHeight);
     glBindFramebuffer(GL_READ_FRAMEBUFFER, g_frameBuffer);
     glReadPixels(0, 0, frameWidth, frameHeight, GL_BGRA, GL_UNSIGNED_BYTE, pixels.data());
@@ -1204,7 +1262,7 @@ static void ShowFrame()
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
-    glBlitFramebuffer(0, 0, kHostWidth * g_scale, kHostHeight * g_scale, left, bottom, left + targetWidth, bottom + targetHeight,
+    glBlitFramebuffer(0, 0, FrameWidth(), FrameHeight(), left, bottom, left + targetWidth, bottom + targetHeight,
         GL_COLOR_BUFFER_BIT, GL_LINEAR);
 
     // Overlays are drawn straight into the window.
@@ -1407,11 +1465,11 @@ void RendererPresent()
     static const char* forced = getenv("CD_SCALE");
     if (forced != nullptr && atoi(forced) >= 1 && atoi(forced) <= 4)
         wanted = uint32_t(atoi(forced));
-    if (wanted != g_scale && CreateFrameTargets(wanted))
-        Log("Renderer: drawing at %ux%u", kHostWidth * wanted, kHostHeight * wanted);
+    if (wanted * 2 != g_halves && CreateFrameTargets(wanted * 2))
+        Log("Renderer: drawing at %ux%u", FrameWidth(), FrameHeight());
 
     glBindFramebuffer(GL_FRAMEBUFFER, g_frameBuffer);
-    glViewport(0, 0, kHostWidth * g_scale, kHostHeight * g_scale);
+    glViewport(0, 0, FrameWidth(), FrameHeight());
     glDisable(GL_SCISSOR_TEST);
     glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
     glDepthMask(GL_TRUE);
@@ -1443,3 +1501,55 @@ void RendererPresent()
         }
     }
 }
+
+#else // CD_DARKLAUNCHER: DarkLauncher has the window, the controls, the menus and the notices
+
+static void AttachTestPad() {}
+
+HostPad RendererPad()
+{
+    HostPad pad;
+    pad.buttons = DlBridgeButtons();
+    return pad;
+}
+
+void RendererRumble(uint16_t left, uint16_t right)
+{
+    DlBridgeRumble(left, right);
+}
+
+// achievements.cpp's notice: DarkLauncher announces achievements itself.
+void LinuxToast(const std::wstring&, const std::wstring&) {}
+
+// The picture just drawn goes to DarkLauncher, which waits for it; the game is held there until
+// DarkLauncher asks for the next one.
+void RendererPresent()
+{
+    if (g_gl == nullptr)
+        return;
+    g_frameNumber++;
+    const uint32_t width = FrameWidth(), height = FrameHeight();
+    static std::vector<uint32_t> rows, picture;
+    rows.resize(size_t(width) * height);
+    picture.resize(rows.size());
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, g_frameBuffer);
+    glReadPixels(0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, rows.data());
+    // OpenGL gives the bottom row first
+    for (uint32_t y = 0; y < height; y++)
+        memcpy(&picture[size_t(y) * width], &rows[size_t(height - 1 - y) * width], width * 4);
+    DlBridgePresent(picture.data(), width, height, width * 4);
+
+    uint32_t wanted = DlBridgeHalves();
+    if (wanted != g_halves && CreateFrameTargets(wanted))
+        Log("Renderer: drawing at %ux%u", FrameWidth(), FrameHeight());
+    glBindFramebuffer(GL_FRAMEBUFFER, g_frameBuffer);
+    glViewport(0, 0, FrameWidth(), FrameHeight());
+    glDisable(GL_SCISSOR_TEST);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthMask(GL_TRUE);
+    glClearColor(g_clearColor[0], g_clearColor[1], g_clearColor[2], g_clearColor[3]);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_SCISSOR_TEST);
+}
+
+#endif

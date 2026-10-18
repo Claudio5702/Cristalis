@@ -66,11 +66,18 @@ copy of the game runs: the script refuses.
 
 ### Linux
 
-`runtime/linux` supplies the small part of the Windows API the runtime is written against, an SDL2
-and OpenGL 3.3 renderer and its own settings menu (DarkLauncher is Windows only). Needs clang, CMake,
-Ninja, SDL2, FreeType, fontconfig and OpenGL development packages, and FFmpeg: a static build with
-only the XMA decoders (`-DCD_FFMPEG_ROOT=...`) keeps the program free of the system's FFmpeg.
-`recomp/tools/package_linux.sh` assembles the release.
+`runtime/linux` supplies the small part of the Windows API the runtime is written against and an
+OpenGL 3.3 renderer (`renderer_sdl.cpp`). With DarkLauncher (the default), DarkLauncher's Linux part
+(`kit/launcher/linux`, copied with `sync_to_project.ps1 -Linux`, on SDL3) has the window, the menus,
+the sound and the controllers; it is built as a library of its own, as it has its own `windows.h`.
+The game draws in an OpenGL context of its own without a window (EGL), and each picture is read back
+for DarkLauncher, as on Windows. SDL2 is then not used at all (two SDLs cannot be in one program);
+`-DCD_DARKLAUNCHER=OFF` builds the earlier version on SDL2, with its own window and F1 menu.
+
+Needs clang, CMake, Ninja, SDL3 (SDL2 for the earlier version), FreeType, fontconfig, OpenGL and EGL
+development packages, and FFmpeg: a static build with only the XMA decoders (`-DCD_FFMPEG_ROOT=...`)
+keeps the program free of the system's FFmpeg. `recomp/tools/package_linux.sh <build> <out>`
+assembles the release, with SDL3 in `lib/` (the program looks there first) and the icon.
 
 ## Checking
 

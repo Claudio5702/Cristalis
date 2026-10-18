@@ -2,7 +2,11 @@
 #include "windows.h"
 #include "mmsystem.h"
 
+#ifdef CD_DARKLAUNCHER
+#include <SDL3/SDL.h> // DarkLauncher's SDL; only its message boxes are used here
+#else
 #include <SDL2/SDL.h>
+#endif
 
 #include <fcntl.h>
 #include <pthread.h>
@@ -826,13 +830,26 @@ int MessageBoxW(HWND, const wchar_t* text, const wchar_t* caption, UINT type)
         data.numbuttons = layout.count;
         data.buttons = layout.buttons;
         int pressed = IDOK;
+#ifdef CD_DARKLAUNCHER
+        if (SDL_ShowMessageBox(&data, &pressed))
+            return pressed;
+#else
         if (SDL_ShowMessageBox(&data, &pressed) == 0)
             return pressed;
+#endif
         break;
     }
     return IDOK;
 }
 
+#ifdef CD_DARKLAUNCHER
+// ---- Sound output: DarkLauncher plays the game's sound (audio.cpp hands it over); never opened ----
+
+UINT waveOutOpen(HWAVEOUT*, UINT, const WAVEFORMATEX*, DWORD_PTR, DWORD_PTR, DWORD) { return 1; }
+UINT waveOutPrepareHeader(HWAVEOUT, WAVEHDR*, UINT) { return MMSYSERR_NOERROR; }
+UINT waveOutWrite(HWAVEOUT, WAVEHDR* header, UINT) { header->dwFlags |= WHDR_DONE; return 1; }
+
+#else
 // ---- Sound output (the waveOut calls of audio.cpp, over SDL) ----
 // The mixer paces itself on buffers being reported done, so each written
 // buffer is marked done once the device has played past its end.
@@ -893,6 +910,8 @@ UINT waveOutWrite(HWAVEOUT, WAVEHDR* header, UINT)
     g_audioPending.push_back({ header, g_audioQueued });
     return MMSYSERR_NOERROR;
 }
+
+#endif
 
 // ---- Older C libraries ----
 // A recent compiler calls the C23 variants of these functions, which only exist

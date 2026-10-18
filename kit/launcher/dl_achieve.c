@@ -9,7 +9,7 @@ static const DlAchievement *ach;
 static int ach_n;
 static long long ach_time[ACH_MAX]; // unlocked at (seconds since 1970), 0: not yet
 
-static void ach_path(char *out) { snprintf(out, MAX_PATH, "%ssaves\\" FILE_STEM ".achievements", dl_base_dir); }
+static void ach_path(char *out) { snprintf(out, MAX_PATH, "%ssaves" DL_SEP FILE_STEM ".achievements", dl_base_dir); }
 
 static void ach_read(void) {
   char p[MAX_PATH], line[160], id[96];

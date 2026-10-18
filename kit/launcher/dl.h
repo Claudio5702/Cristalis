@@ -10,7 +10,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "1.0"
+#define DL_VERSION "1.1"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -140,6 +140,10 @@ typedef struct DlGame {
   // console's resolution, outSize the size on screen). It may declare Texture2D t1-t7 and read the constants game[0..7] (float4). The
   // CRT filter, the scanlines and HDR are applied to what it returns.
   const char *shader;
+  // The same scene(q) in GLSL 3.30 for Linux (OpenGL): vec2, vec3, fetch(q), the constants game[0..7] (vec4)
+  // and the picture's sizes as above; the textures tex and t1-t7 (sampler2D) are declared already.
+  // NULL: on Linux the picture is drawn as it is.
+  const char *shader_glsl;
   // Before the game's picture is drawn through the graphics card: fills game (32 floats) and gives its
   // textures with dl_gpu_texture. step of steps: this picture is shown over steps screen refreshes,
   // this is the step-th (1..steps).

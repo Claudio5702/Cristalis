@@ -19,6 +19,9 @@ extern "C"
 }
 
 #include <windows.h>
+#ifndef _WIN32
+#include <unistd.h> // _exit
+#endif
 
 #include <algorithm>
 #include <array>
@@ -86,8 +89,13 @@ void ApplySettings()
 
 // ---- Texts, in DarkLauncher's order: jp, fr, en, es, br, de, it ----
 
+#ifdef _WIN32
 const DlText t_subtitle = { L"Windows 向け非公式ネイティブ移植版", L"portage natif non officiel pour Windows", L"unofficial native port for Windows",
     L"adaptación nativa no oficial para Windows", L"versão nativa não oficial para Windows", L"inoffizielle native Portierung für Windows", L"conversione nativa non ufficiale per Windows" };
+#else
+const DlText t_subtitle = { L"Linux 向け非公式ネイティブ移植版", L"portage natif non officiel pour Linux", L"unofficial native port for Linux",
+    L"adaptación nativa no oficial para Linux", L"versão nativa não oficial para Linux", L"inoffizielle native Portierung für Linux", L"conversione nativa non ufficiale per Linux" };
+#endif
 
 const DlText t_gameLanguage = { L"ゲームの言語", L"Langue du jeu", L"Game language", L"Idioma del juego", L"Idioma do jogo", L"Spielsprache", L"Lingua del gioco" };
 const DlText t_tabGameLanguage = { L"ゲームの言語", L"LANGUE DU JEU", L"GAME LANGUAGE", L"IDIOMA DEL JUEGO", L"IDIOMA DO JOGO", L"SPIELSPRACHE", L"LINGUA DEL GIOCO" };
@@ -472,5 +480,12 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
             game.theme = &tried;
         }
     }
-    return dl_run(&game, argc, argv);
+    int code = dl_run(&game, argc, argv);
+    // The game's threads are still waiting (for a picture asked for, for sound to be played): the
+    // program ends here rather than unwinding them. On Linux an ordinary exit could wait for them.
+    fflush(nullptr);
+#ifndef _WIN32
+    _exit(code);
+#endif
+    return code;
 }

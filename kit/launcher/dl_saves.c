@@ -132,7 +132,7 @@ static void folder(char *out, const char *name, bool make) {
 static void make_parent(const char *path) {
   char dir[MAX_PATH];
   snprintf(dir, sizeof dir, "%s", path);
-  char *slash = strrchr(dir, '\\');
+  char *slash = strrchr(dir, DL_SEPC);
   if (slash) { *slash = 0; CreateDirectoryA(dir, NULL); }
 }
 
@@ -145,9 +145,9 @@ void dl_slot_path(char *out, int n, const char *ext) {
   else {
     char dir[MAX_PATH];
     folder(dir, "saves", false);
-    if (n < 0) snprintf(base, sizeof base, "%s\\" FILE_STEM ".session", dir);
-    else if (n >= DL_SLOTS) snprintf(base, sizeof base, "%s\\" FILE_STEM ".auto%d", dir, n - DL_SLOTS);
-    else snprintf(base, sizeof base, "%s\\" FILE_STEM ".state%d", dir, n);
+    if (n < 0) snprintf(base, sizeof base, "%s" DL_SEP FILE_STEM ".session", dir);
+    else if (n >= DL_SLOTS) snprintf(base, sizeof base, "%s" DL_SEP FILE_STEM ".auto%d", dir, n - DL_SLOTS);
+    else snprintf(base, sizeof base, "%s" DL_SEP FILE_STEM ".state%d", dir, n);
   }
   snprintf(out, MAX_PATH, "%s%s", base, ext);
 }
@@ -326,9 +326,9 @@ void dl_screenshot(void) {
   folder(dir, "captures", true);
   SYSTEMTIME t;
   GetLocalTime(&t);
-  snprintf(p, sizeof p, "%s\\" FILE_STEM "_%04d%02d%02d_%02d%02d%02d.png", dir, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
+  snprintf(p, sizeof p, "%s" DL_SEP FILE_STEM "_%04d%02d%02d_%02d%02d%02d.png", dir, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond);
   for (int k = 2; file_exists(p) && k < 100; k++)
-    snprintf(p, sizeof p, "%s\\" FILE_STEM "_%04d%02d%02d_%02d%02d%02d_%d.png", dir, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, k);
+    snprintf(p, sizeof p, "%s" DL_SEP FILE_STEM "_%04d%02d%02d_%02d%02d%02d_%d.png", dir, t.wYear, t.wMonth, t.wDay, t.wHour, t.wMinute, t.wSecond, k);
   bool ok = false;
   if (dl_gpu_ready()) { // the picture as shown, drawn once more for it
     snprintf(dl_shot_path, sizeof dl_shot_path, "%s", p);
@@ -572,7 +572,7 @@ static void shots_open(void) {
   folder(shots_dir, "captures", false);
   if (!shots) return;
   char pat[MAX_PATH];
-  snprintf(pat, sizeof pat, "%s\\*.png", shots_dir);
+  snprintf(pat, sizeof pat, "%s" DL_SEP "*.png", shots_dir);
   WIN32_FIND_DATAA fd;
   HANDLE h = FindFirstFileA(pat, &fd);
   if (h == INVALID_HANDLE_VALUE) return;
@@ -590,7 +590,7 @@ static void shots_row(int k, wchar_t *label, wchar_t *value) {
   row_date(&shots[k].t, label, true);
   value[0] = 0;
 }
-static void shot_path(int k, char *out) { snprintf(out, MAX_PATH, "%s\\%s", shots_dir, shots[k].name); }
+static void shot_path(int k, char *out) { snprintf(out, MAX_PATH, "%s" DL_SEP "%s", shots_dir, shots[k].name); }
 static const wchar_t *shots_help(int k) {
   static wchar_t buf[512];
   if (confirm == k) return TX(T_SHH_CONFIRM);

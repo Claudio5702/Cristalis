@@ -128,17 +128,18 @@ them as well, and the folder goes with them. Without the installer: delete the f
 
 ## Linux
 
-**Experimental.** A native build (SDL2 and OpenGL 3.3) for x86-64 Linux with glibc 2.35 or newer:
-Ubuntu 22.04, Debian 12, Fedora 36, SteamOS 3.5 and later. It needs SDL2, OpenGL, FreeType and
-fontconfig from the system; FFmpeg is built in. It has its own settings menu (F1 or both sticks),
-not DarkLauncher, which is Windows only.
+**Experimental.** A native build for x86-64 Linux with glibc 2.35 or newer (Ubuntu 22.04, Debian 12,
+Fedora 36, SteamOS 3.5 and later), with the same DarkLauncher as on Windows: its settings screen,
+pause menu, seven languages, controllers (Xbox and PlayStation, with vibration), achievements and
+theme. The game draws with OpenGL 3.3. It needs OpenGL, FreeType and fontconfig from the system;
+SDL3 comes with it, in `lib/`, and FFmpeg is built in.
 
 1. Unpack the Linux release.
 2. Copy your `CRYSTAL DEFENDERS` (or `58410989`) folder into it.
 3. Run `crystal_defenders.sh`. The game is installed on the first launch.
 
-It has only been run under WSL so far, with software rendering and no controller; nobody has tried
-it on a real Linux desktop or a Steam Deck yet. On a Steam Deck, add `crystal_defenders.sh` to Steam
+It has only been run under WSL so far (on a real graphics card through it, but no controller); nobody
+has tried it on a real Linux desktop or a Steam Deck yet. On a Steam Deck, add `crystal_defenders.sh` to Steam
 as a non-Steam game, without forcing a compatibility tool. The Windows release also runs through
 Proton.
 

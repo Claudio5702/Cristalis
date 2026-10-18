@@ -131,7 +131,7 @@ static void safe_start(void) {
 
 void dl_settings_sibling(char *out, const char *ext) {
   snprintf(out, MAX_PATH, "%s", ini_path);
-  char *dot = strrchr(out, '.'), *slash = strrchr(out, '\\');
+  char *dot = strrchr(out, '.'), *slash = strrchr(out, DL_SEPC);
   if (dot && (!slash || dot > slash)) *dot = 0;
   size_t n = strlen(out);
   snprintf(out + n, MAX_PATH - n, "%s", ext);
@@ -654,7 +654,7 @@ static int gpu_check(void) {
     dl_cfg.crt = shots[k].crt;
     dl_cfg.show_fps = shots[k].fps;
     dl_fps_shown = 60;
-    snprintf(dl_shot_path, sizeof dl_shot_path, "%s\\gpu_%s.png", gpu_check_dir, shots[k].name);
+    snprintf(dl_shot_path, sizeof dl_shot_path, "%s" DL_SEP "gpu_%s.png", gpu_check_dir, shots[k].name);
     dl_shot_ok = false;
     bool shown = dl_gpu_show(true, false);
     printf("gpu check: %-16s %s\n", shots[k].name, shown && dl_shot_ok ? "ok" : "FAILED");
@@ -669,7 +669,7 @@ static int gpu_check(void) {
 int dl_run(const DlGame *game, int argc, char **argv) {
   dl_game = game;
   GetModuleFileNameA(NULL, dl_base_dir, MAX_PATH);
-  char *slash = strrchr(dl_base_dir, '\\');
+  char *slash = strrchr(dl_base_dir, DL_SEPC);
   if (slash) slash[1] = 0;
   snprintf(ini_path, sizeof ini_path, "%s" FILE_STEM ".ini", dl_base_dir);
   bool version = false;

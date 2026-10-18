@@ -1,10 +1,24 @@
 // Inside the kit: what its parts share. Not for the game (it uses dl.h).
 #ifndef DL_INT_H
 #define DL_INT_H
+#ifdef _WIN32
 #include <windows.h>
+#else
+#include "linux/win32.h" // GDI and the rest of what the shared code takes from Windows, made for Linux
+#endif
 #include <stdio.h>
 #include "dl.h"
 #include "project.h"
+
+// The separator of a path's parts: Windows' own, or "/" elsewhere (the paths given to the game are the
+// system's).
+#ifdef _WIN32
+#define DL_SEP "\\"
+#define DL_SEPC '\\'
+#else
+#define DL_SEP "/"
+#define DL_SEPC '/'
+#endif
 
 typedef uint8_t u8;
 typedef uint32_t u32;
@@ -234,6 +248,7 @@ extern const wchar_t *const dl_lang_names[DL_LANGS];
 #define DL_WIDEN2(s) L##s
 #define DL_WIDEN(s) DL_WIDEN2(s)
 #define DL_VERSION_W DL_WIDEN(DL_VERSION) // DL_VERSION as a wide string
+#define DL_SEP_W DL_WIDEN(DL_SEP)
 bool dl_lang_ok(int lang); // one of the game's languages (DlGame.langs)
 int dl_lang_default(void); // the language of Windows if the game has it, otherwise English (or its first)
 
