@@ -1,18 +1,19 @@
 # Builds build\crystal_defenders.exe, next to the FFmpeg DLLs it needs, from the translated code in
-# recomp\ppc (made by recompile.ps1) and the runtime in recomp\runtime.
+# recomp\ppc (made by recompile.ps1) and the runtime in recomp\runtime. The game runs inside
+# DarkLauncher (kit\launcher): its window, settings screen, controls and sound output.
 #
-#   .\build.ps1                build what changed
-#   .\build.ps1 -Clean         build everything again
-#   .\build.ps1 -DarkLauncher  the game inside DarkLauncher (kit\launcher), in build-dl\
+#   .\build.ps1           build what changed
+#   .\build.ps1 -Clean    build everything again
+#   .\build.ps1 -Classic  the game with its own window and start screen instead, in build-classic\
 #
 # Needs clang, CMake and Ninja on the PATH. The game can then be started from build\: the first
 # launch asks for your own copy of the game, or finds it in extracted\ (see the README).
-param([switch]$Clean, [switch]$DarkLauncher)
+param([switch]$Clean, [switch]$Classic)
 
 $ErrorActionPreference = 'Stop'
 $root = $PSScriptRoot
-$build = Join-Path $root $(if ($DarkLauncher) { 'build-dl' } else { 'build' })
-$option = $(if ($DarkLauncher) { 'ON' } else { 'OFF' })
+$build = Join-Path $root $(if ($Classic) { 'build-classic' } else { 'build' })
+$option = $(if ($Classic) { 'OFF' } else { 'ON' })
 if (-not (Test-Path -LiteralPath (Join-Path $root 'recomp\ppc\ppc_recomp_shared.h'))) {
     throw "recomp\ppc is empty: run .\recompile.ps1 first (it needs your own default.xex)"
 }
@@ -22,10 +23,9 @@ if (Get-Process crystal_defenders -ErrorAction SilentlyContinue | Where-Object {
     throw "$exe is running: close the game first"
 }
 
-if (-not (Test-Path -LiteralPath (Join-Path $build 'build.ninja'))) {
-    & cmake -S (Join-Path $root 'recomp') -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ "-DCD_DARKLAUNCHER=$option"
-    if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed" }
-}
+# configured every time, so that the folder always gets the version asked for (quick once configured)
+& cmake -S (Join-Path $root 'recomp') -B $build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ "-DCD_DARKLAUNCHER=$option" | Out-Null
+if ($LASTEXITCODE -ne 0) { throw "CMake configuration failed" }
 # -Clean: every object again (the settings, saves and screenshots of test runs in the folder stay)
 if ($Clean) { & cmake --build $build --clean-first } else { & cmake --build $build }
 if ($LASTEXITCODE -ne 0) { throw "build failed" }

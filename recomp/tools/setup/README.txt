@@ -5,22 +5,23 @@ own copy of the game (Xbox 360, Xbox Live Arcade).
 
 STARTING
   "Crystal Defenders" shortcut (desktop or Start menu), or crystal_defenders.exe.
-  A start screen opens first: Play, Language, Picture, Sound, Options, Controls,
-  Achievements, Screenshots, Game folder, Quit. It works with the keyboard, a
-  controller or the mouse. Start on the controller starts the game at once.
-  To start without it: lanceur = 0 in crystal_defenders.ini.
+  The settings screen (DarkLauncher) opens first: Play, Screenshots, Game,
+  Achievements, Languages, Picture, Sound, Controls, Game folder, Defaults, Quit.
+  It works with the keyboard, a controller or the mouse.
 
 IN THE GAME
-  F1, or both sticks pressed ......... settings menu (the game pauses)
-  F11 or Alt+Enter ................... full screen
-  F12 ................................ screenshot (captures folder)
+  Escape, or the controller's View button .... pause menu (resume, screenshot,
+                                               settings, quit)
+  F11 ........................................ full screen
+  F12 ........................................ screenshot (captures folder)
 
-KEYBOARD (defaults, changed on the start screen, Controls page)
-  Arrows ............. d-pad
-  Space or X ......... A (confirm)          Escape or C ........ B (back)
-  S / D .............. X / Y                Enter / Tab ........ Start / Back
-  Q / E .............. shoulder buttons
-  Any XInput (Xbox-type) controller works without setup.
+CONTROLS
+  Keyboard keys and controller buttons are chosen on the Controls page. Any
+  XInput (Xbox-type) controller works without setup.
+
+LANGUAGES
+  Languages > Game language: the language of the game's texts (the game restarts).
+  Languages > Menu language: that of the settings screen.
 
 FILES
   userdata\ ................ saves and achievements

@@ -5,22 +5,23 @@ votre propre copie du jeu (Xbox 360, Xbox Live Arcade).
 
 LANCER
   Raccourci "Crystal Defenders" (Bureau ou menu Demarrer), ou crystal_defenders.exe.
-  Un ecran de lancement s'ouvre d'abord : Jouer, Langue, Image, Son, Options,
-  Commandes, Succes, Captures, Dossier du jeu, Quitter. Il se manie au clavier,
-  a la manette ou a la souris. Start sur la manette lance directement le jeu.
-  Pour demarrer sans lui : lanceur = 0 dans crystal_defenders.ini.
+  L'ecran des reglages (DarkLauncher) s'ouvre d'abord : Jouer, Captures, Jeu,
+  Succes, Langues, Image, Son, Commandes, Dossier du jeu, Par defaut, Quitter.
+  Il se manie au clavier, a la manette ou a la souris.
 
 EN JEU
-  F1, ou les deux sticks enfonces ..... menu des reglages (le jeu est en pause)
-  F11 ou Alt+Entree ................... plein ecran
-  F12 ................................. capture d'ecran (dossier captures)
+  Echap, ou le bouton View de la manette .... menu de pause (reprendre,
+                                              capture, reglages, quitter)
+  F11 ......................................... plein ecran
+  F12 ......................................... capture d'ecran (dossier captures)
 
-CLAVIER (par defaut, modifiable dans l'ecran de lancement, page Commandes)
-  Fleches ............ croix directionnelle
-  Espace ou X ........ A (confirmer)        Echap ou C ......... B (retour)
-  S / D .............. X / Y                Entree / Tab ....... Start / Back
-  Q / E .............. gachettes hautes
-  Toute manette XInput (type Xbox) fonctionne sans reglage.
+COMMANDES
+  Les touches du clavier et les boutons de la manette se choisissent dans la
+  page Commandes. Toute manette XInput (type Xbox) fonctionne sans reglage.
+
+LANGUES
+  Langues > Langue du jeu : la langue des textes du jeu (le jeu redemarre).
+  Langues > Langue du menu : celle de l'ecran des reglages.
 
 FICHIERS
   userdata\ ................ sauvegardes et succes

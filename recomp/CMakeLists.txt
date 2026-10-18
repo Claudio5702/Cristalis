@@ -53,7 +53,7 @@ if(WIN32)
     enable_language(RC)
     # DarkLauncher (kit/launcher, copied from the DarkLauncher kit): the window, the settings screen,
     # the controls and the sound output of the game; the game's side is runtime/darklauncher.cpp.
-    option(CD_DARKLAUNCHER "Run the game inside DarkLauncher" OFF)
+    option(CD_DARKLAUNCHER "Run the game inside DarkLauncher (OFF: its own window and start screen)" ON)
     set(PLATFORM_SOURCES runtime/renderer.cpp resources/crystal_defenders.rc)
     if(CD_DARKLAUNCHER)
         file(GLOB DARKLAUNCHER_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../kit/launcher/*.c)

@@ -29,16 +29,17 @@ Known differences from the console:
 
 ## Features
 
-- A start screen before the game, after the one of
-  Kahna (Bahamut Lagoon Recomp): language, picture, sound,
-  options, keyboard keys, the achievements earned and the screenshots taken, in six
-  languages, with the keyboard, a controller or the mouse.
-- Renders at the window's resolution (up to 4K), or the original 1280×720.
-- In-game settings menu (F1, right click, or both sticks): language, resolution,
-  rendering, full screen, volume, vibration, pause in background.
-- Achievements stored locally, with a notification and a list.
-- Keyboard (rebindable in `crystal_defenders.ini`) and any XInput controller.
-- F12 screenshot, Alt+Enter / F11 full screen.
+- The game runs inside [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)
+  (`kit/launcher`, the launcher made for Kahna, Bahamut Lagoon Recomp): a settings
+  screen before the game and a pause menu (Escape), in seven languages, with the
+  keyboard, a controller or the mouse. Picture filters (sharp, smooth, CRT,
+  scanlines, HDR), full screen, sound, rebindable keys and buttons, screenshots,
+  and pages of the game's own: its language, its internal resolution (1280×720 or
+  2560×1440), vibration, and the achievements. Its look follows the game's art
+  direction, drawn by DarkLauncher (nothing is taken from the game's files).
+- Achievements stored locally, with a notice over the game and a list.
+- `.\build.ps1 -Classic` builds the earlier version instead, with its own window,
+  start screen and F1 menu.
 
 ## Playing
 
@@ -94,10 +95,12 @@ LGPL shared build (for XMA audio), and your own `default.xex`.
 2. Run `.\recompile.ps1 -Xex <your default.xex>`. It translates the game's code
    into `recomp/ppc`, generates the import table, then builds.
 3. After a change to the runtime, `.\build.ps1` rebuilds what changed
-   (`-Clean` rebuilds everything).
+   (`-Clean` rebuilds everything, `-Classic` the version without DarkLauncher).
 
 The program lands in `build\`, with the FFmpeg DLLs, and can be started from
-there. The path to FFmpeg is set in `recomp/CMakeLists.txt`.
+there. DarkLauncher is copied into `kit/` from its own repository by its
+`tools/sync_to_project.ps1`, and is never changed here; `project.h` gives it this
+project's names. The path to FFmpeg is set in `recomp/CMakeLists.txt`.
 `recomp/tools/make_installer.ps1` then packs the build into an installer
 (`dist/Crystal Defenders - Setup.exe`).
 
