@@ -874,13 +874,13 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     dl_rewind_end();
     // the game runs while it is played, and, before it is started, behind the setup screen (its own
     // title or demo shows in the preview); once started, the setup screen pauses it, and so may
-    // another window in front
-    bool run = dl_mode == M_GAME || !dl_started;
-    if (dl_mode == M_GAME && dl_cfg.bg_pause && GetForegroundWindow() != dl_hwnd) run = false;
+    // another window in front (not in a bench: it measures the game played, whatever window is in front)
+    bool run = dl_mode == M_GAME || !dl_started, bg_pause = dl_cfg.bg_pause && !bench_secs;
+    if (dl_mode == M_GAME && bg_pause && GetForegroundWindow() != dl_hwnd) run = false;
     // a window put away in the taskbar: nothing is drawn, and with "Pause in background" the game
     // waits too (its title behind the setup screen as well)
     bool hidden = IsIconic(dl_hwnd);
-    if (hidden && dl_cfg.bg_pause) run = false;
+    if (hidden && bg_pause) run = false;
     // fast forward: several pictures of the game for one, without their sound
     bool turbo = dl_mode == M_GAME && (dl_turbo_held() || (dl_started && game->turbo && game->turbo()));
     int speed = !turbo ? 1 : dl_cfg.turbo == 2 ? 2 : dl_cfg.turbo == 4 ? 4 : 12;
