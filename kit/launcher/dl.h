@@ -12,8 +12,13 @@
 #include <stdint.h>
 #include <wchar.h>
 
-// Languages of the setup screen, in the order of every table of texts: jp, fr, en, es, br, de.
-#define DL_LANGS 6
+// Languages of the setup screen, in the order of every table of texts: jp, fr, en, es, br, de, it.
+enum { DL_LANG_JP, DL_LANG_FR, DL_LANG_EN, DL_LANG_ES, DL_LANG_BR, DL_LANG_DE, DL_LANG_IT };
+#define DL_LANGS 7
+// DlGame.langs of a game whose texts are in every language of DarkLauncher.
+#define DL_LANGS_ALL ((1u << DL_LANGS) - 1)
+// A text in each language, in the order above. A missing one (NULL, or left out at the end) is shown
+// in English.
 typedef const wchar_t *const DlText[DL_LANGS];
 
 // Buttons of the game's controller (keyboard and XInput pads are read by DarkLauncher).
@@ -137,6 +142,11 @@ typedef struct DlGame {
   bool (*gpu_draw)(void *dev, void *ctx, void *rtv, int x, int y, int w, int h, float hdr, int step, int steps);
 
   const DlTheme *theme; // the setup screen's look from the game (may be NULL)
+
+  // The languages of the game's own texts (its DlTexts, and the tables it reads with dl_lang()): bits
+  // 1 << DL_LANG_*, or DL_LANGS_ALL. 0: the first six (jp to de), the languages before Italian. The
+  // Languages page offers only these, and dl_lang() never returns another.
+  unsigned langs;
 } DlGame;
 
 // ---- pages: lists of rows, drawn and handled by DarkLauncher
@@ -198,7 +208,7 @@ void dl_setting(const char *name, int *value, int lo, int hi, bool keep);
 void dl_function(const wchar_t *const *label, const wchar_t *const *help, const char *hot, int key, const char *pad,
                  void (*run)(void), bool in_pause);
 
-int dl_lang(void);                              // language of the setup screen, 0-5
+int dl_lang(void);                              // language of the setup screen (DL_LANG_*), one of DlGame.langs
 const wchar_t *dl_tr(const wchar_t *const *t); // a DlText in that language
 void dl_redraw(void);                           // the setup screen has to be drawn again
 void dl_note(const wchar_t *text);              // a few words over the game (or in the pause menu) for a moment

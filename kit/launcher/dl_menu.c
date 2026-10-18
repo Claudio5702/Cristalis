@@ -17,7 +17,13 @@ static int stack[8], stack_n; // pages opened from a page (DL_PAGE rows), to com
 static int list_read = -1;    // list page whose contents were read last (-1: read again when shown)
 
 int dl_lang(void) { return dl_cfg.ui_lang; }
-const wchar_t *dl_tr(const wchar_t *const *t) { return t ? t[dl_cfg.ui_lang] : L""; }
+// A text missing in this language is shown in English (--ui-audit reports it).
+const wchar_t *dl_tr(const wchar_t *const *t) {
+  if (!t) return L"";
+  if (t[dl_cfg.ui_lang]) return t[dl_cfg.ui_lang];
+  ui_audit_note("no translation", t[DL_LANG_EN] ? t[DL_LANG_EN] : L"");
+  return t[DL_LANG_EN] ? t[DL_LANG_EN] : L"";
+}
 void dl_redraw(void) { dl_dirty = true; }
 
 // ---- declaration of pages and sections
@@ -64,7 +70,17 @@ void dl_section(int page, unsigned icon, const wchar_t *const *label, const wcha
 
 // ---- the kit's own pages, made in the order of PG_* (dl_int.h)
 
-static const wchar_t *show_lang(int v) { return dl_lang_names[v < 0 || v >= DL_LANGS ? 0 : v]; }
+// Only the game's languages (DlGame.langs) are offered: the others are stepped over, in the direction of
+// the change (the value before it is the one last shown).
+static int lang_shown;
+static const wchar_t *show_lang(int v) {
+  lang_shown = v;
+  return dl_lang_names[v < 0 || v >= DL_LANGS ? 0 : v];
+}
+static void lang_changed(void) {
+  int step = dl_cfg.ui_lang == (lang_shown + 1) % DL_LANGS ? 1 : DL_LANGS - 1;
+  for (int k = 0; k < DL_LANGS && !dl_lang_ok(dl_cfg.ui_lang); k++) dl_cfg.ui_lang = (dl_cfg.ui_lang + step) % DL_LANGS;
+}
 static void full_changed(void) { dl_toggle_fullscreen(); }
 static void try_it(void) { dl_mode = M_TRY; }
 static void picture_defaults(void) { dl_defaults(true); }
@@ -86,7 +102,7 @@ static const wchar_t *const *const gpu_names[] = {dl_texts[T_GPU_OFF], dl_texts[
 static const wchar_t *const *const crt_names[] = {dl_texts[T_NO], dl_texts[T_CRT_FLAT], dl_texts[T_CRT_CURVED]};
 
 static const DlRow langs_rows[] = {
-    {DL_CHOICE, dl_texts[T_UILANG], dl_texts[T_H_UILANG], &dl_cfg.ui_lang, DL_LANGS - 1, NULL, show_lang},
+    {DL_CHOICE, dl_texts[T_UILANG], dl_texts[T_H_UILANG], &dl_cfg.ui_lang, DL_LANGS - 1, NULL, show_lang, lang_changed},
 };
 static const DlRow image_rows[] = {
     {DL_SWITCH, dl_texts[T_FULL], dl_texts[T_H_FULL], &dl_cfg.fullscreen, 1, NULL, NULL, full_changed},
@@ -712,7 +728,7 @@ void dl_mouse(int mx, int my, bool click) {
     if (!click) return;
     side_act();
   }
-  if (row != dl_sel) { dl_sel = row; dl_dirty = true; if (l) l->moved(); }
+  if (row != dl_sel) { dl_sel = row; dl_dirty = true; if (l && l->moved) l->moved(); }
   if (!click) return;
   dl_dirty = true;
   dl_beep(1);
@@ -745,6 +761,7 @@ int dl_audit(void) {
   char path[MAX_PATH];
   RECT rc;
   for (int l = 0; l < DL_LANGS; l++) {
+    if (!dl_lang_ok(l)) continue;
     dl_cfg.ui_lang = l;
     dl_mode = M_SIDE;
     for (int k = 0; k < dl_sec_n; k++) { // the bar, each entry selected (with the page it shows)

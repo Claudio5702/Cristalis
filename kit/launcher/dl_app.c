@@ -86,16 +86,28 @@ void dl_defaults(bool picture_only) {
   dl_dirty = true;
 }
 
+// The languages of the game's texts (DlGame.langs; 0: the six before Italian).
+bool dl_lang_ok(int lang) {
+  unsigned langs = dl_game ? dl_game->langs & DL_LANGS_ALL : 0;
+  if (!langs) langs = (1u << DL_LANG_IT) - 1;
+  return lang >= 0 && lang < DL_LANGS && (langs >> lang & 1);
+}
+
 // The language of Windows, until the settings file says otherwise.
-static int windows_lang(void) {
+int dl_lang_default(void) {
+  int lang;
   switch (GetUserDefaultUILanguage() & 0x3FF) {
-    case 0x11: return 0; // Japanese
-    case 0x0C: return 1; // French
-    case 0x0A: return 3; // Spanish
-    case 0x16: return 4; // Portuguese
-    case 0x07: return 5; // German
-    default: return 2;   // English
+    case 0x11: lang = DL_LANG_JP; break;
+    case 0x0C: lang = DL_LANG_FR; break;
+    case 0x0A: lang = DL_LANG_ES; break;
+    case 0x16: lang = DL_LANG_BR; break;
+    case 0x07: lang = DL_LANG_DE; break;
+    case 0x10: lang = DL_LANG_IT; break;
+    default: lang = DL_LANG_EN; break;
   }
+  if (!dl_lang_ok(lang)) lang = DL_LANG_EN;
+  for (int k = 0; !dl_lang_ok(lang) && k < DL_LANGS; k++) lang = k; // a game without English
+  return lang;
 }
 
 // ---------------------------------------------------------------- picture
@@ -585,7 +597,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   if (!dl_pic || !scan_buf) return 1;
 
   // settings: the kit's, then the game's
-  dl_cfg.ui_lang = windows_lang();
+  dl_cfg.ui_lang = dl_lang_default();
   add_setting("ui_lang", &dl_cfg.ui_lang, 0, DL_LANGS - 1, 0);
   add_setting("fullscreen", &dl_cfg.fullscreen, 0, 1, 0);
   add_setting("integer_scale", &dl_cfg.integer_scale, 0, 1, 1);
@@ -611,6 +623,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   if (game->setup) game->setup();
   dl_menu_finish();
   settings_load();
+  if (!dl_lang_ok(dl_cfg.ui_lang)) dl_cfg.ui_lang = dl_lang_default(); // a language this game's texts do not have
   for (int k = 0; k < setting_n; k++) saved[k] = *settings[k].value; // as read: nothing to write yet
 
   // window: where it was last time, otherwise 1280 x 800 in the middle of the screen

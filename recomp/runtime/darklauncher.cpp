@@ -79,70 +79,70 @@ void ApplySettings()
     config.pauseInBackground = false; // and DarkLauncher pauses the game behind another window
 }
 
-// ---- Texts, in DarkLauncher's order: jp, fr, en, es, br, de ----
+// ---- Texts, in DarkLauncher's order: jp, fr, en, es, br, de, it ----
 
 const DlText t_subtitle = { L"Windows 向け非公式ネイティブ移植版", L"portage natif non officiel pour Windows", L"unofficial native port for Windows",
-    L"adaptación nativa no oficial para Windows", L"versão nativa não oficial para Windows", L"inoffizielle native Portierung für Windows" };
+    L"adaptación nativa no oficial para Windows", L"versão nativa não oficial para Windows", L"inoffizielle native Portierung für Windows", L"conversione nativa non ufficiale per Windows" };
 
-const DlText t_gameLanguage = { L"ゲームの言語", L"Langue du jeu", L"Game language", L"Idioma del juego", L"Idioma do jogo", L"Spielsprache" };
-const DlText t_tabGameLanguage = { L"ゲームの言語", L"LANGUE DU JEU", L"GAME LANGUAGE", L"IDIOMA DEL JUEGO", L"IDIOMA DO JOGO", L"SPIELSPRACHE" };
+const DlText t_gameLanguage = { L"ゲームの言語", L"Langue du jeu", L"Game language", L"Idioma del juego", L"Idioma do jogo", L"Spielsprache", L"Lingua del gioco" };
+const DlText t_tabGameLanguage = { L"ゲームの言語", L"LANGUE DU JEU", L"GAME LANGUAGE", L"IDIOMA DEL JUEGO", L"IDIOMA DO JOGO", L"SPIELSPRACHE", L"LINGUA DEL GIOCO" };
 const DlText t_hGameLanguage = { L"ゲームのテキストの言語です。変更するとゲームが再起動します。",
     L"La langue des textes du jeu. En changer relance le jeu.",
     L"The language of the game's texts. Changing it starts the game again.",
     L"El idioma de los textos del juego. Cambiarlo reinicia el juego.",
     L"O idioma dos textos do jogo. Mudá-lo reinicia o jogo.",
-    L"Die Sprache der Spieltexte. Eine Änderung startet das Spiel neu." };
+    L"Die Sprache der Spieltexte. Eine Änderung startet das Spiel neu.", L"La lingua dei testi del gioco. Cambiarla riavvia il gioco." };
 const DlText t_hLanguageRow = { L"Enter：この言語でゲームを再起動します。セーブしていない進行は失われます。",
     L"Entrée : relance le jeu dans cette langue. Une partie non sauvegardée est perdue.",
     L"Enter: starts the game again in this language. Progress not saved is lost.",
     L"Intro: reinicia el juego en este idioma. Se pierde lo que no esté guardado.",
     L"Enter: reinicia o jogo neste idioma. O que não foi salvo é perdido.",
-    L"Eingabe: startet das Spiel in dieser Sprache neu. Nicht Gespeichertes geht verloren." };
+    L"Eingabe: startet das Spiel in dieser Sprache neu. Nicht Gespeichertes geht verloren.", L"Invio: riavvia il gioco in questa lingua. Ciò che non è salvato va perso." };
 const DlText t_automatic = { L"自動（Windows）", L"Automatique (Windows)", L"Automatic (Windows)", L"Automático (Windows)", L"Automático (Windows)",
-    L"Automatisch (Windows)" };
+    L"Automatisch (Windows)", L"Automatica (Windows)" };
 
-const DlText t_resolution = { L"内部解像度", L"Résolution interne", L"Internal resolution", L"Resolución interna", L"Resolução interna", L"Interne Auflösung" };
+const DlText t_resolution = { L"内部解像度", L"Résolution interne", L"Internal resolution", L"Resolución interna", L"Resolução interna", L"Interne Auflösung", L"Risoluzione interna" };
 const DlText t_hResolution = { L"ゲームが画像を描く大きさです。大きいほど大画面でくっきりしますが、重くなります。",
     L"La taille à laquelle le jeu dessine ses images : plus grande, l'image est plus nette sur un grand écran, mais plus lourde.",
     L"The size the game draws its pictures at: larger is sharper on a big screen, but heavier.",
     L"El tamaño al que el juego dibuja sus imágenes: más grande es más nítido en una pantalla grande, pero más pesado.",
     L"O tamanho em que o jogo desenha as imagens: maior fica mais nítido numa tela grande, mas mais pesado.",
-    L"Die Größe, in der das Spiel seine Bilder zeichnet: größer ist auf großen Bildschirmen schärfer, aber aufwendiger." };
+    L"Die Größe, in der das Spiel seine Bilder zeichnet: größer ist auf großen Bildschirmen schärfer, aber aufwendiger.", L"La dimensione a cui il gioco disegna le immagini: più grande è più nitida su un grande schermo, ma più pesante." };
 
-const DlText t_game = { L"ゲーム", L"Jeu", L"Game", L"Juego", L"Jogo", L"Spiel" };
-const DlText t_tabGame = { L"ゲーム", L"JEU", L"GAME", L"JUEGO", L"JOGO", L"SPIEL" };
+const DlText t_game = { L"ゲーム", L"Jeu", L"Game", L"Juego", L"Jogo", L"Spiel", L"Opzioni" };
+const DlText t_tabGame = { L"ゲーム", L"JEU", L"GAME", L"JUEGO", L"JOGO", L"SPIEL", L"OPZIONI" };
 const DlText t_hGame = { L"振動と、オフラインの本体と同じ表示に関する設定です。",
     L"Vibrations, et ce que le jeu affiche comme sur une console hors ligne.",
     L"Vibration, and what the game shows as on an offline console.",
     L"Vibración y lo que el juego muestra como en una consola sin conexión.",
     L"Vibração e o que o jogo mostra como num console offline.",
-    L"Vibration und was das Spiel wie auf einer Konsole ohne Verbindung zeigt." };
-const DlText t_vibration = { L"振動", L"Vibrations", L"Vibration", L"Vibración", L"Vibração", L"Vibration" };
+    L"Vibration und was das Spiel wie auf einer Konsole ohne Verbindung zeigt.", L"Vibrazione e ciò che il gioco mostra come su una console non connessa." };
+const DlText t_vibration = { L"振動", L"Vibrations", L"Vibration", L"Vibración", L"Vibração", L"Vibration", L"Vibrazione" };
 const DlText t_hVibration = { L"ゲームの指示でコントローラーが振動します。", L"La manette vibre quand le jeu le demande.",
     L"The controller vibrates when the game asks for it.", L"El mando vibra cuando el juego lo pide.", L"O controle vibra quando o jogo pede.",
-    L"Der Controller vibriert, wenn das Spiel es verlangt." };
-const DlText t_live = { L"Xbox LIVE の通知", L"Avertissement Xbox LIVE", L"Xbox LIVE notice", L"Aviso de Xbox LIVE", L"Aviso da Xbox LIVE", L"Xbox-LIVE-Hinweis" };
+    L"Der Controller vibriert, wenn das Spiel es verlangt.", L"Il controller vibra quando il gioco lo richiede." };
+const DlText t_live = { L"Xbox LIVE の通知", L"Avertissement Xbox LIVE", L"Xbox LIVE notice", L"Aviso de Xbox LIVE", L"Aviso da Xbox LIVE", L"Xbox-LIVE-Hinweis", L"Avviso Xbox LIVE" };
 const DlText t_hLive = { L"起動時に「Xbox LIVE に接続されていません」を表示します（オフラインの本体と同じ）。次の起動から有効です。",
     L"Affiche au démarrage « Non connecté à Xbox LIVE », comme une console hors ligne. Au prochain lancement.",
     L"Shows “Not connected to Xbox LIVE” at start, as an offline console does. From the next start.",
     L"Muestra al inicio «No conectado a Xbox LIVE», como una consola sin conexión. Desde el próximo inicio.",
     L"Mostra no início “Não conectado à Xbox LIVE”, como um console offline. A partir do próximo início.",
-    L"Zeigt beim Start „Nicht mit Xbox LIVE verbunden“, wie eine Konsole ohne Verbindung. Ab dem nächsten Start." };
-const DlText t_storage = { L"保存先の選択", L"Choix du stockage", L"Storage choice", L"Elegir almacenamiento", L"Escolha do armazenamento", L"Speicherauswahl" };
+    L"Zeigt beim Start „Nicht mit Xbox LIVE verbunden“, wie eine Konsole ohne Verbindung. Ab dem nächsten Start.", L"Mostra all'avvio «Non connesso a Xbox LIVE», come una console non connessa. Dal prossimo avvio." };
+const DlText t_storage = { L"保存先の選択", L"Choix du stockage", L"Storage choice", L"Elegir almacenamiento", L"Escolha do armazenamento", L"Speicherauswahl", L"Scelta archiviazione" };
 const DlText t_hStorage = { L"本体と同じように保存先を尋ねます。オフなら userdata に直接保存します。次の起動から有効です。",
     L"Le jeu demande où enregistrer, comme sur la console ; sinon il utilise le dossier userdata. Au prochain lancement.",
     L"The game asks where to save, as on the console; otherwise it uses the userdata folder. From the next start.",
     L"El juego pregunta dónde guardar, como en la consola; si no, usa la carpeta userdata. Desde el próximo inicio.",
     L"O jogo pergunta onde salvar, como no console; senão usa a pasta userdata. A partir do próximo início.",
-    L"Das Spiel fragt wie auf der Konsole nach dem Speicherort, sonst nutzt es den Ordner userdata. Ab dem nächsten Start." };
+    L"Das Spiel fragt wie auf der Konsole nach dem Speicherort, sonst nutzt es den Ordner userdata. Ab dem nächsten Start.", L"Il gioco chiede dove salvare, come sulla console; altrimenti usa la cartella userdata. Dal prossimo avvio." };
 
-const DlText t_achievements = { L"実績", L"Succès", L"Achievements", L"Logros", L"Conquistas", L"Erfolge" };
-const DlText t_tabAchievements = { L"実績", L"SUCCÈS", L"ACHIEVEMENTS", L"LOGROS", L"CONQUISTAS", L"ERFOLGE" };
+const DlText t_achievements = { L"実績", L"Succès", L"Achievements", L"Logros", L"Conquistas", L"Erfolge", L"Obiettivi" };
+const DlText t_tabAchievements = { L"実績", L"SUCCÈS", L"ACHIEVEMENTS", L"LOGROS", L"CONQUISTAS", L"ERFOLGE", L"OBIETTIVI" };
 const DlText t_hAchievements = { L"ゲームで獲得した実績です（このパソコンに保存）。", L"Les succès gagnés dans le jeu, enregistrés sur cet ordinateur.",
     L"Achievements earned in the game, stored on this computer.", L"Logros obtenidos en el juego, guardados en este ordenador.",
-    L"Conquistas obtidas no jogo, salvas neste computador.", L"Im Spiel errungene Erfolge, auf diesem Computer gespeichert." };
-const DlText t_noAchievements = { L"実績はありません。", L"Aucun succès.", L"No achievements.", L"No hay logros.", L"Nenhuma conquista.", L"Keine Erfolge." };
-const DlText t_earned = { L"獲得", L"gagné", L"earned", L"obtenido", L"obtida", L"errungen" };
+    L"Conquistas obtidas no jogo, salvas neste computador.", L"Im Spiel errungene Erfolge, auf diesem Computer gespeichert.", L"Obiettivi ottenuti nel gioco, salvati su questo computer." };
+const DlText t_noAchievements = { L"実績はありません。", L"Aucun succès.", L"No achievements.", L"No hay logros.", L"Nenhuma conquista.", L"Keine Erfolge.", L"Nessun obiettivo." };
+const DlText t_earned = { L"獲得", L"gagné", L"earned", L"obtenido", L"obtida", L"errungen", L"ottenuto" };
 
 // ---- The game's language: a page of actions, one per language ----
 
@@ -168,12 +168,12 @@ template <int N> const wchar_t* MarkN(int) { return LanguageMark(N); }
 // Labels of the language rows: each language in itself, the same in every language of the menu.
 const DlText t_lang[] =
 {
-    { L"Français", L"Français", L"Français", L"Français", L"Français", L"Français" },
-    { L"English", L"English", L"English", L"English", L"English", L"English" },
-    { L"Deutsch", L"Deutsch", L"Deutsch", L"Deutsch", L"Deutsch", L"Deutsch" },
-    { L"Español", L"Español", L"Español", L"Español", L"Español", L"Español" },
-    { L"Italiano", L"Italiano", L"Italiano", L"Italiano", L"Italiano", L"Italiano" },
-    { L"日本語", L"日本語", L"日本語", L"日本語", L"日本語", L"日本語" },
+    { L"Français", L"Français", L"Français", L"Français", L"Français", L"Français", L"Français" },
+    { L"English", L"English", L"English", L"English", L"English", L"English", L"English" },
+    { L"Deutsch", L"Deutsch", L"Deutsch", L"Deutsch", L"Deutsch", L"Deutsch", L"Deutsch" },
+    { L"Español", L"Español", L"Español", L"Español", L"Español", L"Español", L"Español" },
+    { L"Italiano", L"Italiano", L"Italiano", L"Italiano", L"Italiano", L"Italiano", L"Italiano" },
+    { L"日本語", L"日本語", L"日本語", L"日本語", L"日本語", L"日本語", L"日本語" },
 };
 
 const DlRow kLanguageRows[] =
@@ -210,12 +210,8 @@ const wchar_t* AchievementsHelp(int k)
     return help.c_str();
 }
 
-// Nothing to do when the selection moves; given anyway, as DarkLauncher dfd88a5 calls it without
-// checking when the mouse moves over a row (dl_menu.c), and a missing one crashed the program.
-void AchievementsMoved() {}
-
-const DlList kAchievementList = { AchievementsOpen, AchievementsCount, AchievementsRow, AchievementsHelp, nullptr, nullptr,
-    AchievementsMoved, t_noAchievements, nullptr };
+const DlList kAchievementList = { AchievementsOpen, AchievementsCount, AchievementsRow, AchievementsHelp, nullptr, nullptr, nullptr,
+    t_noAchievements, nullptr };
 
 // ---- Picture page: the internal resolution ----
 
@@ -414,6 +410,7 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.fps = 60;
     game.audio_rate = kRate;
     game.subtitle = t_subtitle;
+    game.langs = DL_LANGS_ALL; // every text above is in DarkLauncher's seven languages, Italian included
     game.start = Start;
     game.frame = Frame;
     game.setup = Setup;

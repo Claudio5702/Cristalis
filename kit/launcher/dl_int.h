@@ -197,7 +197,9 @@ enum {
 };
 extern const wchar_t *const dl_texts[T_COUNT][DL_LANGS];
 extern const wchar_t *const dl_lang_names[DL_LANGS];
-#define TX(id) (dl_texts[id][dl_cfg.ui_lang])
+#define TX(id) (dl_tr(dl_texts[id]))
+bool dl_lang_ok(int lang); // one of the game's languages (DlGame.langs)
+int dl_lang_default(void); // the language of Windows if the game has it, otherwise English (or its first)
 
 // ---- drawing on the logical 640 x 400 canvas (dl_draw.c)
 extern double ui_s;
