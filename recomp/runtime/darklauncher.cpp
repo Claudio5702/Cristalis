@@ -301,11 +301,15 @@ bool Start()
 
 int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
 {
-    // DarkLauncher's buttons as the game's controller (XINPUT_GAMEPAD bits).
+    // DarkLauncher's buttons as the game's controller (XINPUT_GAMEPAD bits). DarkLauncher names its
+    // buttons after a Super Nintendo pad: by default its A is the controller's right face button (the
+    // Xbox B), its B the bottom one (the Xbox A), its X the top one (Xbox Y), its Y the left one (Xbox X).
+    // Each is passed on as the Xbox button in that place, so a button of the controller is the same
+    // button in the game.
     static const struct { uint32_t from; uint16_t to; } map[] =
     {
         { DL_UP, 0x0001 }, { DL_DOWN, 0x0002 }, { DL_LEFT, 0x0004 }, { DL_RIGHT, 0x0008 }, { DL_START, 0x0010 }, { DL_SELECT, 0x0020 },
-        { DL_L, 0x0100 }, { DL_R, 0x0200 }, { DL_A, 0x1000 }, { DL_B, 0x2000 }, { DL_X, 0x4000 }, { DL_Y, 0x8000 },
+        { DL_L, 0x0100 }, { DL_R, 0x0200 }, { DL_B, 0x1000 }, { DL_A, 0x2000 }, { DL_Y, 0x4000 }, { DL_X, 0x8000 },
     };
     uint16_t buttons = 0;
     for (auto& entry : map)

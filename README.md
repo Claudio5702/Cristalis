@@ -1,130 +1,195 @@
 # CrystalDefendersRecomp
 
-**Unofficial** native PC port of *Crystal Defenders* (Xbox 360).
+**Crystal Defenders (Xbox 360) — unofficial native port by static recompilation**
 
-A static recompilation of the Xbox Live Arcade game *Crystal Defenders*
-for Windows. The game's PowerPC code is translated to C++ with
-[XenonRecomp](https://github.com/hedge-dev/XenonRecomp) and runs on a small runtime
-written for this one game.
+![The settings screen, DarkLauncher in the colours of the game](docs/screenshots/launcher-en.png)
 
-**This repository contains no game data.** You need your own copy of the game.
-This project is not affiliated with or endorsed by Square Enix.
+This project runs Crystal Defenders, the Xbox Live Arcade game, as a native Windows program: the
+game's PowerPC code is translated ahead of time to C++ with
+[XenonRecomp](https://github.com/hedge-dev/XenonRecomp) and runs on a small runtime written for this
+one game. A Linux build is experimental.
 
-## Made with AI
+This repository contains **no game data and none of the game's code**: the translated code is
+generated locally from your own `default.xex`, and the pictures, sounds and texts are read from your
+own copy of the game.
 
-This port was written by an AI: [Claude Code](https://claude.com/claude-code)
-running Claude Opus 5.5, directed and play-tested by the repository's owner. The
-runtime, the tools and this documentation were all produced that way.
+**You must supply your own copy of Crystal Defenders (Xbox 360).** Crystal Defenders belongs to
+Square Enix; this project is not affiliated with or endorsed by Square Enix.
 
-## State
-
-Playable from start to finish: graphics, sound, saves, six languages, replays.
-Tested by very few people so far; expect rough edges.
-
-Known differences from the console:
-
-- No online leaderboards (they needed Xbox LIVE).
-- Music loops are handled by the runtime rather than by the game's original mechanism.
-- Windows is the complete version; the Linux build is experimental.
-
-## Features
-
-- The game runs inside [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)
-  (`kit/launcher`, the launcher made for Kahna, Bahamut Lagoon Recomp): a settings
-  screen before the game and a pause menu (Escape), in seven languages, with the
-  keyboard, a controller or the mouse. Picture filters (sharp, smooth, CRT,
-  scanlines, HDR), full screen, sound, rebindable keys and buttons, screenshots,
-  and pages of the game's own: its language, its internal resolution (1280×720 or
-  2560×1440), vibration, and the achievements. Its look follows the game's art
-  direction, drawn by DarkLauncher (nothing is taken from the game's files).
-- Achievements stored locally, with a notice over the game and a list.
-- `.\build.ps1 -Classic` builds the earlier version instead, with its own window,
-  start screen and F1 menu.
+**Contents:** [Playing](#playing) · [Features](#features) · [Settings screen](#settings-screen) ·
+[Controls](#controls) · [Files](#files) · [Uninstalling](#uninstalling) · [Linux](#linux) ·
+[Known limits](#known-limits) · [For developers](#for-developers) · [FAQ](#faq) ·
+[Roadmap](#roadmap) · [License](#license) · [Credits](#credits)
 
 ## Playing
 
-With the installer: put your own copy of the game, the `CRYSTAL DEFENDERS` (or
-`58410989`) folder as copied from the console's storage, next to
-`Crystal Defenders - Setup.exe` and run it. The game is installed from that folder,
-with shortcuts and an entry in Windows' list of applications (which uninstalls it).
-Without the folder, the last window of the installer asks for it.
+1. Copy the game from your console: the `CRYSTAL DEFENDERS` folder (or the folder named after its
+   title id, `58410989`) as found on the console's storage, for example on a USB drive.
+2. With the installer: put that folder next to `Crystal Defenders - Setup.exe` and run it. The game
+   is installed from it, with shortcuts and an entry in Windows' list of applications. Without the
+   folder, the last window of the installer asks where it is.
+3. Without the installer: run `crystal_defenders.exe`. On the first start it asks for that folder
+   (or a folder already holding `default.xex` and `Media`), or takes it at once when it lies next
+   to the program.
 
-Without the installer:
-
-1. Download a release and unzip it.
-2. Run `crystal_defenders.exe`.
-3. On first launch, choose the folder of your own copy of the game: the
-   `CRYSTAL DEFENDERS` (or `58410989`) folder as copied from the console's
-   storage, or a folder already holding `default.xex` and `Media`.
+The game's data is then kept in a `game` folder next to the program; the console's folder is no
+longer needed. Keep these files to yourself.
 
 Windows 10 or 11, 64-bit, a Direct3D 11 graphics card.
 
-Instead of step 3, you can drop the console's `CRYSTAL DEFENDERS` (or `58410989`)
-folder next to `crystal_defenders.exe` before the first launch: the game is then
-installed from it without any question.
+### The game to use
 
-### Linux
+| | |
+| --- | --- |
+| Title id | `58410989` (Xbox Live Arcade) |
+| Console package | `58410989\000D0000\18F4739D37853F8596CE621540680922AFE9F23A`, 58,126,336 bytes, SHA-1 `118C64C901976CD8E2B570D77B0A5E01C15C7A46` |
+| `default.xex` inside it | 1,658,880 bytes, SHA-1 `31A90704D4233F6E730714515CD5F20BF08D7F0D` |
 
-**Experimental.** So far it has only been run under WSL on a PC, with software
-rendering and no controller; nobody has tried it on a real Linux desktop or a
-Steam Deck yet.
+The program checks that `default.xex` is the one its code was translated from, and says so when it
+is not.
 
-A native build (SDL2 and OpenGL 3.3) for x86-64 Linux with glibc 2.35 or newer:
-Ubuntu 22.04, Debian 12, Fedora 36, SteamOS 3.5 and later. It needs SDL2 and
-OpenGL, FreeType and fontconfig from the system; FFmpeg is built in.
+## Features
+
+- **The game in [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)**, the launcher made
+  for Kahna (Bahamut Lagoon Recomp): a settings screen before the game and a pause menu in game, in
+  seven languages, with the keyboard, a controller or the mouse. Its look follows the game's art
+  direction: the blue of its windows, the gold of its crystals, a starry night. DarkLauncher draws
+  all of it; nothing is taken from the game's files.
+- **Six languages of the game** (French, English, German, Spanish, Italian, Japanese), chosen in the
+  settings; the game restarts in the new one.
+- **Display through the graphics card**: the game drawn at 1280×720 or 2560×1440, then sharp,
+  smooth or smooth-edged at any window size; scanlines, a flat or curved CRT look, HDR.
+- **Achievements stored on the computer**, with a notice over the game and a list in the settings.
+- **The console's own offline behaviour on request**: the "Not connected to Xbox LIVE" notice and
+  the choice of the storage device are off by default, and can be turned on.
+- **Screenshots** of the picture as shown, filters included, and a gallery in the settings.
+- **Keys and controller buttons** chosen on the Controls page; any XInput (Xbox-type) controller.
+- **An installer and an uninstaller**, in six languages.
+
+## Settings screen
+
+At start-up DarkLauncher shows its settings screen, with the game running in the preview. **Play**
+starts it; in game, **Esc** (or the controller's View button) opens a pause menu over the paused
+picture: resume, screenshot, settings, quit.
+
+A bar on the left lists the sections; the page of the section under the selection is shown beside
+it. Enter or Right goes into it, Esc comes back.
+
+- **Screenshots**: the screenshots taken, newest first. Enter opens one, Delete twice moves it to the
+  Recycle Bin.
+- **Game**: vibration, the "Not connected to Xbox LIVE" notice and the choice of the storage device
+  (both as on an offline console; from the next start).
+- **Achievements**: the game's twelve achievements, earned or not, with what each asks for.
+- **Languages**: the game's language (the game restarts in it) and the menu's.
+- **Picture**: the internal resolution (1280×720 or 2560×1440), full screen, integer scaling,
+  display through the graphics card or in software, filter, scanlines, CRT, HDR, vertical sync,
+  frame rate, and "Try it full size".
+- **Sound**: the volume and the sounds of the menu.
+- **Controls**: the keyboard keys and controller buttons of the game, and the shortcuts.
+- At the bottom: the game folder, the default settings, quit.
+
+![The Picture page](docs/screenshots/picture-en.png)
+
+## Controls
+
+Keys follow the **physical position** (the same on AZERTY and QWERTY keyboards); all of them can be
+changed on the Controls page.
+
+| Game (Xbox 360) | Keyboard (QWERTY positions) | Controller |
+| --- | --- | --- |
+| D-pad | Arrows | D-pad / left stick |
+| A (confirm) / B (back) | Z / X | A / B |
+| X / Y | A / S | X / Y |
+| LB / RB | Q / W | LB / RB |
+| Start / Back | Enter / Right Shift | Start / Back (View), which also opens the pause menu |
+
+`Esc`: pause menu — `F11` or `Alt+Enter`: full screen — `F12`: screenshot into `captures\` —
+`Tab` (held): fast-forward.
+
+## Files
+
+Everything stays in the program's folder:
+
+| | |
+| --- | --- |
+| `game\` | the game's data, taken out of your copy on the first start |
+| `userdata\` | the game's saves and the achievements earned |
+| `captures\` | screenshots |
+| `crystal_defenders.ini` | settings |
+| `crystal_defenders.log` | log of the last session (`.prev.log`: the one before) |
+
+## Uninstalling
+
+Installed with the installer: run `Uninstall.exe` in the game folder, or remove "Crystal Defenders"
+from the list of installed applications in the Windows settings. By default your saves, settings,
+screenshots and the game's data stay in the folder, in case you reinstall; tick the box to remove
+them as well, and the folder goes with them. Without the installer: delete the folder.
+
+## Linux
+
+**Experimental.** A native build (SDL2 and OpenGL 3.3) for x86-64 Linux with glibc 2.35 or newer:
+Ubuntu 22.04, Debian 12, Fedora 36, SteamOS 3.5 and later. It needs SDL2, OpenGL, FreeType and
+fontconfig from the system; FFmpeg is built in. It has its own settings menu (F1 or both sticks),
+not DarkLauncher, which is Windows only.
 
 1. Unpack the Linux release.
 2. Copy your `CRYSTAL DEFENDERS` (or `58410989`) folder into it.
 3. Run `crystal_defenders.sh`. The game is installed on the first launch.
 
-It has the same features as the Windows version: sound, saves, keyboard and
-controllers, six languages, high-resolution rendering, the settings menu, the
-pause and local achievements.
+It has only been run under WSL so far, with software rendering and no controller; nobody has tried
+it on a real Linux desktop or a Steam Deck yet. On a Steam Deck, add `crystal_defenders.sh` to Steam
+as a non-Steam game, without forcing a compatibility tool. The Windows release also runs through
+Proton.
 
-On a Steam Deck, add `crystal_defenders.sh` to Steam as a non-Steam game, without
-forcing a compatibility tool. The Windows release also runs through Proton.
+## Known limits
 
-## Building
+- No online leaderboards: they needed Xbox LIVE.
+- No save states: the game is a whole Xbox 360 program with its own threads; it saves by itself.
+- Music loops are handled by the runtime rather than by the console's own mechanism.
+- Tested by very few people so far; controllers have been tried less than the keyboard.
 
-Requirements: Windows, clang (MinGW-w64 target), CMake, Ninja, Python 3, an FFmpeg
-LGPL shared build (for XMA audio), and your own `default.xex`.
+## For developers
 
-1. Get XenonRecomp, apply the changes described in
-   [`recomp/tools/README.md`](recomp/tools/README.md) and build it into
-   `tools/build-xenonrecomp` (or pass its path with `-XenonRecomp`).
-2. Run `.\recompile.ps1 -Xex <your default.xex>`. It translates the game's code
-   into `recomp/ppc`, generates the import table, then builds.
-3. After a change to the runtime, `.\build.ps1` rebuilds what changed
-   (`-Clean` rebuilds everything, `-Classic` the version without DarkLauncher).
+How the project works, how to build it, translate the game's code again, check it and make the
+installer: [docs/DEVELOPERS.md](docs/DEVELOPERS.md).
 
-The program lands in `build\`, with the FFmpeg DLLs, and can be started from
-there. DarkLauncher is copied into `kit/` from its own repository by its
-`tools/sync_to_project.ps1`, and is never changed here; `project.h` gives it this
-project's names. The path to FFmpeg is set in `recomp/CMakeLists.txt`.
-`recomp/tools/make_installer.ps1` then packs the build into an installer
-(`dist/Crystal Defenders - Setup.exe`).
+## FAQ
 
-On Linux: clang, CMake, Ninja, SDL2, FFmpeg and OpenGL development packages;
-the same steps, and `runtime/linux` supplies the small part of the Windows API
-the runtime is written against.
+**Is it an emulator?** No. The game's own program is translated ahead of time into native code for
+the PC (static recompilation); what the console's hardware did (graphics, XMA sound, the system's
+functions) is written again for Windows.
 
-## Layout
+**Why do I need my own copy?** The repository holds none of the game: the translated code is
+generated from your `default.xex`, and the game reads its pictures, sounds and texts from your copy.
 
-| Path | Contents |
-|---|---|
-| `recomp/config` | XenonRecomp configuration: function bounds, jump tables, hooks |
-| `recomp/runtime` | The runtime: kernel and XAM imports, GPU command processor, Direct3D 11 renderer, XMA audio, settings menu, first-launch setup |
-| `recomp/tools` | Scripts used during the port and to package it |
+**Can I use my saves from the console?** The saves are in `userdata\`, in the game's own format;
+copying saves between the console and the PC has not been tried.
 
-## Credits
+**Is anything sent over the Internet?** No. The program does not use the network at all.
 
-- Written with [Claude Code](https://claude.com/claude-code) (Claude Opus 5.5).
-- [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) by hedge-dev.
-- [FFmpeg](https://ffmpeg.org) for XMA decoding (LGPL).
-- [Xenia](https://xenia.jp) documentation of the Xbox 360, used as reference.
-- *Crystal Defenders* © Square Enix.
+## Roadmap
+
+- Linux with DarkLauncher, and a real test on a Steam Deck.
+- The menu sounds and more of the game's art direction in DarkLauncher's theme.
+- More testing with controllers and on other computers.
 
 ## License
 
-The code in this repository is under the [MIT license](LICENSE). It grants no
-rights to the game itself.
+The source code of this project is under the MIT license (see [LICENSE](LICENSE)). That license does
+not cover the game, its data or its code.
+
+## Credits
+
+This project was made 100 % with [Claude Code](https://claude.com/claude-code) (Claude Opus 5.5),
+the AI coding assistant by Anthropic: all the code, the tools and the documentation were written by
+it, following the requests and the tests of the project's author.
+
+- [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) by hedge-dev: the recompiler that translates
+  the game's code.
+- [DarkLauncher](https://github.com/Claudio5702/DarkLauncher): the settings screen, the pause menu
+  and the picture filters, made for Kahna.
+- [FFmpeg](https://ffmpeg.org) (LGPL): XMA decoding.
+- [Xenia](https://xenia.jp): its documentation of the Xbox 360, used as reference.
+- [llvm-mingw](https://github.com/mstorsjo/llvm-mingw): the compiler of the program and the installer.
+
+And of course to Square Enix, who made Crystal Defenders.
