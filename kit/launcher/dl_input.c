@@ -103,6 +103,25 @@ static u32 pad_raw;      // XInput codes held (bit n: code n), and the left stic
 #define STICK_LEFT (1u << 20)
 #define STICK_RIGHT (1u << 21)
 static DWORD joy_raw;    // WinMM buttons held
+static bool joy_ps;      // that controller is a PlayStation one (by its name)
+int dl_input_kind;
+
+void dl_input_used(int kind) {
+  if (kind == dl_input_kind) return;
+  dl_input_kind = kind;
+  dl_dirty = true;
+}
+
+// The button that chooses (or goes back) in the menus, as a picture: A and B of an Xbox pad; on another
+// controller the buttons of the game's A and B (dl_pad_poll), drawn as PlayStation symbols when it is
+// one (DirectInput order: square, cross, circle, triangle), as their numbers otherwise.
+int dl_pad_glyph(bool confirm) {
+  if (dl_input_kind == DL_IN_XBOX) return confirm ? GL_XA : GL_XB;
+  int n = dl_joy_code[confirm ? 4 : 5];
+  if (n < 0) n = confirm ? 1 : 0;
+  if (dl_input_kind == DL_IN_PS && n < 4) return GL_PS_SQUARE + n;
+  return GL_NUM + n;
+}
 static u32 joy_dirs;     // its stick and hat, as DL_UP..DL_RIGHT
 
 static void xinput_load(void) {
@@ -157,6 +176,18 @@ static bool joy_poll(void) {
     for (UINT k = 0; k < n && k < 16 && id < 0; k++)
       if (joyGetPosEx(k, &ji) == JOYERR_NOERROR) id = (int)k;
     if (id < 0) return false;
+    JOYCAPSW caps;
+    joy_ps = false;
+    if (joyGetDevCapsW((UINT)id, &caps, sizeof caps) == JOYERR_NOERROR) {
+      static const wchar_t *const ps_names[] = {L"Wireless Controller", L"DualSense", L"DUALSHOCK", L"PLAYSTATION", L"PS4", L"PS5"};
+      CharUpperW(caps.szPname);
+      for (int k = 0; k < 6 && !joy_ps; k++) {
+        wchar_t want[32];
+        lstrcpynW(want, ps_names[k], 32);
+        CharUpperW(want);
+        joy_ps = wcsstr(caps.szPname, want) != NULL;
+      }
+    }
   }
   if (joyGetPosEx((UINT)id, &ji) != JOYERR_NOERROR) { id = -1; return false; }
   if (ji.dwXpos < 16000) joy_dirs |= DL_LEFT;
@@ -292,6 +323,10 @@ void dl_pad_poll(void) {
   }
   if (dl_wait) return; // a keyboard key is expected
   bool joy = dl_joy_mode();
+  static u32 prev_dirs;
+  u32 dirs = (pad_raw & 0x3C000Fu) | joy_dirs;
+  if (pressed || jpressed || (dirs & ~prev_dirs)) dl_input_used(!joy ? DL_IN_XBOX : joy_ps ? DL_IN_PS : DL_IN_PAD); // the footer shows its buttons
+  prev_dirs = dirs;
 #define FN_PRESSED(k) ((dl_pad_code[k] >= 0 && (pressed & (1u << dl_pad_code[k]))) || (joy && dl_joy_code[k] >= 0 && (jpressed & (1u << dl_joy_code[k]))))
   if (dl_mode == M_GAME) {
     if (FN_PRESSED(FN_MENU)) dl_pause_open();
@@ -316,9 +351,13 @@ void dl_pad_poll(void) {
   if (pressed & ((1u << 12) | (1u << 4))) dl_key(VK_RETURN); // A or Start
   if (pressed & (1u << 13)) dl_key(VK_ESCAPE);               // B
   if (pressed & (1u << 15)) dl_key(VK_DELETE);               // Y
+  if (pressed & (1u << 8)) dl_key(VK_PRIOR);                 // LB, RB: Page Up, Page Down (a pack moved)
+  if (pressed & (1u << 9)) dl_key(VK_NEXT);
   if (joy) { // other controllers: the buttons of the game's A and B
     if (dl_joy_code[4] >= 0 && (jpressed & (1u << dl_joy_code[4]))) dl_key(VK_RETURN);
     if (dl_joy_code[5] >= 0 && (jpressed & (1u << dl_joy_code[5]))) dl_key(VK_ESCAPE);
+    if (dl_joy_code[8] >= 0 && (jpressed & (1u << dl_joy_code[8]))) dl_key(VK_PRIOR);
+    if (dl_joy_code[9] >= 0 && (jpressed & (1u << dl_joy_code[9]))) dl_key(VK_NEXT);
   }
 #undef FN_PRESSED
 }

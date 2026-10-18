@@ -17,6 +17,7 @@ typedef struct {
   int gpu, crt, hdr, vsync; // graphics card (0: GDI), CRT filter (0 off, 1 flat, 2 curved), HDR white (0 off, 1-4), vertical sync
   int turbo, pause_menu, bg_pause; // fast forward (0 max, 2 2x, 4 4x), Esc opens the pause menu, pause behind another window
   int win_x, win_y, win_w, win_h;
+  int contrast, cvd, still, big_help; // accessibility: high contrast, colour-blind filter (0 off, 1 protan, 2 deutan, 3 tritan), still sky, large help text
 } DlCfg;
 extern DlCfg dl_cfg;
 void dl_defaults(bool picture_only);
@@ -32,6 +33,10 @@ extern int dl_pic_scale;     // its pixels per pixel of the console (dl_picture_
 extern bool dl_started;      // the player has started the game (it is paused while the menu is shown)
 extern bool dl_running;
 extern bool dl_start_done;   // the game's start() has run (the theme's pictures may be asked for)
+extern bool dl_safe;         // this run is in safe mode (the last one did not close normally)
+void dl_safe_restart(void);  // the player's settings back, then the program started again
+void dl_settings_sibling(char *out, const char *ext); // the settings file's path with another extension (MAX_PATH)
+bool dl_packs_key(int vk);   // Page Up / Page Down on the Packs page (dl_packs.c); true: used
 extern bool dl_no_mouse;
 extern const char *dl_audit_dir;
 extern int dl_fps_shown;
@@ -65,6 +70,13 @@ void dl_keys_default(void);
 void dl_pads_default(void);
 void dl_hot_default(void);
 bool dl_joy_mode(void);
+// What the player used last in the menus: the footer shows its buttons.
+enum { DL_IN_KEYS, DL_IN_XBOX, DL_IN_PS, DL_IN_PAD };
+extern int dl_input_kind;
+void dl_input_used(int kind);
+// Pictures of controller buttons (ui_pad_glyph): GL_NUM + n is button n + 1 of another controller.
+enum { GL_DPAD, GL_XA, GL_XB, GL_XX, GL_XY, GL_PS_SQUARE, GL_PS_CROSS, GL_PS_CIRCLE, GL_PS_TRIANGLE, GL_NUM };
+int dl_pad_glyph(bool confirm); // the button that chooses (true) or goes back in the menus, for dl_input_kind
 u32 dl_game_buttons(void);         // DL_* bits held now
 void dl_input_release(void);       // the game gets no button until every one has been released
 bool dl_turbo_held(void);
@@ -96,6 +108,7 @@ void dl_rewind_end(void);          // the key released
 bool dl_session_exists(void);
 bool dl_session_resume(void);      // "Continue": the session kept at the last close
 void dl_session_keep(void);        // at closing time
+int dl_latest_auto(void);          // the newest of the session and the game's automatic states (-1, DL_SLOTS + k), -2: none
 const wchar_t *dl_session_help(void);
 bool dl_saves_key(int vk);         // a key on the Saves page while a slot's name is typed; true: used
 void dl_saves_char(wchar_t c);
@@ -104,6 +117,11 @@ extern bool dl_state_taken;        // a state was loaded before the game was sta
 const wchar_t *dl_note_now(void);  // the note being shown, or NULL
 void dl_note_size(HDC dc, int h, int *w, int *bh);
 void dl_draw_note(HDC dc, int x, int y, int h);
+// "Achievement unlocked" over the game (dl_achieve.c): the name being shown or NULL, its box, its drawing
+const wchar_t *dl_toast_now(void);
+void dl_toast_size(HDC dc, int h, int *w, int *bh);
+void dl_draw_toast(HDC dc, int x, int y, int h);
+void dl_toast_sample(void); // --gpu-check: the first achievement's box, without unlocking it
 HBITMAP dl_picture_load(const char *path, int *w, int *h);
 
 // the program's own list pages (DlList: dl.h)
@@ -142,10 +160,11 @@ extern DlSection dl_secs[DL_MAX_SECTIONS];
 extern int dl_sec_n, dl_sec_top; // entries before dl_sec_top: upper group of the bar
 
 // the kit's pages, in this order (DL_PAGE_LANGS, DL_PAGE_IMAGE, DL_PAGE_SOUND first)
-enum { PG_CTRL = DL_PAGE_SOUND + 1, PG_KEYS, PG_PAD, PG_PADFN, PG_HOT, PG_SAVES, PG_SHOTS };
+enum { PG_CTRL = DL_PAGE_SOUND + 1, PG_KEYS, PG_PAD, PG_PADFN, PG_HOT, PG_SAVES, PG_SHOTS, PG_A11Y };
 void dl_page_insert(int page, int at, const DlRow *row);
 void dl_menu_init(void);   // the kit's pages and the first entry, before the game's setup()
 void dl_menu_finish(void); // the kit's entries after the game's ones
+void dl_safe_page_open(void); // the safe mode page, at the start of a run after a crash
 extern u32 *dl_menu_bits;                         // the setup screen as last drawn (window size)
 extern int dl_prev_x, dl_prev_y, dl_prev_w, dl_prev_h; // the live picture in it (dl_prev_w 0: none)
 void dl_draw_menu(HDC wdc);
@@ -193,6 +212,12 @@ enum {
   T_CONTINUE, T_H_CONTINUE, T_SESSION, T_SESSION_DATE, T_SVH_F2, T_SVH_NAME, T_HK_REWIND, T_SVH_AUTO, T_SVH_AUTO_EMPTY, T_M_REWIND, T_M_RESUMED,
   T_SOUND, T_TAB_SOUND, T_H_SOUND, T_VOL, T_H_VOL, T_MENUSND, T_H_MENUSND,
   T_FOLDER, T_H_FOLDER, T_DEFAULTS, T_H_DEFAULTS, T_RESET, T_H_RESET, T_QUIT, T_H_QUIT,
+  T_FT_MOVE, T_FT_OK, T_FT_BACK,
+  T_A11Y, T_TAB_A11Y, T_H_A11Y, T_CONTRAST, T_H_CONTRAST, T_CVD, T_H_CVD, T_CVD_PROTAN, T_CVD_DEUTAN, T_CVD_TRITAN, T_STILL, T_H_STILL,
+  T_BIG_HELP, T_H_BIG_HELP,
+  T_PK_ON, T_PK_OFF, T_PK_FOLDER, T_H_PK_FOLDER, T_PK_RESTART, T_H_PK_RESTART, T_H_PK, T_PK_DIR, T_PK_FILE,
+  T_ACH, T_TAB_ACH, T_H_ACH, T_ACH_SECRET, T_ACH_H_SECRET, T_ACH_UNLOCKED, T_ACH_COUNT, T_ACH_LOCKED, T_ACH_DATE,
+  T_SAFE_TAB, T_SAFE_KEEP, T_H_SAFE_KEEP, T_SAFE_LOAD, T_H_SAFE_LOAD, T_SAFE_RESTART, T_H_SAFE_RESTART,
   T_COUNT
 };
 extern const wchar_t *const dl_texts[T_COUNT][DL_LANGS];
@@ -219,6 +244,7 @@ void ui_title(HDC dc, double x, double base);
 void ui_bar(HDC dc, double x0, double y, double x1, int value, int max);
 void ui_row(HDC dc, double y, double h, bool sel, const wchar_t *label, const wchar_t *value, int sw, bool plain, int bar, int bar_max);
 HFONT ui_icons(HDC dc);
+void ui_pad_glyph(HDC dc, int glyph, double cx, double cy, double d); // a controller button, d across, centred at cx, cy
 void sky_draw(HDC dc, int cw, int ch);
 bool backdrop_draw(HDC dc, int cw, int ch); // the player's launcher_bg.*, or the theme's backdrop; false: none
 

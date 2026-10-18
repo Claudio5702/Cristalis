@@ -280,6 +280,15 @@ const DlTheme kTheme = {
     DL_FRAME_ROUND, DL_CURSOR_BAR, DL_SKY_STARS, DL_TITLE_FLAT, DL_BEEP_CRYSTAL,
 };
 
+// ---- Safe mode ----
+
+// The run after a crash: the game draws at the console's own 1280 x 720, the lightest for the graphics
+// card (DarkLauncher turns off its own risky options; the player's setting comes back unless changed).
+void SafeMode()
+{
+    g_scaleSetting = 0;
+}
+
 // ---- The game ----
 
 DWORD WINAPI GuestThread(void*)
@@ -419,6 +428,7 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.start = Start;
     game.frame = Frame;
     game.setup = Setup;
+    game.safe_mode = SafeMode;
     // --no-theme: DarkLauncher's own look (to compare)
     bool themed = true;
     for (int i = 1; i < argc; i++)

@@ -85,10 +85,21 @@ static void tint3(double *rgb) {
   from_hsl(hsl, rgb);
 }
 
+// High contrast: light colours (the texts) become white, dark ones (the panels) darker still.
+static void contrast3(double *rgb) {
+  double hsl[3];
+  to_hsl(rgb, hsl);
+  if (hsl[2] > 0.62) hsl[2] = 1;
+  else if (hsl[2] < 0.4) hsl[2] *= 0.45;
+  from_hsl(hsl, rgb);
+}
+
 COLORREF ui_tint(COLORREF c) {
-  if (!theme_colours()) return c;
+  bool th = theme_colours();
+  if (!th && !dl_cfg.contrast) return c;
   double v[3] = {GetRValue(c), GetGValue(c), GetBValue(c)};
-  tint3(v);
+  if (th) tint3(v);
+  if (dl_cfg.contrast) contrast3(v);
   int q[3];
   for (int k = 0; k < 3; k++) { q[k] = (int)(v[k] + 0.5); q[k] = q[k] < 0 ? 0 : q[k] > 255 ? 255 : q[k]; }
   return RGB(q[0], q[1], q[2]);
@@ -116,6 +127,7 @@ static double ui_corner(double r) {
 }
 
 COLORREF ui_value(void) {
+  if (dl_cfg.contrast) return RGB(255, 230, 80);
   if (theme() && theme()->value) { u32 v = theme()->value; return RGB(v >> 16 & 255, v >> 8 & 255, v & 255); }
   return ui_tint(RGB(130, 214, 255));
 }
@@ -263,21 +275,22 @@ const void *ui_theme_sound(int kind, int volume) {
 
 void ui_fonts(void) {
   int px = PX(100);
-  static int font_lang = -1;
-  if (px == font_px && font_lang == dl_cfg.ui_lang) return;
+  static int font_lang = -1, font_big = -1;
+  if (px == font_px && font_lang == dl_cfg.ui_lang && font_big == dl_cfg.big_help) return;
+  font_big = dl_cfg.big_help;
   font_px = px;
   font_lang = dl_cfg.ui_lang;
   HFONT *all[] = {&f_title, &f_title_small, &f_item, &f_small, &f_help, &f_help_small};
   for (int k = 0; k < 6; k++)
     if (*all[k]) DeleteObject(*all[k]);
-  f_help_small = CreateFontW(-PX(10.5), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
+  f_help_small = CreateFontW(-PX(dl_cfg.big_help ? 12.5 : 10.5), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
   // title: a serif face drawn slightly narrow, with a larger initial (see ui_title)
   bool slant = title_style() != DL_TITLE_FLAT;
   f_title = CreateFontW(-PX(43), PX(14.5), 0, 0, FW_BOLD, slant, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
   f_title_small = CreateFontW(-PX(33), PX(11.5), 0, 0, FW_BOLD, slant, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
   f_item = CreateFontW(-PX(15), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
   f_small = CreateFontW(-PX(11), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
-  f_help = CreateFontW(-PX(13), 0, 0, 0, FW_NORMAL, dl_cfg.ui_lang != 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
+  f_help = CreateFontW(-PX(dl_cfg.big_help ? 15.5 : 13), 0, 0, 0, FW_NORMAL, dl_cfg.ui_lang != 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
 }
 
 void ui_rect(HDC dc, double x0, double y0, double x1, double y1, COLORREF c) {
@@ -341,6 +354,15 @@ void ui_cursor(HDC dc, double x0, double y0, double x1, double y1) {
     SelectObject(dc, ob);
     DeleteObject(pen);
   } else ui_box(dc, x0, y0, x1, y1, ui_tint(RGB(34, 84, 184)), 4);
+  if (dl_cfg.contrast && st != DL_CURSOR_OUTLINE) { // high contrast: the row framed as well
+    HPEN pen = CreatePen(PS_SOLID, PX(2) < 1 ? 1 : PX(2), ui_value());
+    HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, GetStockObject(NULL_BRUSH));
+    int d = PX(ui_corner(4) * 2);
+    RoundRect(dc, ui_ox + PX(x0), ui_oy + PX(y0), ui_ox + PX(x1) + 1, ui_oy + PX(y1) + 1, d, d);
+    SelectObject(dc, op);
+    SelectObject(dc, ob);
+    DeleteObject(pen);
+  }
 }
 
 // A panel letting the sky show through a little, in the theme's frame style (rounded with a line by
@@ -352,7 +374,7 @@ void ui_panel(HDC dc, double x0, double y0, double x1, double y1, COLORREF fill,
   if (fill != RGB(0, 0, 0)) {
     HRGN rg = CreateRoundRectRgn(X0, Y0, X1 + 1, Y1 + 1, d, d);
     SelectClipRgn(dc, rg);
-    ui_rect_alpha(dc, x0, y0, x1, y1, fill, st == DL_FRAME_DOUBLE ? 235 : st == DL_FRAME_SOFT ? 180 : 205);
+    ui_rect_alpha(dc, x0, y0, x1, y1, fill, dl_cfg.contrast ? 245 : st == DL_FRAME_DOUBLE ? 235 : st == DL_FRAME_SOFT ? 180 : 205);
     SelectClipRgn(dc, NULL);
     DeleteObject(rg);
   } else ui_round(dc, x0, y0, x1, y1, fill, rad);
@@ -584,6 +606,60 @@ HFONT ui_icons(HDC dc) {
     ok = !lstrcmpiW(got, L"Segoe MDL2 Assets");
   }
   return ok > 0 ? f : NULL;
+}
+
+// ---- controller buttons for the footer: Xbox letters on their colours, PlayStation symbols on a dark
+// disc, the number of another controller's button, the directional pad as a cross
+static void disc(HDC dc, double cx, double cy, double r, COLORREF fill) {
+  HBRUSH b = CreateSolidBrush(fill);
+  HGDIOBJ ob = SelectObject(dc, b), op = SelectObject(dc, GetStockObject(NULL_PEN));
+  Ellipse(dc, ui_ox + PX(cx - r), ui_oy + PX(cy - r), ui_ox + PX(cx + r) + 1, ui_oy + PX(cy + r) + 1);
+  SelectObject(dc, ob);
+  SelectObject(dc, op);
+  DeleteObject(b);
+}
+
+void ui_pad_glyph(HDC dc, int g, double cx, double cy, double d) {
+  double r = d / 2;
+  if (g == GL_DPAD) {
+    COLORREF c = RGB(228, 232, 240);
+    ui_rect(dc, cx - r, cy - r * 0.34, cx + r, cy + r * 0.34, c);
+    ui_rect(dc, cx - r * 0.34, cy - r, cx + r * 0.34, cy + r, c);
+    return;
+  }
+  if (g >= GL_XA && g <= GL_XY) {
+    static const COLORREF fill[4] = {RGB(76, 168, 64), RGB(214, 58, 52), RGB(46, 110, 214), RGB(226, 178, 22)};
+    static const wchar_t *const letter[4] = {L"A", L"B", L"X", L"Y"};
+    disc(dc, cx, cy, r, fill[g - GL_XA]);
+    ui_text(dc, f_small, cx, cy - 6.5, letter[g - GL_XA], RGB(255, 255, 255), TA_CENTER);
+    return;
+  }
+  disc(dc, cx, cy, r, RGB(34, 36, 44));
+  if (g >= GL_NUM) {
+    wchar_t n[8];
+    wsprintfW(n, L"%d", g - GL_NUM + 1);
+    ui_text(dc, f_small, cx, cy - 6.5, n, RGB(240, 242, 248), TA_CENTER);
+    return;
+  }
+  static const COLORREF ink[4] = {RGB(232, 128, 186), RGB(124, 168, 236), RGB(236, 96, 104), RGB(64, 200, 160)}; // square, cross, circle, triangle
+  HPEN pen = CreatePen(PS_SOLID, PX(1.4) < 1 ? 1 : PX(1.4), ink[g - GL_PS_SQUARE]);
+  HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, GetStockObject(NULL_BRUSH));
+  double s = r * 0.48;
+  int x0 = ui_ox + PX(cx - s), y0 = ui_oy + PX(cy - s), x1 = ui_ox + PX(cx + s), y1 = ui_oy + PX(cy + s);
+  if (g == GL_PS_SQUARE) Rectangle(dc, x0, y0, x1 + 1, y1 + 1);
+  else if (g == GL_PS_CIRCLE) Ellipse(dc, x0, y0, x1 + 1, y1 + 1);
+  else if (g == GL_PS_CROSS) {
+    MoveToEx(dc, x0, y0, NULL);
+    LineTo(dc, x1, y1);
+    MoveToEx(dc, x1, y0, NULL);
+    LineTo(dc, x0, y1);
+  } else {
+    POINT p[3] = {{ui_ox + PX(cx), ui_oy + PX(cy - s * 1.05)}, {x1, ui_oy + PX(cy + s * 0.75)}, {x0, ui_oy + PX(cy + s * 0.75)}};
+    Polygon(dc, p, 3);
+  }
+  SelectObject(dc, op);
+  SelectObject(dc, ob);
+  DeleteObject(pen);
 }
 
 // ---- the backdrop: a deep blue sky over a sea of clouds, computed (layered value noise)

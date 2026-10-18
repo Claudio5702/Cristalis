@@ -225,6 +225,24 @@ void dl_session_keep(void) {
 }
 
 // The help of "Continue": when the session dates from, and the time played if the game counts it.
+// The newest of the session and the game's automatic states: -1 the session, DL_SLOTS + k an automatic
+// state, -2 none.
+int dl_latest_auto(void) {
+  if (!dl_game->load_state) return -2;
+  int best = -2;
+  FILETIME best_t = {0, 0};
+  for (int i = -1; i < dl_game->auto_slots && i < 8; i++) {
+    int n = i < 0 ? -1 : DL_SLOTS + i;
+    if (n < 0 && !dl_game->resume) continue;
+    char p[MAX_PATH];
+    dl_slot_path(p, n, "");
+    WIN32_FILE_ATTRIBUTE_DATA a;
+    if (!GetFileAttributesExA(p, GetFileExInfoStandard, &a)) continue;
+    if (best == -2 || CompareFileTime(&a.ftLastWriteTime, &best_t) > 0) { best = n; best_t = a.ftLastWriteTime; }
+  }
+  return best;
+}
+
 const wchar_t *dl_session_help(void) {
   static wchar_t out[1024];
   char p[MAX_PATH];

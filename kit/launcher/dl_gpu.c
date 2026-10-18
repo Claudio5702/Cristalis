@@ -17,7 +17,7 @@
 static const char gpu_hlsl_head[] =
     "Texture2D tex : register(t0);\n"
     "SamplerState smp : register(s0);\n"
-    "cbuffer C : register(b0) { float2 texSize; float2 outSize; float2 origin; float filt; float scan; float crt; float hdr; float2 srcSize; float4 game[8]; };\n" // srcSize: the console's resolution (texSize / dl_picture_scale)
+    "cbuffer C : register(b0) { float2 texSize; float2 outSize; float2 origin; float filt; float scan; float crt; float hdr; float2 srcSize; float cvd; float3 cvdPad; float4 game[8]; };\n" // srcSize: the console's resolution (texSize / dl_picture_scale)
     "struct V { float4 p : SV_Position; float2 uv : TEXCOORD0; };\n"
     "V vs(uint id : SV_VertexID) {\n"
     "  V o; float2 t = float2((id << 1) & 2, id & 2);\n"
@@ -58,6 +58,18 @@ static const char gpu_hlsl_head[] =
 // the game's picture as it is when the game adds nothing
 static const char gpu_hlsl_scene[] = "float3 scene(float2 q) { return fetch(q); }\n";
 static const char gpu_hlsl_tail[] =
+    // the colour-blind filter (cvd 1 protan, 2 deutan, 3 tritan), as cvd_apply in dl_app.c
+    "float3 cvd_fix(float3 c) {\n"
+    "  if (cvd < 0.5) return c;\n"
+    "  float3x3 m;\n"
+    "  if (cvd < 1.5) m = float3x3(0.152286, 1.052583, -0.204868, 0.114503, 0.786281, 0.099216, -0.003882, -0.048116, 1.051998);\n"
+    "  else if (cvd < 2.5) m = float3x3(0.367322, 0.860646, -0.227968, 0.280085, 0.672501, 0.047413, -0.011820, 0.042940, 0.968881);\n"
+    "  else m = float3x3(1.255528, -0.076749, -0.178779, -0.078411, 0.930809, 0.147602, 0.004733, 0.691367, 0.303900);\n"
+    "  float3 e = c - mul(m, c);\n"
+    "  if (cvd < 2.5) return saturate(c + float3(0, 0.7 * e.r + e.g, 0.7 * e.r + e.b));\n"
+    "  return saturate(c + float3(e.r + 0.7 * e.b, e.g + 0.7 * e.b, 0));\n"
+    "}\n"
+    "float3 scene_c(float2 q) { return cvd_fix(scene(q)); }\n"
     "float4 ps(V v) : SV_Target {\n"
     "  float2 c = v.uv * 2 - 1, s = c;\n"
     "  if (crt > 1.5) { s.x = c.x * (1 + 0.045 * c.y * c.y); s.y = c.y * (1 + 0.07 * c.x * c.x); }\n" // bulging tube
@@ -70,7 +82,7 @@ static const char gpu_hlsl_tail[] =
     // their surroundings, each scanline is a beam that gets wider where the picture is brighter, and
     // the screen is a grille of red, green and blue stripes.
     "    float2 dx = float2(1.0 / srcSize.x, 0), dy = float2(0, 1.0 / srcSize.y);\n"
-    "    float3 lin = pow(scene(q), 2.2) * 0.6 + (pow(scene(q - dx * 0.75), 2.2) + pow(scene(q + dx * 0.75), 2.2)) * 0.2;\n"
+    "    float3 lin = pow(scene_c(q), 2.2) * 0.6 + (pow(scene_c(q - dx * 0.75), 2.2) + pow(scene_c(q + dx * 0.75), 2.2)) * 0.2;\n"
     "    float3 glow = float3(0, 0, 0);\n"
     "    static const float2 ring[8] = {float2(1.5, 0), float2(-1.5, 0), float2(0, 1.5), float2(0, -1.5), float2(2.5, 2.5), float2(-2.5, 2.5), float2(2.5, -2.5), float2(-2.5, -2.5)};\n"
     "    for (int k = 0; k < 8; k++) glow += pow(tex.SampleLevel(smp, q + ring[k].x * dx + ring[k].y * dy, 0).rgb, 2.2);\n"
@@ -96,7 +108,7 @@ static const char gpu_hlsl_tail[] =
     "    if (hdr > 0) return float4(min(lin * hdr, 12.5), 1);\n"
     "    col = pow(saturate(lin), 1.0 / 2.2);\n"
     "  } else {\n"
-    "    col = scene(q);\n"
+    "    col = scene_c(q);\n"
     "    if (line_pos > 0.6667) col *= 1 - scan * 0.1875;\n" // last third of each line darkened
     "  }\n"
     // HDR without the tube: the picture at the chosen white, the brightest colours raised a little
@@ -203,11 +215,11 @@ static const char gpu_hlsl_tail[] =
     "  return float4(outc(dl_tint(col)), 1);\n"
     "}\n";
 
-typedef struct { float tex_size[2], out_size[2], origin[2], filt, scan, crt, hdr, src_size[2], game[32]; } GpuConsts;
+typedef struct { float tex_size[2], out_size[2], origin[2], filt, scan, crt, hdr, src_size[2], cvd, cvd_pad[3], game[32]; } GpuConsts;
 
 typedef struct { ID3D11Texture2D *tex; ID3D11ShaderResourceView *srv; int w, h, format; } GpuTex;
 // the game's textures t1-t7 (dl_gpu_texture) come after the kit's own
-enum { GT_PICTURE, GT_MENU, GT_FPS, GT_NOTE, GT_OVERLAY, GT_GAME = GT_OVERLAY + DL_MAX_OVERLAYS, GT_COUNT = GT_GAME + 7 };
+enum { GT_PICTURE, GT_MENU, GT_FPS, GT_NOTE, GT_TOAST, GT_OVERLAY, GT_GAME = GT_OVERLAY + DL_MAX_OVERLAYS, GT_COUNT = GT_GAME + 7 };
 
 static struct {
   bool tried, ok;
@@ -501,6 +513,7 @@ static void gpu_game_quad(int x, int y, int w, int h, int step, int steps) {
   GpuConsts c = {{(float)dl_pic_w, (float)dl_pic_h}, {(float)w, (float)h}, {(float)x, (float)y},
                  (float)dl_cfg.smooth, dl_cfg.crt ? 0.0f : (float)dl_cfg.scanlines, (float)dl_cfg.crt, hdr_chain ? hdr_white : 0,
                  {(float)dl_pic_w / dl_pic_scale, (float)dl_pic_h / dl_pic_scale}};
+  c.cvd = (float)dl_cfg.cvd;
   if (dl_game->gpu_frame) dl_game->gpu_frame(c.game, step, steps);
   gpu_consts(&c);
   ID3D11ShaderResourceView *views[8] = {gpu.t[GT_PICTURE].srv};
@@ -671,6 +684,20 @@ static bool note_layer(HDC wdc, int h, int *lw, int *lh) {
   return small_layer(wdc, GT_NOTE, *lw, *lh, h, note_draw);
 }
 
+static void toast_draw(HDC dc, int h) { dl_draw_toast(dc, 0, 0, h); }
+
+// "Achievement unlocked" over the game: made again when it changes.
+static bool toast_layer(HDC wdc, int h, int *lw, int *lh) {
+  static wchar_t made[96];
+  static int made_h;
+  const wchar_t *s = dl_toast_now();
+  dl_toast_size(wdc, h, lw, lh);
+  if (made_h == h && !lstrcmpW(made, s) && gpu.t[GT_TOAST].tex) return true;
+  lstrcpynW(made, s, 96);
+  made_h = h;
+  return small_layer(wdc, GT_TOAST, *lw, *lh, h, toast_draw);
+}
+
 // One picture of what dl_mode shows. rebuild: the setup screen changed (its layer is drawn again).
 // False: the graphics card path is no longer usable (it has been stopped; GDI from now on).
 bool dl_gpu_show(bool rebuild, bool vsync) {
@@ -693,12 +720,15 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
   int x = 0, y = 0, w = 0, h = 0, fw = 0, fhh = 0, nw = 0, nh = 0;
   bool game = dl_mode == M_GAME || dl_mode == M_TRY || dl_mode == M_PAUSE, fps = dl_cfg.show_fps && dl_mode != M_PAUSE && !dl_shot_game;
   bool note = dl_mode == M_GAME && dl_note_now() && !dl_shot_game;
+  bool toast = dl_mode == M_GAME && dl_toast_now() && !dl_shot_game;
+  int tw = 0, th = 0;
   if (game) {
     dl_fit(cw, ch, dl_cfg.integer_scale, &w, &h);
     x = (cw - w) / 2;
     y = (ch - h) / 2;
     if (good && fps) good = fps_layer(wdc, h, &fw, &fhh);
     if (good && note) good = note_layer(wdc, h, &nw, &nh);
+    if (good && toast) good = toast_layer(wdc, h, &tw, &th);
   }
   DlOverlay ov[DL_MAX_OVERLAYS]; // the game's pictures over its own, while it is played
   int ov_n = dl_mode == M_GAME && dl_game->overlays ? dl_game->overlays(x, y, w, h, ov, DL_MAX_OVERLAYS) : 0;
@@ -729,13 +759,14 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
         int fh = h / 22 < 14 ? 14 : h / 22;
         gpu_quad(x + fh, y + h - fh * 5 / 2, nw, nh, gpu.ps_ui, GT_NOTE, true);
       }
+      if (toast) gpu_quad(x + w - tw - h / 30, y + h / 30, tw, th, gpu.ps_ui, GT_TOAST, true);
     } else {
       // the sky, moving, then the setup screen, then the live preview with the game's filters
       static LARGE_INTEGER t0, fq;
       LARGE_INTEGER now;
       if (!fq.QuadPart) { QueryPerformanceFrequency(&fq); QueryPerformanceCounter(&t0); }
       QueryPerformanceCounter(&now);
-      GpuConsts sky = {{1, 1}, {(float)cw, (float)ch}, {(float)((double)(now.QuadPart - t0.QuadPart) / (double)fq.QuadPart), (float)cw / (float)ch}};
+      GpuConsts sky = {{1, 1}, {(float)cw, (float)ch}, {dl_cfg.still ? 0.0f : (float)((double)(now.QuadPart - t0.QuadPart) / (double)fq.QuadPart), (float)cw / (float)ch}};
       sky.hdr = hdr_chain ? hdr_white : 0;
       sky.game[2] = (float)ui_sky_style();
       if (ui_theme_hsl(&sky.game[0], &sky.game[1])) sky.game[3] = 1;

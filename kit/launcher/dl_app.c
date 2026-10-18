@@ -56,12 +56,18 @@ static void settings_load(void) {
 
 static int saved[160]; // the values as last written
 
+// Safe mode: the values the player had when the run started, and the ones safe mode put instead.
+// A value still the forced one is written as the player's.
+bool dl_safe;
+static int safe_orig[160], safe_forced[160];
+
 static void settings_save(void) {
   FILE *f = fopen(ini_path, "w");
   if (!f) return;
   for (int k = 0; k < setting_n; k++) {
-    fprintf(f, "%s=%d\n", settings[k].name, *settings[k].value);
-    saved[k] = *settings[k].value;
+    int v = *settings[k].value;
+    fprintf(f, "%s=%d\n", settings[k].name, dl_safe && v == safe_forced[k] ? safe_orig[k] : v);
+    saved[k] = v;
   }
   fclose(f);
 }
@@ -75,6 +81,66 @@ static void settings_follow(void) {
   at = t;
   for (int k = 0; k < setting_n; k++)
     if (saved[k] != *settings[k].value) { settings_save(); return; }
+}
+
+// ---------------------------------------------------------------- safe mode
+// While the program runs, "<settings file>.running" holds its process id; it is removed when the
+// program closes normally. Found at start while no such program runs, it says the last run ended
+// otherwise (a crash, a driver, the power...): this run starts in safe mode.
+static char run_mark[MAX_PATH];
+
+static bool same_program_runs(DWORD pid) {
+  HANDLE h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, pid);
+  if (!h) return false;
+  wchar_t a[MAX_PATH], b[MAX_PATH];
+  DWORD n = MAX_PATH, code = 0;
+  bool same = GetExitCodeProcess(h, &code) && code == STILL_ACTIVE && QueryFullProcessImageNameW(h, 0, a, &n) &&
+              GetModuleFileNameW(NULL, b, MAX_PATH) && !lstrcmpiW(a, b);
+  CloseHandle(h);
+  return same;
+}
+
+static bool last_run_failed(void) {
+  snprintf(run_mark, sizeof run_mark, "%s.running", ini_path);
+  FILE *f = fopen(run_mark, "r");
+  if (!f) return false;
+  unsigned long pid = 0;
+  int got = fscanf(f, "%lu", &pid);
+  fclose(f);
+  return !(got == 1 && pid != GetCurrentProcessId() && same_program_runs((DWORD)pid)); // another copy running: no crash
+}
+
+static void run_mark_write(void) {
+  FILE *f = fopen(run_mark, "w");
+  if (f) { fprintf(f, "%lu\n", (unsigned long)GetCurrentProcessId()); fclose(f); }
+}
+
+static void run_mark_clear(void) { if (run_mark[0]) DeleteFileA(run_mark); }
+
+static void safe_start(void) {
+  for (int k = 0; k < setting_n; k++) safe_orig[k] = *settings[k].value;
+  dl_cfg.gpu = 0;
+  dl_cfg.hdr = 0;
+  dl_cfg.crt = 0;
+  dl_cfg.vsync = 0;
+  dl_cfg.fullscreen = 0;
+  if (dl_game->safe_mode) dl_game->safe_mode();
+  for (int k = 0; k < setting_n; k++) safe_forced[k] = *settings[k].value;
+  dl_safe = true;
+}
+
+void dl_settings_sibling(char *out, const char *ext) {
+  snprintf(out, MAX_PATH, "%s", ini_path);
+  char *dot = strrchr(out, '.'), *slash = strrchr(out, '\\');
+  if (dot && (!slash || dot > slash)) *dot = 0;
+  size_t n = strlen(out);
+  snprintf(out + n, MAX_PATH - n, "%s", ext);
+}
+
+void dl_safe_restart(void) {
+  for (int k = 0; k < setting_n; k++) *settings[k].value = safe_orig[k];
+  dl_safe = false;
+  dl_relaunch();
 }
 
 void dl_defaults(bool picture_only) {
@@ -111,7 +177,27 @@ int dl_lang_default(void) {
 }
 
 // ---------------------------------------------------------------- picture
-static u32 *scan_buf;
+static u32 *scan_buf, *cvd_buf;
+
+// The colour-blind filter (dl_cfg.cvd; the same as cvd_fix in dl_gpu.c): what the eye sees is worked
+// out (Machado's matrices), and what it misses is moved into the colours it does see.
+static void cvd_apply(const u32 *src, u32 *dst, size_t n, int kind) {
+  static const double sim[3][9] = {
+      {0.152286, 1.052583, -0.204868, 0.114503, 0.786281, 0.099216, -0.003882, -0.048116, 1.051998},
+      {0.367322, 0.860646, -0.227968, 0.280085, 0.672501, 0.047413, -0.011820, 0.042940, 0.968881},
+      {1.255528, -0.076749, -0.178779, -0.078411, 0.930809, 0.147602, 0.004733, 0.691367, 0.303900}};
+  const double *m = sim[kind - 1];
+  for (size_t i = 0; i < n; i++) {
+    u32 p = src[i];
+    double c[3] = {(p >> 16 & 255) / 255.0, (p >> 8 & 255) / 255.0, (p & 255) / 255.0}, e[3], o[3];
+    for (int k = 0; k < 3; k++) e[k] = c[k] - (m[k * 3] * c[0] + m[k * 3 + 1] * c[1] + m[k * 3 + 2] * c[2]);
+    if (kind < 3) { o[0] = c[0]; o[1] = c[1] + 0.7 * e[0] + e[1]; o[2] = c[2] + 0.7 * e[0] + e[2]; }
+    else { o[0] = c[0] + e[0] + 0.7 * e[2]; o[1] = c[1] + e[1] + 0.7 * e[2]; o[2] = c[2]; }
+    u32 q = 0;
+    for (int k = 0; k < 3; k++) { int v = (int)(o[k] * 255 + 0.5); q = q << 8 | (u32)(v < 0 ? 0 : v > 255 ? 255 : v); }
+    dst[i] = q;
+  }
+}
 int dl_fps_shown;
 
 void dl_fit(int cw, int ch, bool integer, int *w, int *h) {
@@ -147,6 +233,10 @@ void dl_blit(HDC dc, int x, int y, int w, int h) {
     }
     src = scan_buf;
     sh = gh * 3;
+  }
+  if (dl_cfg.cvd > 0 && dl_cfg.cvd < 4 && cvd_buf) {
+    cvd_apply(src, cvd_buf, (size_t)gw * sh, dl_cfg.cvd);
+    src = cvd_buf;
   }
   BITMAPINFO bi = {0};
   bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
@@ -236,6 +326,11 @@ static void present(HDC dc) {
   dl_draw_overlays(dc, ox, oy, w, h);
   int fh = h / 22 < 14 ? 14 : h / 22;
   dl_draw_note(dc, ox + fh, oy + h - fh * 5 / 2, h);
+  if (dl_toast_now()) { // an achievement just unlocked, at the top right
+    int tw, tb, m = h / 30;
+    dl_toast_size(dc, h, &tw, &tb);
+    dl_draw_toast(dc, ox + w - tw - m, oy + m, h);
+  }
   HBRUSH black = GetStockObject(BLACK_BRUSH);
   if (ox > 0) { RECT l = {0, 0, ox, ch}, r = {ox + w, 0, cw, ch}; FillRect(dc, &l, black); FillRect(dc, &r, black); }
   if (oy > 0) { RECT t = {0, 0, cw, oy}, b = {0, oy + h, cw, ch}; FillRect(dc, &t, black); FillRect(dc, &b, black); }
@@ -480,6 +575,7 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       if (dl_mode != M_GAME) dl_mouse((short)LOWORD(lp), (short)HIWORD(lp), false);
       return 0;
     case WM_LBUTTONDOWN:
+      dl_input_used(DL_IN_KEYS);
       if (dl_mode != M_GAME) dl_mouse((short)LOWORD(lp), (short)HIWORD(lp), true);
       return 0;
     case WM_RBUTTONDOWN:
@@ -489,6 +585,7 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       if (dl_mode != M_GAME) dl_key((short)HIWORD(wp) > 0 ? VK_UP : VK_DOWN);
       return 0;
     case WM_KEYDOWN:
+      dl_input_used(DL_IN_KEYS);
       if (dl_mode == M_GAME) {
         if (!(lp & (1 << 30))) dl_game_key((int)wp);
         return 0;
@@ -537,6 +634,7 @@ static int gpu_check(void) {
   }
   if (!dl_gpu_ready()) { printf("gpu check: the graphics card cannot be used\n"); return 3; }
   for (int k = 0; k < 90; k++) dl_game->frame(&(DlInput){k > 30 ? DL_LEFT | DL_UP : 0}, dl_pic, tmp, 4096);
+  dl_toast_sample(); // over the game's pictures, when it has achievements
   static const struct { const char *name; int mode, page, smooth, scan, crt, fps; } shots[] = {
       {"menu", M_SIDE, -1, 0, 0, 0, 0},     {"image_page", M_PAGE, DL_PAGE_IMAGE, 0, 0, 0, 0}, {"game_sharp", M_GAME, -1, 0, 0, 0, 1},
       {"game_smooth", M_GAME, -1, 1, 0, 0, 0}, {"game_edges", M_GAME, -1, 2, 0, 0, 0},       {"game_scanlines", M_GAME, -1, 0, 3, 0, 0},
@@ -594,6 +692,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   dl_pic_h = game->height;
   dl_pic_aspect = game->aspect > 0 ? game->aspect : (double)game->width / game->height;
   scan_buf = malloc((size_t)game->width * game->height * 3 * 4);
+  cvd_buf = malloc((size_t)game->width * game->height * 3 * 4);
   if (!dl_pic || !scan_buf) return 1;
 
   // settings: the kit's, then the game's
@@ -614,6 +713,10 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   add_setting("pause_menu", &dl_cfg.pause_menu, 0, 1, 2);
   add_setting("bg_pause", &dl_cfg.bg_pause, 0, 1, 2);
   add_setting("state_slot", &dl_slot, 0, DL_SLOTS - 1, 0);
+  add_setting("a11y_contrast", &dl_cfg.contrast, 0, 1, 0); // kept by "Defaults": a player who needs them keeps them
+  add_setting("a11y_cvd", &dl_cfg.cvd, 0, 3, 0);
+  add_setting("a11y_still", &dl_cfg.still, 0, 1, 0);
+  add_setting("a11y_big_help", &dl_cfg.big_help, 0, 1, 0);
   add_setting("win_x", &dl_cfg.win_x, -32000, 32000, 0);
   add_setting("win_y", &dl_cfg.win_y, -32000, 32000, 0);
   add_setting("win_w", &dl_cfg.win_w, 0, 32000, 0);
@@ -625,6 +728,8 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   settings_load();
   if (!dl_lang_ok(dl_cfg.ui_lang)) dl_cfg.ui_lang = dl_lang_default(); // a language this game's texts do not have
   for (int k = 0; k < setting_n; k++) saved[k] = *settings[k].value; // as read: nothing to write yet
+  bool crashed = !dl_audit_dir && !gpu_check_dir && !bench_secs && last_run_failed();
+  if (crashed) safe_start();
 
   // window: where it was last time, otherwise 1280 x 800 in the middle of the screen
   WNDCLASSW wc = {0};
@@ -658,12 +763,13 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     dl_start_done = true;
     return gpu_check();
   }
+  if (!bench_secs) run_mark_write(); // removed when the program closes normally
   if (dl_cfg.gpu) dl_gpu_prepare(); // the shaders, on a second thread; GDI shows the first pictures
   ShowWindow(dl_hwnd, SW_SHOW);
   bool want_full = dl_cfg.fullscreen;
   dl_cfg.fullscreen = 0;
   if (want_full) dl_toggle_fullscreen();
-  if (game->start && !game->start()) return 1;
+  if (game->start && !game->start()) { run_mark_clear(); return 1; } // the game said why: not a crash
   dl_start_done = true;
   ui_window_icon();
   audio_init();
@@ -678,7 +784,8 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   int audio_max = game->audio_rate > 0 ? (int)(game->audio_rate / (game->fps > 0 ? game->fps : 60.0)) * 2 + 64 : 0;
   s16 *audio = audio_max ? malloc((size_t)audio_max * 4) : NULL;
   u32 bench_frames = 0, bench_gaps = 0;
-  if (bench_secs || play_now) dl_play();
+  if (crashed) dl_safe_page_open();
+  else if (bench_secs || play_now) dl_play();
   LARGE_INTEGER bench_t0;
   QueryPerformanceCounter(&bench_t0);
   while (dl_running) {
@@ -790,6 +897,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   settings_save();
   dl_gpu_stop();
   if (wave_out) { waveOutReset(wave_out); waveOutClose(wave_out); }
+  run_mark_clear(); // a normal close
   if (relaunch) { // the same program with the same command line, once this window is gone
     DestroyWindow(dl_hwnd);
     wchar_t exe[MAX_PATH];

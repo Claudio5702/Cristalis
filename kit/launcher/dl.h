@@ -88,6 +88,12 @@ typedef struct DlGame {
   // running behind the setup screen until then: an emulator resets the machine here). May be NULL.
   void (*begin)(void);
   void (*quit)(void);              // the program closes (after the session is kept); may be NULL
+  // After a crash (the program did not close normally last time), DarkLauncher starts in safe mode for
+  // that run: software display, no HDR, no CRT filter, no vertical sync, in a window, and a page that
+  // offers to go on, to resume the latest automatic save or to restart normally. safe_mode, if given,
+  // is called then (before start()) to turn off the game's own risky options by changing their values;
+  // the settings file keeps the player's values unless the player changes them in that run. May be NULL.
+  void (*safe_mode)(void);
   // true: fast forward now, without the key (the game knows a dull moment: the enemy's turn...). May be NULL.
   bool (*turbo)(void);
 
@@ -207,6 +213,37 @@ void dl_setting(const char *name, int *value, int lo, int hi, bool keep);
 // buttons' names ("_turn": pad_turn and joy_turn), NULL: no button. At most 8.
 void dl_function(const wchar_t *const *label, const wchar_t *const *help, const char *hot, int key, const char *pad,
                  void (*run)(void), bool in_pause);
+
+// ---- achievements (optional)
+typedef struct DlAchievement {
+  const char *id;                            // its name in the file that keeps them (letters, digits, _)
+  const wchar_t *const *name, *const *desc;  // DlTexts
+  bool hidden;                               // name and description secret until it is unlocked
+} DlAchievement;
+// In setup(): the game's achievements (at most 128). DarkLauncher adds the Achievements page and its
+// entry in the bar, and keeps which are unlocked and when in saves\<FILE_STEM>.achievements next to the
+// program. The list must stay valid while the program runs.
+void dl_achievements(const DlAchievement *list, int count);
+// Unlocks one, once: "Achievement unlocked" and its name over the game for a few seconds, with a sound.
+void dl_unlock(const char *id);
+bool dl_unlocked(const char *id);
+
+// ---- packs and mods (optional): folders, or files of the game's kinds, that the player drops into a
+// folder; a page turns each on or off and orders them (the ones above come before the ones below)
+typedef struct DlPacks {
+  const char *folder;           // where the player puts them: a folder next to the program ("packs"), or a full path
+  const char *const *exts;      // files that are packs, by extension ({".zip", NULL}); folders always are; NULL: folders only
+  const wchar_t *const *tab, *const *label, *const *help; // DlTexts of the page and of its entry in the bar
+  unsigned icon;                // its entry in the bar (a Segoe MDL2 Assets character); 0: none (a DL_PAGE row of the game opens the page)
+  // The packs turned on or their order changed: the game reads them again now. NULL: the game reads
+  // them at start only, and the page offers to restart the program.
+  void (*changed)(void);
+} DlPacks;
+// In setup(): the Packs page (its id is returned) and its entry in the bar; the packs are read at once,
+// and their choice is kept in "<settings file>.packs".
+int dl_packs(const DlPacks *p);
+int dl_pack_count(void);         // the packs turned on, the one that comes first first
+const char *dl_pack_path(int k); // full path of pack k (a folder or a file), in the Windows code page
 
 int dl_lang(void);                              // language of the setup screen (DL_LANG_*), one of DlGame.langs
 const wchar_t *dl_tr(const wchar_t *const *t); // a DlText in that language

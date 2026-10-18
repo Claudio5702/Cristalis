@@ -116,6 +116,14 @@ static const DlRow image_rows[] = {
     {DL_SWITCH, dl_texts[T_FPS], dl_texts[T_H_FPS], &dl_cfg.show_fps, 1},
     {DL_ACTION, dl_texts[T_TRY], dl_texts[T_H_TRY], NULL, 0, NULL, NULL, try_it},
     {DL_ACTION, dl_texts[T_GFXDEF], dl_texts[T_H_GFXDEF], NULL, 0, NULL, NULL, picture_defaults},
+    {.kind = DL_PAGE, .label = dl_texts[T_A11Y], .help = dl_texts[T_H_A11Y], .page = PG_A11Y},
+};
+static const wchar_t *const *const cvd_names[] = {dl_texts[T_NO], dl_texts[T_CVD_PROTAN], dl_texts[T_CVD_DEUTAN], dl_texts[T_CVD_TRITAN]};
+static const DlRow a11y_rows[] = {
+    {DL_SWITCH, dl_texts[T_CONTRAST], dl_texts[T_H_CONTRAST], &dl_cfg.contrast, 1},
+    {DL_CHOICE, dl_texts[T_CVD], dl_texts[T_H_CVD], &dl_cfg.cvd, 3, cvd_names},
+    {DL_SWITCH, dl_texts[T_STILL], dl_texts[T_H_STILL], &dl_cfg.still, 1},
+    {DL_SWITCH, dl_texts[T_BIG_HELP], dl_texts[T_H_BIG_HELP], &dl_cfg.big_help, 1},
 };
 static const DlRow sound_rows[] = {
     {DL_BAR, dl_texts[T_VOL], dl_texts[T_H_VOL], &dl_cfg.volume, 10},
@@ -169,9 +177,30 @@ void dl_menu_init(void) {
     if ((saves || k > HK_NEXT) && (k != HK_REWIND || dl_rewind_ok())) ph->rows[ph->n++] = &hot_rows[k];
   dl_list_page(dl_texts[T_TAB_SAVES], &dl_saves_list);
   dl_list_page(dl_texts[T_TAB_SHOTS], &dl_shots_list);
+  dl_page(dl_texts[T_TAB_A11Y], a11y_rows, sizeof a11y_rows / sizeof a11y_rows[0]);
   add_section(SEC_PLAY, -1, 0xE768, dl_texts[T_PLAY], dl_texts[T_H_PLAY]);
   if (saves) add_section(SEC_PAGE, PG_SAVES, 0xE74E, dl_texts[T_SAVES], dl_texts[T_H_SAVES]);
   add_section(SEC_PAGE, PG_SHOTS, 0xE722, dl_texts[T_SHOTS], dl_texts[T_H_SHOTS]);
+}
+
+// ---- safe mode: a page shown at the start of a run after one that did not close normally (dl_app.c)
+static int safe_page = -1;
+static void safe_keep(void) { dl_mode = M_SIDE; dl_side = 0; }
+static void safe_load(void) {
+  int n = dl_latest_auto();
+  if (n == -1) dl_session_resume();
+  else if (n >= 0 && dl_state_load(n)) dl_play();
+}
+static const DlRow safe_rows[] = {
+    {DL_ACTION, dl_texts[T_SAFE_KEEP], dl_texts[T_H_SAFE_KEEP], NULL, 0, NULL, NULL, safe_keep},
+    {DL_ACTION, dl_texts[T_SAFE_RESTART], dl_texts[T_H_SAFE_RESTART], NULL, 0, NULL, NULL, dl_safe_restart},
+};
+static const DlRow safe_load_row = {DL_ACTION, dl_texts[T_SAFE_LOAD], dl_texts[T_H_SAFE_LOAD], NULL, 0, NULL, NULL, safe_load};
+
+void dl_safe_page_open(void) {
+  if (safe_page < 0) return;
+  if (dl_latest_auto() >= -1) dl_page_insert(safe_page, 1, &safe_load_row); // only when there is one
+  dl_open_page(safe_page);
 }
 
 void dl_menu_finish(void) {
@@ -184,6 +213,9 @@ void dl_menu_finish(void) {
   add_section(SEC_DEFAULTS, -1, 0xE7A7, dl_texts[T_DEFAULTS], dl_texts[T_H_DEFAULTS]);
   if (dl_game->reset) add_section(SEC_RESET, -1, 0xE72C, dl_texts[T_RESET], dl_texts[T_H_RESET]); // a game that cannot restart has no such entry
   add_section(SEC_QUIT, -1, 0xE7E8, dl_texts[T_QUIT], dl_texts[T_H_QUIT]);
+  // the safe mode page, reached only after a crash (made always, so that --ui-audit sees it)
+  safe_page = dl_page(dl_texts[T_SAFE_TAB], safe_rows, sizeof safe_rows / sizeof safe_rows[0]);
+  if (dl_audit_dir) dl_page_insert(safe_page, 1, &safe_load_row);
 }
 
 // ---- rows
@@ -423,6 +455,7 @@ void dl_key(int vk) {
   dl_dirty = true;
   if (dl_wait) { dl_wait_key(vk); return; }
   if (dl_mode == M_PAGE && dl_cur == PG_SAVES && dl_saves_key(vk)) return; // a slot's name being typed
+  if (dl_mode == M_PAGE && dl_packs_key(vk)) return;                          // a pack moved up or down
   if (dl_mode == M_TRY) { dl_mode = M_PAGE; return; }
   if (vk == VK_UP || vk == VK_DOWN) dl_beep(0);
   else if (vk == VK_RETURN || vk == VK_LEFT || vk == VK_RIGHT) dl_beep(1);
@@ -527,6 +560,24 @@ static void draw_help(HDC dc, double x0, double y0, double x1, double y1, const 
     if (need.bottom > hr.bottom) ui_audit_note("help overflows", help);
   }
   DrawTextW(dc, help, -1, &hr, DT_WORDBREAK | DT_NOPREFIX);
+}
+
+// The footer with a controller: its buttons, each with what it does.
+static double pad_item(HDC dc, double x, int glyph, const wchar_t *label) {
+  SIZE sz;
+  ui_pad_glyph(dc, glyph, x + 6.5, 388, 13);
+  SelectObject(dc, f_small);
+  GetTextExtentPoint32W(dc, label, lstrlenW(label), &sz);
+  ui_text(dc, f_small, x + 18, 382, label, RGB(0, 0, 0), TA_LEFT);
+  ui_text(dc, f_small, x + 17, 381, label, RGB(255, 255, 255), TA_LEFT);
+  return x + 17 + sz.cx / ui_s + 20;
+}
+
+static void pad_footer(HDC dc) {
+  double x = pad_item(dc, 16, GL_DPAD, TX(T_FT_MOVE));
+  x = pad_item(dc, x, dl_pad_glyph(true), TX(T_FT_OK));
+  x = pad_item(dc, x, dl_pad_glyph(false), TX(T_FT_BACK));
+  if (x > 630) ui_audit_note("footer too long", TX(T_FT_MOVE));
 }
 
 // The game alone in the window ("Try it full size", and the game itself through dl_app.c).
@@ -660,8 +711,10 @@ void dl_draw_menu(HDC wdc) {
   else if (!dl_layer) dl_blit(dc, dl_prev_x, dl_prev_y, dl_prev_w, dl_prev_h);
   draw_help(dc, vx0, hy0, 630, PANEL_BOTTOM, help);
 
-  ui_text(dc, f_small, 17, 382, TX(T_FOOTER), RGB(0, 0, 0), TA_LEFT);
-  ui_text(dc, f_small, 16, 381, TX(T_FOOTER), RGB(255, 255, 255), TA_LEFT);
+  if (dl_input_kind == DL_IN_KEYS) {
+    ui_text(dc, f_small, 17, 382, TX(T_FOOTER), RGB(0, 0, 0), TA_LEFT);
+    ui_text(dc, f_small, 16, 381, TX(T_FOOTER), RGB(255, 255, 255), TA_LEFT);
+  } else pad_footer(dc);
   if (dl_layer) GdiFlush();
   else BitBlt(wdc, 0, 0, cw, ch, mem, 0, 0, SRCCOPY);
 }
@@ -760,6 +813,8 @@ int dl_audit(void) {
   int keep = dl_cfg.ui_lang;
   char path[MAX_PATH];
   RECT rc;
+  // the bar: its upper entries must end above its lower ones
+  if (ROW_Y0 + dl_sec_top * ROW_H > PANEL_BOTTOM - 6 - (dl_sec_n - dl_sec_top) * ROW_H) ui_audit_note("navigation bar too full", L"");
   for (int l = 0; l < DL_LANGS; l++) {
     if (!dl_lang_ok(l)) continue;
     dl_cfg.ui_lang = l;
@@ -774,6 +829,18 @@ int dl_audit(void) {
         dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
       }
     }
+    static const char *const kinds[] = {"", "xbox", "ps", "pad"};
+    for (int kind = DL_IN_XBOX; kind <= DL_IN_PAD; kind++) { // the footer with each kind of controller
+      dl_input_kind = kind;
+      dl_side = 0;
+      dl_draw_menu(wdc);
+      if (dl_menu_bits) {
+        GetClientRect(dl_hwnd, &rc);
+        snprintf(path, sizeof path, "%s\\%d_home_%s.png", dl_audit_dir, l, kinds[kind]);
+        dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
+      }
+    }
+    dl_input_kind = DL_IN_KEYS;
     for (int p = 0; p < dl_page_n; p++) { // every page, each row selected
       dl_mode = M_PAGE;
       dl_cur = p;
