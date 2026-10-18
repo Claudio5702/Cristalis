@@ -359,7 +359,7 @@ static void draw_pause(HDC dc, int cw, int ch) {
     dl_blit(dc, (cw - pw) / 2, (ch - ph) / 2, pw, ph);
     dl_cfg.show_fps = keep;
   }
-  ui_rect_alpha(dc, -ui_ox / ui_s, -ui_oy / ui_s, (cw - ui_ox) / ui_s + 1, (ch - ui_oy) / ui_s + 1, RGB(0, 6, 30), 120);
+  ui_rect_alpha(dc, -ui_ox / ui_s, -ui_oy / ui_s, (cw - ui_ox) / ui_s + 1, (ch - ui_oy) / ui_s + 1, ui_tint(RGB(0, 6, 30)), 120);
   double y0 = pa_y0(), y1 = y0 + pa_n * ROW_H + 46;
   ui_panel(dc, PA_X0, y0 - 20, PA_X1, y1, COL_PANEL, TX(T_TAB_PAUSE));
   wchar_t num[8];
@@ -369,10 +369,10 @@ static void draw_pause(HDC dc, int cw, int ch) {
     bool sel = dl_sel == r, slot_row = it == PA_SAVE || it == PA_LOAD;
     const wchar_t *label = it >= PA_COUNT ? dl_tr(dl_funcs[it - PA_COUNT].label) : it == PA_RESUME ? TX(T_RESUME) : it == PA_SAVE ? TX(T_HK_SAVE)
                          : it == PA_LOAD ? TX(T_HK_LOAD) : it == PA_SHOT ? TX(T_HK_SHOT) : it == PA_SETTINGS ? TX(T_PA_SETTINGS) : TX(T_QUIT);
-    if (sel) ui_round(dc, PA_X0 + 3, y - 1, PA_X1 - 3, y + ROW_H - 2, RGB(34, 84, 184), 4);
-    ui_text_fit(dc, PA_X0 + 12, y, label, sel ? COL_SEL : RGB(240, 242, 255), TA_LEFT, (slot_row ? PA_VAL0 : PA_X1 - 6) - PA_X0 - 16);
+    if (sel) ui_round(dc, PA_X0 + 3, y - 1, PA_X1 - 3, y + ROW_H - 2, ui_tint(RGB(34, 84, 184)), 4);
+    ui_text_fit(dc, PA_X0 + 12, y, label, sel ? COL_SEL : ui_tint(RGB(240, 242, 255)), TA_LEFT, (slot_row ? PA_VAL0 : PA_X1 - 6) - PA_X0 - 16);
     if (slot_row) { // the slot, changed with Left and Right
-      ui_round(dc, PA_VAL0, y, PA_X1 - 8, y + ROW_H - 4, RGB(6, 18, 58), 4);
+      ui_round(dc, PA_VAL0, y, PA_X1 - 8, y + ROW_H - 4, ui_tint(RGB(6, 18, 58)), 4);
       wsprintfW(num, L"%d", dl_slot);
       ui_text(dc, f_item, (PA_VAL0 + PA_X1 - 8) / 2, y, num, COL_VALUE, TA_CENTER);
       if (sel) {
@@ -395,7 +395,7 @@ static void draw_pause(HDC dc, int cw, int ch) {
   SelectObject(dc, f_help_small);
   SetBkMode(dc, TRANSPARENT);
   SetTextAlign(dc, TA_LEFT | TA_TOP);
-  SetTextColor(dc, RGB(200, 216, 250));
+  SetTextColor(dc, ui_tint(RGB(200, 216, 250)));
   RECT need = r;
   DrawTextW(dc, note, -1, &need, DT_WORDBREAK | DT_NOPREFIX | DT_CALCRECT);
   if (need.bottom > r.bottom) ui_audit_note("pause note overflows", note);
@@ -454,11 +454,12 @@ static void draw_side(HDC dc) {
   for (int k = 0; k < dl_sec_n; k++) {
     double y = side_y(k);
     bool focus = dl_mode == M_SIDE && dl_side == k, here = !focus && dl_secs[k].kind == SEC_PAGE && dl_side == k;
-    if (focus) ui_round(dc, SIDE_X0, y - 1, SIDE_X1, y + ROW_H - 2, RGB(34, 84, 184), 4);
-    else if (here) ui_round(dc, SIDE_X0, y - 1, SIDE_X1, y + ROW_H - 2, RGB(22, 50, 118), 4);
-    COLORREF c = focus ? COL_SEL : here ? RGB(255, 255, 255) : RGB(196, 212, 244);
+    if (focus) ui_round(dc, SIDE_X0, y - 1, SIDE_X1, y + ROW_H - 2, ui_tint(RGB(34, 84, 184)), 4);
+    else if (here) ui_round(dc, SIDE_X0, y - 1, SIDE_X1, y + ROW_H - 2, ui_tint(RGB(22, 50, 118)), 4);
+    COLORREF c = focus ? COL_SEL : here ? RGB(255, 255, 255) : ui_tint(RGB(196, 212, 244));
     double lx = SIDE_X0 + 8;
-    if (icons && dl_secs[k].icon) {
+    if (dl_secs[k].icon && ui_theme_icon(dc, dl_secs[k].icon, SIDE_X0 + 5, y, SIDE_X0 + 21, y + 16)) lx = SIDE_X0 + 28;
+    else if (icons && dl_secs[k].icon) {
       wchar_t g[2] = {(wchar_t)dl_secs[k].icon, 0};
       ui_text(dc, icons, SIDE_X0 + 8, y + 2, g, c, TA_LEFT);
       lx = SIDE_X0 + 28;
@@ -500,7 +501,7 @@ static void draw_help(HDC dc, double x0, double y0, double x1, double y1, const 
   RECT hr = {ui_ox + PX(x0 + 10), ui_oy + PX(y0 + 6), ui_ox + PX(x1 - 8), ui_oy + PX(y1 - 4)};
   SelectObject(dc, f_help);
   SetTextAlign(dc, TA_LEFT | TA_TOP);
-  SetTextColor(dc, RGB(240, 242, 255));
+  SetTextColor(dc, ui_tint(RGB(240, 242, 255)));
   RECT need = hr;
   DrawTextW(dc, help, -1, &need, DT_WORDBREAK | DT_NOPREFIX | DT_CALCRECT);
   if (need.bottom > hr.bottom) {
@@ -519,7 +520,7 @@ static void draw_try(HDC dc, int cw, int ch) {
   int w, h;
   dl_fit(cw, ch, dl_cfg.integer_scale, &w, &h);
   if (!dl_layer) dl_blit(dc, (cw - w) / 2, (ch - h) / 2, w, h);
-  ui_text(dc, f_small, 320, 384, TX(T_TRY_BACK), RGB(220, 230, 255), TA_CENTER);
+  ui_text(dc, f_small, 320, 384, TX(T_TRY_BACK), ui_tint(RGB(220, 230, 255)), TA_CENTER);
 }
 
 // A picture, whole and centred, in the area x0,y0 - x1,y1 of the canvas.

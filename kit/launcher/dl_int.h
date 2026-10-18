@@ -31,6 +31,7 @@ extern double dl_pic_aspect; // its proportions on screen (width / height)
 extern int dl_pic_scale;     // its pixels per pixel of the console (dl_picture_scale)
 extern bool dl_started;      // the player has started the game (it is paused while the menu is shown)
 extern bool dl_running;
+extern bool dl_start_done;   // the game's start() has run (the theme's pictures may be asked for)
 extern bool dl_no_mouse;
 extern const char *dl_audit_dir;
 extern int dl_fps_shown;
@@ -217,13 +218,21 @@ void ui_bar(HDC dc, double x0, double y, double x1, int value, int max);
 void ui_row(HDC dc, double y, double h, bool sel, const wchar_t *label, const wchar_t *value, int sw, bool plain, int bar, int bar_max);
 HFONT ui_icons(HDC dc);
 void sky_draw(HDC dc, int cw, int ch);
-bool backdrop_draw(HDC dc, int cw, int ch); // the player's launcher_bg.*; false: none
+bool backdrop_draw(HDC dc, int cw, int ch); // the player's launcher_bg.*, or the theme's backdrop; false: none
 
-#define COL_PANEL RGB(12, 30, 84)
-#define COL_SIDE RGB(6, 18, 58)
-#define COL_EDGE RGB(96, 140, 220)
+// ---- the game's theme (DlTheme, dl_draw.c)
+COLORREF ui_tint(COLORREF c); // one of DarkLauncher's colours in the theme's hue and strength (c itself without one)
+COLORREF ui_value(void);      // the colour of values and bars
+bool ui_theme_icon(HDC dc, unsigned icon, double x0, double y0, double x1, double y1); // false: the theme has none
+void ui_window_icon(void);    // the theme's icon 0 on the window, if any
+// The theme's sound for dl_beep (kind 0 moving, 1 choosing) as a WAV in memory at that volume (0-10); NULL: none.
+const void *ui_theme_sound(int kind, int volume);
+
+#define COL_PANEL ui_tint(RGB(12, 30, 84))
+#define COL_SIDE ui_tint(RGB(6, 18, 58))
+#define COL_EDGE ui_tint(RGB(96, 140, 220))
 #define COL_SEL RGB(255, 255, 255)
-#define COL_VALUE RGB(130, 214, 255)
+#define COL_VALUE ui_value()
 
 // layout of the canvas
 #define ROW_H 20.0

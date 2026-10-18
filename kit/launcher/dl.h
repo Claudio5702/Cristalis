@@ -28,6 +28,30 @@ typedef struct { uint32_t buttons; } DlInput;
 // already multiplied by their opacity, at x,y in the window.
 typedef struct { const uint32_t *pixels; int x, y, w, h; } DlOverlay;
 
+// The look of the setup screen taken from the game (DlGame.theme; NULL: DarkLauncher's own night
+// blue). Every field may be 0 or NULL, and a function returning NULL leaves DarkLauncher's own.
+// Pictures are w x h pixels 0xAARRGGBB, colours already multiplied by their opacity (as overlays): they
+// come from the player's own copy of the game, are asked for once start() has run, and must stay valid
+// while the program runs. Nothing of the game goes into the project's files.
+typedef struct DlTheme {
+  // 0xRRGGBB, from the game's logo or its own menus (0: DarkLauncher's blue): the panels, the selection,
+  // the sky and the edges take its hue and strength, each keeping how light DarkLauncher makes it, so
+  // the texts stay readable.
+  uint32_t colour;
+  uint32_t value;                                // 0xRRGGBB of the values and bars; 0: from colour
+  const wchar_t *title_font;                     // the project's name and subtitle (an installed font); NULL: Palatino Linotype
+  const wchar_t *text_font;                      // the menus, except in Japanese; NULL: Verdana
+  const uint32_t *(*backdrop)(int *w, int *h);   // behind the menus instead of the sky (the player's launcher_bg.* still wins)
+  const uint32_t *(*logo)(int *w, int *h);       // at the top left instead of the project's name
+  // A picture for an icon of the navigation bar, known by its Segoe MDL2 Assets character (dl_section;
+  // DarkLauncher's own: 0xE768 Play, 0xE74E Saves, 0xE722 Screenshots, 0xE774 Languages, 0xE7F4 Picture,
+  // 0xE767 Sound, 0xE765 Controls, 0xE8B7 Folder, 0xE7A7 Defaults, 0xE72C Restart, 0xE7E8 Quit), or
+  // icon 0: the window's and the taskbar's.
+  const uint32_t *(*icon)(unsigned icon, int *w, int *h);
+  // The menus' sounds (kind 0 moving, 1 choosing): n mono 16-bit samples, rate per second.
+  const int16_t *(*sound)(int kind, int *n, int *rate);
+} DlTheme;
+
 typedef struct DlGame {
   int width, height;               // size of the picture in pixels (the largest one, see dl_picture_size)
   double aspect;                   // width / height of the picture as shown; 0: square pixels
@@ -91,6 +115,18 @@ typedef struct DlGame {
   // 1 or NULL: one. With more than one, the screen sets the pace and the sound is stretched by a few
   // samples when it runs short.
   int (*gpu_steps)(void);
+  // The game draws its picture itself with the graphics card (a 3D scene...) instead of the picture
+  // with the filters, while it is played and under the pause menu (not in the setup screen's preview,
+  // not in "Try it full size"). dev, ctx, rtv: the ID3D11Device*, ID3D11DeviceContext* and
+  // ID3D11RenderTargetView* of the window; x, y, w, h: where the picture goes, in the window's pixels.
+  // The game sets its own viewport and states; DarkLauncher sets its own again afterwards. hdr: 0,
+  // colours as usual (8 bits, gamma); otherwise the output is HDR (16-bit floating point, linear light,
+  // 1.0 = 80 cd/m2) and hdr is the brightness of white in those units. step of steps as for gpu_frame.
+  // False: the picture is drawn as usual this time. The overlays, the frame rate, the notes and the
+  // pause menu go over it, and screenshots take it. Without the graphics card, the picture as usual.
+  bool (*gpu_draw)(void *dev, void *ctx, void *rtv, int x, int y, int w, int h, float hdr, int step, int steps);
+
+  const DlTheme *theme; // the setup screen's look from the game (may be NULL)
 } DlGame;
 
 // ---- pages: lists of rows, drawn and handled by DarkLauncher

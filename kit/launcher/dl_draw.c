@@ -2,6 +2,8 @@
 // panels, rows, switches, bars, the project's title and the sky behind them. GDI only.
 #include "dl_int.h"
 #include <math.h>
+#include <stdlib.h>
+#include <string.h>
 
 double ui_s = 1;
 int ui_ox, ui_oy;
@@ -19,7 +21,224 @@ void ui_audit_note(const char *what, const wchar_t *text) {
   dl_audit_issues++;
 }
 
-static const wchar_t *face(void) { return dl_cfg.ui_lang == 0 ? L"Yu Gothic UI" : L"Verdana"; }
+static const DlTheme *theme(void) { return dl_game ? dl_game->theme : NULL; }
+
+static const wchar_t *face(void) {
+  if (dl_cfg.ui_lang == 0) return L"Yu Gothic UI";
+  return theme() && theme()->text_font ? theme()->text_font : L"Verdana";
+}
+
+static const wchar_t *title_face(void) { return theme() && theme()->title_font ? theme()->title_font : L"Palatino Linotype"; }
+
+// ---- the theme's colours: DarkLauncher's blues turned by the hue between its selection blue and the
+// theme's colour, their strength scaled the same way, their lightness kept
+static void to_hsl(const double *rgb, double *hsl) {
+  double r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
+  double hi = r > g ? (r > b ? r : b) : (g > b ? g : b), lo = r < g ? (r < b ? r : b) : (g < b ? g : b), d = hi - lo;
+  hsl[2] = (hi + lo) / 2;
+  if (d <= 0) { hsl[0] = hsl[1] = 0; return; }
+  hsl[1] = hsl[2] > 0.5 ? d / (2 - hi - lo) : d / (hi + lo);
+  double h = hi == r ? (g - b) / d + (g < b ? 6 : 0) : hi == g ? (b - r) / d + 2 : (r - g) / d + 4;
+  hsl[0] = h / 6;
+}
+
+static double hue_part(double p, double q, double t) {
+  if (t < 0) t += 1;
+  if (t > 1) t -= 1;
+  return t < 1.0 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2.0 / 3 ? p + (q - p) * (2.0 / 3 - t) * 6 : p;
+}
+
+static void from_hsl(const double *hsl, double *rgb) {
+  double h = hsl[0], s = hsl[1], l = hsl[2];
+  if (s <= 0) { rgb[0] = rgb[1] = rgb[2] = l * 255; return; }
+  double q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  rgb[0] = hue_part(p, q, h + 1.0 / 3) * 255;
+  rgb[1] = hue_part(p, q, h) * 255;
+  rgb[2] = hue_part(p, q, h - 1.0 / 3) * 255;
+}
+
+static double hue_turn, strength = 1;
+
+static bool theme_colours(void) {
+  static int ready = -1;
+  if (ready < 0) {
+    ready = theme() && theme()->colour;
+    if (ready) {
+      u32 c = theme()->colour;
+      double ref[3] = {34, 84, 184}, mine[3] = {c >> 16 & 255, c >> 8 & 255, c & 255}, a[3], b[3]; // ref: the selection
+      to_hsl(ref, a);
+      to_hsl(mine, b);
+      hue_turn = b[0] - a[0];
+      strength = b[1] / a[1];
+    }
+  }
+  return ready;
+}
+
+static void tint3(double *rgb) {
+  double hsl[3];
+  to_hsl(rgb, hsl);
+  hsl[0] += hue_turn;
+  hsl[0] -= floor(hsl[0]);
+  hsl[1] *= strength;
+  if (hsl[1] > 1) hsl[1] = 1;
+  from_hsl(hsl, rgb);
+}
+
+COLORREF ui_tint(COLORREF c) {
+  if (!theme_colours()) return c;
+  double v[3] = {GetRValue(c), GetGValue(c), GetBValue(c)};
+  tint3(v);
+  int q[3];
+  for (int k = 0; k < 3; k++) { q[k] = (int)(v[k] + 0.5); q[k] = q[k] < 0 ? 0 : q[k] > 255 ? 255 : q[k]; }
+  return RGB(q[0], q[1], q[2]);
+}
+
+COLORREF ui_value(void) {
+  if (theme() && theme()->value) { u32 v = theme()->value; return RGB(v >> 16 & 255, v >> 8 & 255, v & 255); }
+  return ui_tint(RGB(130, 214, 255));
+}
+
+// ---- the theme's pictures (0xAARRGGBB, premultiplied), made at the size they are drawn: averaged
+// when smaller, pixel for pixel when larger (the pixels of a game's icon stay sharp)
+typedef struct {
+  bool tried;
+  const u32 *src;
+  int sw, sh;
+  HDC dc;
+  HBITMAP bmp;
+  int dw, dh;
+} UiPic;
+
+static void pic_scale(const u32 *src, int sw, int sh, u32 *out, int dw, int dh) {
+  for (int y = 0; y < dh; y++)
+    for (int x = 0; x < dw; x++) {
+      int x0 = x * sw / dw, x1 = (x + 1) * sw / dw, y0 = y * sh / dh, y1 = (y + 1) * sh / dh;
+      if (x1 <= x0) x1 = x0 + 1;
+      if (y1 <= y0) y1 = y0 + 1;
+      u32 sum[4] = {0}, n = 0;
+      for (int v = y0; v < y1; v++)
+        for (int u = x0; u < x1; u++, n++) {
+          u32 p = src[(size_t)v * sw + u];
+          for (int k = 0; k < 4; k++) sum[k] += p >> (k * 8) & 255;
+        }
+      out[(size_t)y * dw + x] = sum[0] / n | sum[1] / n << 8 | sum[2] / n << 16 | sum[3] / n << 24;
+    }
+}
+
+// Draws p whole, centred in the box (window pixels), with its proportions.
+static void pic_draw(HDC dc, UiPic *p, int bx, int by, int bw, int bh) {
+  if (!p->src || p->sw <= 0 || p->sh <= 0 || bw <= 0 || bh <= 0) return;
+  int w = bw, h = (int)((s64)bw * p->sh / p->sw);
+  if (h > bh) { h = bh; w = (int)((s64)bh * p->sw / p->sh); }
+  if (w < 1 || h < 1) return;
+  if (w != p->dw || h != p->dh) {
+    BITMAPINFO bi = {{sizeof(BITMAPINFOHEADER), w, -h, 1, 32}};
+    u32 *bits = NULL;
+    HBITMAP nb = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, (void **)&bits, NULL, 0);
+    if (!nb) return;
+    pic_scale(p->src, p->sw, p->sh, bits, w, h);
+    if (!p->dc) p->dc = CreateCompatibleDC(dc);
+    SelectObject(p->dc, nb);
+    if (p->bmp) DeleteObject(p->bmp);
+    p->bmp = nb;
+    p->dw = w;
+    p->dh = h;
+  }
+  BLENDFUNCTION bf = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+  AlphaBlend(dc, bx + (bw - w) / 2, by + (bh - h) / 2, w, h, p->dc, 0, 0, w, h, bf);
+}
+
+bool ui_theme_icon(HDC dc, unsigned icon, double x0, double y0, double x1, double y1) {
+  static struct { unsigned icon; UiPic pic; } got[DL_MAX_SECTIONS];
+  static int got_n;
+  if (!theme() || !theme()->icon || !dl_start_done) return false;
+  int k = 0;
+  while (k < got_n && got[k].icon != icon) k++;
+  if (k == got_n) {
+    if (got_n == DL_MAX_SECTIONS) return false;
+    got[got_n++].icon = icon;
+  }
+  UiPic *p = &got[k].pic;
+  if (!p->tried) { p->tried = true; p->src = theme()->icon(icon, &p->sw, &p->sh); }
+  if (!p->src) return false;
+  pic_draw(dc, p, ui_ox + PX(x0), ui_oy + PX(y0), PX(x1 - x0), PX(y1 - y0));
+  return true;
+}
+
+// Icon 0 at the sizes Windows asks for (title bar, taskbar), its colours no longer premultiplied.
+static HICON make_icon(const u32 *src, int sw, int sh, int size) {
+  u32 *px = malloc((size_t)size * size * 4);
+  if (!px) return NULL;
+  int w = size, h = size * sh / sw;
+  if (h > size) { h = size; w = size * sw / sh; }
+  if (w < 1) w = 1;
+  if (h < 1) h = 1;
+  u32 *fit = malloc((size_t)w * h * 4);
+  if (!fit) { free(px); return NULL; }
+  pic_scale(src, sw, sh, fit, w, h);
+  memset(px, 0, (size_t)size * size * 4);
+  for (int y = 0; y < h; y++)
+    for (int x = 0; x < w; x++) {
+      u32 c = fit[(size_t)y * w + x], a = c >> 24;
+      if (a) c = a << 24 | (((c >> 16 & 255) * 255 / a) << 16) | (((c >> 8 & 255) * 255 / a) << 8) | ((c & 255) * 255 / a);
+      px[(size_t)(y + (size - h) / 2) * size + x + (size - w) / 2] = c;
+    }
+  free(fit);
+  BITMAPINFO bi = {{sizeof(BITMAPINFOHEADER), size, -size, 1, 32}};
+  void *bits = NULL;
+  HDC sdc = GetDC(NULL);
+  HBITMAP colour = CreateDIBSection(sdc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
+  ReleaseDC(NULL, sdc);
+  HBITMAP mask = CreateBitmap(size, size, 1, 1, NULL);
+  HICON ic = NULL;
+  if (colour && mask) {
+    memcpy(bits, px, (size_t)size * size * 4);
+    ICONINFO ii = {TRUE, 0, 0, mask, colour};
+    ic = CreateIconIndirect(&ii);
+  }
+  if (colour) DeleteObject(colour);
+  if (mask) DeleteObject(mask);
+  free(px);
+  return ic;
+}
+
+void ui_window_icon(void) {
+  if (!theme() || !theme()->icon) return;
+  int w, h;
+  const u32 *src = theme()->icon(0, &w, &h);
+  if (!src || w <= 0 || h <= 0) return;
+  HICON big = make_icon(src, w, h, GetSystemMetrics(SM_CXICON)), small = make_icon(src, w, h, GetSystemMetrics(SM_CXSMICON));
+  if (big) SendMessageW(dl_hwnd, WM_SETICON, ICON_BIG, (LPARAM)big);
+  if (small) SendMessageW(dl_hwnd, WM_SETICON, ICON_SMALL, (LPARAM)small);
+}
+
+const void *ui_theme_sound(int kind, int volume) {
+  static u8 *wav[2];
+  static int made_for[2] = {-1, -1};
+  static bool tried[2];
+  static const int16_t *samples[2];
+  static int count[2];
+  if (!theme() || !theme()->sound || !dl_start_done || kind < 0 || kind > 1) return NULL;
+  if (!tried[kind]) {
+    tried[kind] = true;
+    int rate = 0;
+    samples[kind] = theme()->sound(kind, &count[kind], &rate);
+    if (samples[kind] && count[kind] > 0 && rate > 0 && (wav[kind] = malloc(44 + (size_t)count[kind] * 2))) {
+      u32 n = (u32)count[kind], hd[11] = {0x46464952, 36 + n * 2, 0x45564157, 0x20746D66, 16, 0x00010001, (u32)rate, (u32)rate * 2, 0x00100002, 0x61746164, n * 2};
+      memcpy(wav[kind], hd, 44);
+    }
+  }
+  if (!wav[kind]) return NULL;
+  if (made_for[kind] != volume) { // the samples at that volume, in place (as dl_beep does)
+    made_for[kind] = volume;
+    for (int k = 0; k < count[kind]; k++) {
+      s16 v = (s16)(samples[kind][k] * volume / 10);
+      memcpy(wav[kind] + 44 + k * 2, &v, 2);
+    }
+  }
+  return wav[kind];
+}
 
 void ui_fonts(void) {
   int px = PX(100);
@@ -32,8 +251,8 @@ void ui_fonts(void) {
     if (*all[k]) DeleteObject(*all[k]);
   f_help_small = CreateFontW(-PX(10.5), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
   // title: a serif face drawn slightly narrow, with a larger initial (see ui_title)
-  f_title = CreateFontW(-PX(43), PX(14.5), 0, 0, FW_BOLD, 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Palatino Linotype");
-  f_title_small = CreateFontW(-PX(33), PX(11.5), 0, 0, FW_BOLD, 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Palatino Linotype");
+  f_title = CreateFontW(-PX(43), PX(14.5), 0, 0, FW_BOLD, 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
+  f_title_small = CreateFontW(-PX(33), PX(11.5), 0, 0, FW_BOLD, 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
   f_item = CreateFontW(-PX(15), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
   f_small = CreateFontW(-PX(11), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
   f_help = CreateFontW(-PX(13), 0, 0, 0, FW_NORMAL, dl_cfg.ui_lang != 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
@@ -97,10 +316,10 @@ void ui_panel(HDC dc, double x0, double y0, double x1, double y1, COLORREF fill,
     SelectObject(dc, f_small);
     GetTextExtentPoint32W(dc, tab, lstrlenW(tab), &sz);
     double w = sz.cx / ui_s + 12;
-    ui_round(dc, x0 + 12, y0 - 8, x0 + 12 + w, y0 + 7, RGB(176, 206, 250), 4);
+    ui_round(dc, x0 + 12, y0 - 8, x0 + 12 + w, y0 + 7, ui_tint(RGB(176, 206, 250)), 4);
     SetBkMode(dc, TRANSPARENT);
     SetTextAlign(dc, TA_LEFT | TA_TOP);
-    SetTextColor(dc, RGB(8, 26, 84));
+    SetTextColor(dc, ui_tint(RGB(8, 26, 84)));
     TextOutW(dc, ui_ox + PX(x0 + 18), ui_oy + PX(y0 - 7), tab, lstrlenW(tab));
   }
 }
@@ -162,10 +381,22 @@ static double title_path(HDC dc, double x, double base) {
   return (px - ui_ox) / ui_s;
 }
 
+static void title_extra(HDC dc, double end, double base);
+
 void ui_title(HDC dc, double x, double base) {
+  static UiPic logo;
+  if (!logo.tried && dl_start_done && theme() && theme()->logo) { logo.tried = true; logo.src = theme()->logo(&logo.sw, &logo.sh); }
+  if (logo.src && logo.sw > 0 && logo.sh > 0) { // the game's logo, as tall as the name, and the subtitle beside it
+    int bh = PX(54), bw = PX(320), w = (int)((s64)bh * logo.sw / logo.sh);
+    if (w > bw) w = bw;
+    pic_draw(dc, &logo, ui_ox + PX(x), ui_oy + PX(base - 38), w, bh);
+    double end = x + w / ui_s - 25;
+    title_extra(dc, end, base);
+    return;
+  }
   // soft shadow, then a dark edge, then the metal
-  HBRUSH shade = CreateSolidBrush(RGB(4, 14, 60)), edge_fill = CreateSolidBrush(RGB(10, 30, 96));
-  HPEN edge = CreatePen(PS_SOLID, PX(3.2) < 2 ? 2 : PX(3.2), RGB(6, 22, 84));
+  HBRUSH shade = CreateSolidBrush(ui_tint(RGB(4, 14, 60))), edge_fill = CreateSolidBrush(ui_tint(RGB(10, 30, 96)));
+  HPEN edge = CreatePen(PS_SOLID, PX(3.2) < 2 ? 2 : PX(3.2), ui_tint(RGB(6, 22, 84)));
   HGDIOBJ old_brush = SelectObject(dc, shade), old_pen = SelectObject(dc, GetStockObject(NULL_PEN));
   title_path(dc, x + 2.2, base + 2.6);
   FillPath(dc);
@@ -177,8 +408,9 @@ void ui_title(HDC dc, double x, double base) {
   SelectClipPath(dc, RGN_COPY);
   // white, with a faint blue towards the foot of the letters
   int x0 = ui_ox + PX(x - 4), x1 = ui_ox + PX(end + 4), top = ui_oy + PX(base - 34), mid = ui_oy + PX(base - 13), bottom = ui_oy + PX(base + 4);
+  COLORREF foot = ui_tint(RGB(0xC4, 0xDC, 0xFF));
   TRIVERTEX v[4] = {{x0, top, 0xFF00, 0xFF00, 0xFF00, 0}, {x1, mid, 0xFF00, 0xFF00, 0xFF00, 0},
-                    {x0, mid, 0xFF00, 0xFF00, 0xFF00, 0}, {x1, bottom, 0xC400, 0xDC00, 0xFF00, 0}};
+                    {x0, mid, 0xFF00, 0xFF00, 0xFF00, 0}, {x1, bottom, GetRValue(foot) << 8, GetGValue(foot) << 8, GetBValue(foot) << 8, 0}};
   GRADIENT_RECT gr[2] = {{0, 1}, {2, 3}};
   GradientFill(dc, v, 4, gr, 2, GRADIENT_FILL_RECT_V);
   SelectClipRgn(dc, NULL);
@@ -188,58 +420,63 @@ void ui_title(HDC dc, double x, double base) {
   DeleteObject(edge_fill);
   DeleteObject(edge);
   // thin rule under the name, fading out to the right
+  COLORREF fade = ui_tint(RGB(0x10, 0x38, 0xA0));
   TRIVERTEX r[2] = {{ui_ox + PX(x), ui_oy + PX(base + 6.5), 0xFF00, 0xFF00, 0xFF00, 0},
-                    {ui_ox + PX(end + 40), ui_oy + PX(base + 6.5) + (PX(1.2) < 1 ? 1 : PX(1.2)), 0x1000, 0x3800, 0xA000, 0}};
+                    {ui_ox + PX(end + 40), ui_oy + PX(base + 6.5) + (PX(1.2) < 1 ? 1 : PX(1.2)), GetRValue(fade) << 8, GetGValue(fade) << 8, GetBValue(fade) << 8, 0}};
   GRADIENT_RECT rr = {0, 1};
   GradientFill(dc, r, 2, &rr, 1, GRADIENT_FILL_RECT_H);
-  // beside it: the subtitle in spaced capitals, and what the program is
+  title_extra(dc, end, base);
+}
+
+// Beside the name: the subtitle in spaced capitals, and what the program is.
+static void title_extra(HDC dc, double end, double base) {
   static HFONT f_sub1, f_sub2;
   static int sub_px = -1, sub_lang = -1;
   if (sub_px != font_px || sub_lang != dl_cfg.ui_lang) {
     if (f_sub1) DeleteObject(f_sub1);
     if (f_sub2) DeleteObject(f_sub2);
     bool jp = dl_cfg.ui_lang == 0;
-    f_sub1 = CreateFontW(-PX(16), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Palatino Linotype");
-    f_sub2 = CreateFontW(-PX(13), 0, 0, 0, FW_NORMAL, jp ? 0 : 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, jp ? L"Yu Mincho" : L"Palatino Linotype");
+    f_sub1 = CreateFontW(-PX(16), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
+    f_sub2 = CreateFontW(-PX(13), 0, 0, 0, FW_NORMAL, jp ? 0 : 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, jp ? L"Yu Mincho" : title_face());
     sub_px = font_px;
     sub_lang = dl_cfg.ui_lang;
   }
   static wchar_t caps[64];
   if (!caps[0]) { lstrcpynW(caps, L"" PROJECT_SUBTITLE, 64); CharUpperW(caps); }
   SetTextCharacterExtra(dc, PX(2.0));
-  ui_text(dc, f_sub1, end + 46, base - 30, caps, RGB(4, 14, 60), TA_LEFT);
+  ui_text(dc, f_sub1, end + 46, base - 30, caps, ui_tint(RGB(4, 14, 60)), TA_LEFT);
   ui_text(dc, f_sub1, end + 45, base - 31, caps, RGB(255, 255, 255), TA_LEFT);
   SetTextCharacterExtra(dc, 0);
   if (dl_game && dl_game->subtitle) {
     const wchar_t *s = dl_tr(dl_game->subtitle);
-    ui_text(dc, f_sub2, end + 46, base - 9, s, RGB(4, 14, 60), TA_LEFT);
-    ui_text(dc, f_sub2, end + 45, base - 10, s, RGB(214, 228, 255), TA_LEFT);
+    ui_text(dc, f_sub2, end + 46, base - 9, s, ui_tint(RGB(4, 14, 60)), TA_LEFT);
+    ui_text(dc, f_sub2, end + 45, base - 10, s, ui_tint(RGB(214, 228, 255)), TA_LEFT);
   }
 }
 
 void ui_bar(HDC dc, double x0, double y, double x1, int value, int max) {
   double w = (x1 - x0 - 8) / max;
   for (int k = 0; k < max; k++)
-    ui_rect(dc, x0 + 4 + k * w, y + 5, x0 + 4 + (k + 1) * w - 1.5, y + 13, k < value ? COL_VALUE : RGB(30, 56, 118));
+    ui_rect(dc, x0 + 4 + k * w, y + 5, x0 + 4 + (k + 1) * w - 1.5, y + 13, k < value ? COL_VALUE : ui_tint(RGB(30, 56, 118)));
 }
 
 // A row of a page at height y (logical), h high. sw >= 0: a switch (0 off, 1 on); plain: a value that is
 // only shown (no < > arrows); bar_max > 0: a bar.
 void ui_row(HDC dc, double y, double h, bool sel, const wchar_t *label, const wchar_t *value, int sw, bool plain, int bar, int bar_max) {
   if (y + h > PANEL_BOTTOM + 1) ui_audit_note("row under the panel", label);
-  if (sel) ui_round(dc, ROW_X0, y - 1, ROW_X1, y + h - 2, RGB(34, 84, 184), 4);
+  if (sel) ui_round(dc, ROW_X0, y - 1, ROW_X1, y + h - 2, ui_tint(RGB(34, 84, 184)), 4);
   bool has_value = value || bar_max || sw >= 0;
-  ui_text_fit(dc, ROW_X0 + 9, y, label, sel ? COL_SEL : RGB(240, 242, 255), TA_LEFT,
+  ui_text_fit(dc, ROW_X0 + 9, y, label, sel ? COL_SEL : ui_tint(RGB(240, 242, 255)), TA_LEFT,
               !has_value ? ROW_X1 - ROW_X0 - 16 : sw >= 0 ? ROW_X1 - ROW_X0 - 56 : VAL_X0 - ROW_X0 - 13); // a switch leaves more room
   if (!has_value) return;
   if (sw >= 0) { // a pill with a knob on the side of its state
     double x1 = VAL_X1 - 2, x0 = x1 - 30, cy = y + 8;
-    ui_round(dc, x0, cy - 7, x1, cy + 7, sw ? RGB(240, 246, 255) : RGB(44, 72, 140), 7);
+    ui_round(dc, x0, cy - 7, x1, cy + 7, sw ? ui_tint(RGB(240, 246, 255)) : ui_tint(RGB(44, 72, 140)), 7);
     double kx = sw ? x1 - 7 : x0 + 7;
-    ui_round(dc, kx - 5, cy - 5, kx + 5, cy + 5, sw ? RGB(12, 40, 110) : RGB(214, 228, 252), 5);
+    ui_round(dc, kx - 5, cy - 5, kx + 5, cy + 5, sw ? ui_tint(RGB(12, 40, 110)) : ui_tint(RGB(214, 228, 252)), 5);
     return;
   }
-  ui_round(dc, VAL_X0, y, VAL_X1, y + h - 4, RGB(6, 18, 58), 4);
+  ui_round(dc, VAL_X0, y, VAL_X1, y + h - 4, ui_tint(RGB(6, 18, 58)), 4);
   if (bar_max) ui_bar(dc, VAL_X0, y, VAL_X1, bar, bar_max);
   else ui_text_fit(dc, (VAL_X0 + VAL_X1) / 2, y, value, COL_VALUE, TA_CENTER, sel && !plain ? VAL_W - 30 : VAL_W - 4); // selected: room for < >
   if (sel && value && !bar_max && !plain) {
@@ -335,10 +572,10 @@ static void sky_pixel(double u, double v, double aspect, double *rgb) {
 }
 
 // The player's own backdrop instead of the sky: launcher_bg.png (or .jpg, .bmp, .gif) next to the
-// program, scaled to cover the window with its proportions kept (made again when the size changes).
-// False when there is none.
+// program; otherwise the theme's. Scaled to cover the window with its proportions kept (made again when
+// the size changes). False when there is none.
 bool backdrop_draw(HDC dc, int cw, int ch) {
-  static bool tried;
+  static bool tried, theme_tried;
   static HBITMAP pic;
   static int iw, ih;
   if (!tried) {
@@ -348,6 +585,16 @@ bool backdrop_draw(HDC dc, int cw, int ch) {
       char p[MAX_PATH];
       snprintf(p, sizeof p, "%s%s", dl_base_dir, names[k]);
       if (GetFileAttributesA(p) != INVALID_FILE_ATTRIBUTES) pic = dl_picture_load(p, &iw, &ih);
+    }
+  }
+  if (!pic && !theme_tried && dl_start_done && theme() && theme()->backdrop) {
+    theme_tried = true;
+    const u32 *src = theme()->backdrop(&iw, &ih);
+    if (src && iw > 0 && ih > 0) {
+      BITMAPINFO bi = {{sizeof(BITMAPINFOHEADER), iw, -ih, 1, 32}};
+      void *bits = NULL;
+      pic = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
+      if (pic) memcpy(bits, src, (size_t)iw * ih * 4);
     }
   }
   if (!pic || iw <= 0 || ih <= 0) return false;
@@ -393,6 +640,7 @@ void sky_draw(HDC dc, int cw, int ch) {
         for (int x = 0; x < w; x++) {
           double rgb[3];
           sky_pixel((x + 0.5) / w, (y + 0.5) / h, aspect, rgb);
+          if (theme_colours()) tint3(rgb);
           u32 c = 0;
           for (int k = 0; k < 3; k++) { int q = (int)(rgb[k] + 0.5); c = (c << 8) | (u32)(q < 0 ? 0 : q > 255 ? 255 : q); }
           px[(size_t)y * (size_t)w + (size_t)x] = c;

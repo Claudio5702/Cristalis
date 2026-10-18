@@ -458,6 +458,23 @@ static void gpu_game_quad(int x, int y, int w, int h, int step, int steps) {
   gpu_quad(x, y, w, h, gpu.ps, -1, false);
 }
 
+// The states DarkLauncher's quads rely on: at the start of each picture, and again after the game's
+// own drawing (DlGame.gpu_draw), which may have changed any of them.
+static void gpu_states(void) {
+  ID3D11DeviceContext_OMSetRenderTargets(gpu.ctx, 1, &gpu.rtv, NULL);
+  ID3D11DeviceContext_OMSetDepthStencilState(gpu.ctx, NULL, 0);
+  ID3D11DeviceContext_OMSetBlendState(gpu.ctx, NULL, NULL, 0xFFFFFFFF);
+  ID3D11DeviceContext_RSSetState(gpu.ctx, NULL);
+  ID3D11DeviceContext_IASetInputLayout(gpu.ctx, NULL);
+  ID3D11DeviceContext_IASetPrimitiveTopology(gpu.ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+  ID3D11DeviceContext_VSSetShader(gpu.ctx, gpu.vs, NULL, 0);
+  ID3D11DeviceContext_GSSetShader(gpu.ctx, NULL, NULL, 0);
+  ID3D11DeviceContext_HSSetShader(gpu.ctx, NULL, NULL, 0);
+  ID3D11DeviceContext_DSSetShader(gpu.ctx, NULL, NULL, 0);
+  ID3D11DeviceContext_PSSetConstantBuffers(gpu.ctx, 0, 1, &gpu.consts);
+  ID3D11DeviceContext_PSSetSamplers(gpu.ctx, 0, 1, &gpu.linear);
+}
+
 // Screen refreshes for each picture of the game played (DlGame.gpu_steps; smooth motion).
 int dl_gpu_steps(void) {
   int n = dl_mode == M_GAME && dl_game->gpu_steps && gpu.ok ? dl_game->gpu_steps() : 1;
@@ -641,15 +658,14 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
   int steps = dl_shot_path[0] ? 1 : dl_gpu_steps();
   for (int step = 1; good && step <= steps; step++) {
     static const float black[4] = {0, 0, 0, 1};
-    ID3D11DeviceContext_OMSetRenderTargets(gpu.ctx, 1, &gpu.rtv, NULL);
+    gpu_states();
     ID3D11DeviceContext_ClearRenderTargetView(gpu.ctx, gpu.rtv, black);
-    ID3D11DeviceContext_IASetInputLayout(gpu.ctx, NULL);
-    ID3D11DeviceContext_IASetPrimitiveTopology(gpu.ctx, D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-    ID3D11DeviceContext_VSSetShader(gpu.ctx, gpu.vs, NULL, 0);
-    ID3D11DeviceContext_PSSetConstantBuffers(gpu.ctx, 0, 1, &gpu.consts);
-    ID3D11DeviceContext_PSSetSamplers(gpu.ctx, 0, 1, &gpu.linear);
     if (game) {
-      gpu_game_quad(x, y, w, h, step, steps);
+      // the game's own drawing (a 3D scene...) while it is played or paused, otherwise its picture
+      if ((dl_mode == M_GAME || dl_mode == M_PAUSE) && dl_game->gpu_draw &&
+          dl_game->gpu_draw(gpu.dev, gpu.ctx, gpu.rtv, x, y, w, h, hdr_chain ? hdr_white : 0, step, steps))
+        gpu_states();
+      else gpu_game_quad(x, y, w, h, step, steps);
       if (dl_shot_path[0] && dl_shot_game) { // a screenshot: the game's picture alone, as shown
         dl_shot_ok = gpu_save(dl_shot_path, x, y, w, h);
         dl_shot_path[0] = 0;

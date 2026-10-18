@@ -72,7 +72,8 @@ void dl_draw_note(HDC dc, int x, int y, int h) {
     src = CreateCompatibleDC(dc);
     SelectObject(src, CreateDIBSection(src, &bi, DIB_RGB_COLORS, (void **)&px, NULL, 0));
   }
-  *px = 0x000A1A40;
+  COLORREF band = ui_tint(RGB(0x0A, 0x1A, 0x40));
+  *px = (u32)GetRValue(band) << 16 | (u32)GetGValue(band) << 8 | GetBValue(band);
   BLENDFUNCTION bf = {AC_SRC_OVER, 0, 170, 0};
   AlphaBlend(dc, x, y, w, bh, src, 0, 0, 1, 1, bf);
   HGDIOBJ of = SelectObject(dc, note_font(h));
@@ -361,7 +362,7 @@ static void row_date(const FILETIME *ft, wchar_t *out, bool seconds) {
 }
 
 static void empty_text(HDC dc, double x0, double y0, double x1, double y1) {
-  ui_text(dc, f_item, (x0 + x1) / 2, (y0 + y1) / 2 - 8, TX(T_EMPTY), RGB(110, 124, 210), TA_CENTER);
+  ui_text(dc, f_item, (x0 + x1) / 2, (y0 + y1) / 2 - 8, TX(T_EMPTY), ui_tint(RGB(110, 124, 210)), TA_CENTER);
 }
 
 // save states: the ten slots, then the game's automatic ones

@@ -17,6 +17,7 @@ bool dl_started, dl_running = true, dl_no_mouse;
 const char *dl_audit_dir;
 static const char *gpu_check_dir;
 static int bench_secs; // --bench N: N seconds of play, then the frame rate and the sound's gaps
+bool dl_start_done;
 static bool play_now;  // --play: straight into the game, without the setup screen
 static bool relaunch;  // dl_relaunch: started again once closed
 
@@ -294,6 +295,8 @@ void dl_beep(int kind) {
   static u8 wav[2][44 + 2 * 1400];
   static int made_for = -1;
   if (!dl_cfg.menu_sound || !dl_cfg.volume || dl_audit_dir) return;
+  const void *own = ui_theme_sound(kind, dl_cfg.volume); // the game's own, if its theme has them
+  if (own) { PlaySoundA(own, NULL, SND_MEMORY | SND_ASYNC | SND_NODEFAULT); return; }
   if (made_for != dl_cfg.volume) {
     made_for = dl_cfg.volume;
     for (int w = 0; w < 2; w++) {
@@ -615,6 +618,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   if (dl_audit_dir) {
     // the picture of a first frame, then every page; nothing is saved
     if (game->start) game->start();
+    dl_start_done = true;
     static s16 tmp[8192];
     game->frame(&(DlInput){0}, dl_pic, tmp, 4096);
     ShowWindow(dl_hwnd, SW_SHOWNOACTIVATE);
@@ -622,6 +626,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   }
   if (gpu_check_dir) { // nothing is saved
     if (game->start && !game->start()) return 1;
+    dl_start_done = true;
     return gpu_check();
   }
   if (dl_cfg.gpu) dl_gpu_prepare(); // the shaders, on a second thread; GDI shows the first pictures
@@ -630,6 +635,8 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   dl_cfg.fullscreen = 0;
   if (want_full) dl_toggle_fullscreen();
   if (game->start && !game->start()) return 1;
+  dl_start_done = true;
+  ui_window_icon();
   audio_init();
   timeBeginPeriod(1);
 
