@@ -442,6 +442,7 @@ void dl_beep(int kind) {
 #define ABUF_FRAMES 512
 #define RING 32768 // sample frames
 static HWAVEOUT wave_out;
+static HANDLE audio_event; // set by the sound device whenever a buffer has been played (NULL: none, Linux)
 static WAVEHDR wave_hdr[ABUF_COUNT];
 static s16 wave_data[ABUF_COUNT][ABUF_FRAMES * 2];
 static s16 ring[RING * 2];
@@ -457,7 +458,8 @@ static void audio_init(void) {
   fmt.wBitsPerSample = 16;
   fmt.nBlockAlign = 4;
   fmt.nAvgBytesPerSec = fmt.nSamplesPerSec * 4;
-  if (waveOutOpen(&wave_out, WAVE_MAPPER, &fmt, 0, 0, CALLBACK_NULL) != MMSYSERR_NOERROR) { wave_out = NULL; return; }
+  audio_event = CreateEventW(NULL, FALSE, FALSE, NULL);
+  if (waveOutOpen(&wave_out, WAVE_MAPPER, &fmt, (DWORD_PTR)audio_event, 0, audio_event ? CALLBACK_EVENT : CALLBACK_NULL) != MMSYSERR_NOERROR) { wave_out = NULL; return; }
   for (int k = 0; k < ABUF_COUNT; k++) {
     wave_hdr[k].lpData = (LPSTR)wave_data[k];
     wave_hdr[k].dwBufferLength = ABUF_FRAMES * 4;
@@ -615,6 +617,42 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_ERASEBKGND: return 1;
   }
   return DefWindowProcW(h, msg, wp, lp);
+}
+
+// ---------------------------------------------------------------- using the computer lightly
+#ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#endif
+
+// The waits of the main loop: a high resolution timer (Windows 10 1803 and later), so that the
+// program sleeps until the next picture instead of waking every millisecond; without one, the
+// system's clock at 1 ms (timeBeginPeriod). A message (a key, the mouse, the window) ends a wait.
+static HANDLE wait_timer;
+
+static void wait_start(void) {
+  wait_timer = CreateWaitableTimerExW(NULL, NULL, CREATE_WAITABLE_TIMER_HIGH_RESOLUTION, TIMER_ALL_ACCESS);
+  if (!wait_timer) timeBeginPeriod(1);
+}
+static void wait_stop(void) {
+  if (wait_timer) CloseHandle(wait_timer);
+  else timeEndPeriod(1);
+  wait_timer = NULL;
+}
+
+// Waits until about ms milliseconds from now, or a message. To the moment (the game's pictures), the
+// last quarter of a millisecond is left to the loop, which checks the clock itself: a timer may wake
+// a little late. Otherwise (the menus) the whole time is slept.
+static void wait_ms(double ms, bool to_the_moment) {
+  if (wait_timer) {
+    double margin = to_the_moment ? 0.25 : 0;
+    if (ms <= margin + 0.05) return;
+    LARGE_INTEGER due = {.QuadPart = -(LONGLONG)((ms - margin) * 10000)}; // in 100 ns, from now
+    if (SetWaitableTimer(wait_timer, &due, 0, NULL, NULL, FALSE)) {
+      MsgWaitForMultipleObjects(1, &wait_timer, FALSE, INFINITE, QS_ALLINPUT);
+      return;
+    }
+  }
+  if (ms > 1.5) MsgWaitForMultipleObjects(0, NULL, FALSE, (DWORD)(ms - 1), QS_ALLINPUT);
 }
 
 // ---------------------------------------------------------------- --gpu-check DIR
@@ -782,7 +820,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   dl_start_done = true;
   ui_window_icon();
   audio_init();
-  timeBeginPeriod(1);
+  wait_start();
 
   LARGE_INTEGER fq, now, next, fps_t0;
   QueryPerformanceFrequency(&fq);
@@ -795,7 +833,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   u32 bench_frames = 0, bench_gaps = 0;
   if (crashed) dl_safe_page_open();
   else if (bench_secs || play_now) dl_play();
-  LARGE_INTEGER bench_t0;
+  LARGE_INTEGER bench_t0, menu_next = {0}; // menu_next: when the sky behind the setup screen moves next
   QueryPerformanceCounter(&bench_t0);
   while (dl_running) {
     if (bench_secs) {
@@ -839,6 +877,10 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     // another window in front
     bool run = dl_mode == M_GAME || !dl_started;
     if (dl_mode == M_GAME && dl_cfg.bg_pause && GetForegroundWindow() != dl_hwnd) run = false;
+    // a window put away in the taskbar: nothing is drawn, and with "Pause in background" the game
+    // waits too (its title behind the setup screen as well)
+    bool hidden = IsIconic(dl_hwnd);
+    if (hidden && dl_cfg.bg_pause) run = false;
     // fast forward: several pictures of the game for one, without their sound
     bool turbo = dl_mode == M_GAME && (dl_turbo_held() || (dl_started && game->turbo && game->turbo()));
     int speed = !turbo ? 1 : dl_cfg.turbo == 2 ? 2 : dl_cfg.turbo == 4 ? 4 : 12;
@@ -849,11 +891,10 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     bool pace = game->pace_by_sound && wave_out && !turbo;
     // smooth motion: each picture takes several screen refreshes, so the screen sets the pace; the
     // sound, a little short then, is stretched by a few samples, which cannot be heard
-    int steps = dl_mode == M_GAME && !turbo && dl_gpu_ready() ? dl_gpu_steps() : 1;
+    int steps = dl_mode == M_GAME && !turbo && !hidden && dl_gpu_ready() ? dl_gpu_steps() : 1;
     if (steps > 1) pace = false;
     audio_stretch = steps > 1 && wave_out && queued < 3 ? 8 : 0;
     if (bench_frames > 120 && wave_out && queued == 0 && run) bench_gaps++; // the sound card ran dry
-    bool waited = false;
     QueryPerformanceCounter(&now);
     if (run && (steps > 1 || (pace ? queued < 3 : now.QuadPart >= next.QuadPart))) {
       DlInput in = {dl_mode == M_GAME ? dl_game_buttons() : 0};
@@ -868,7 +909,8 @@ int dl_run(const DlGame *game, int argc, char **argv) {
       if (now.QuadPart - next.QuadPart > (LONGLONG)(period * 4)) next = now; // far behind: no catching up
       if (now.QuadPart - fps_t0.QuadPart >= fq.QuadPart) { dl_fps_shown = fps_frames; fps_frames = 0; fps_t0 = now; }
       bool vsync = dl_cfg.vsync && dl_mode == M_GAME && sound_ok && !turbo;
-      if (dl_gpu_ready() && dl_gpu_show(dl_dirty, vsync)) dl_dirty = false;
+      if (hidden) { // minimized: nothing drawn
+      } else if (dl_gpu_ready() && dl_gpu_show(dl_dirty, vsync)) dl_dirty = false;
       else {
         HDC dc = GetDC(dl_hwnd);
         if (dl_mode == M_GAME) present(dc);
@@ -877,13 +919,15 @@ int dl_run(const DlGame *game, int argc, char **argv) {
         ReleaseDC(dl_hwnd, dc);
         if (vsync) DwmFlush();
       }
+    } else if (hidden) { // minimized: nothing drawn
     } else if (!run && dl_gpu_ready()) {
-      // the setup screen over a paused game: the sky moves, one picture per screen refresh
-      LARGE_INTEGER t0, t1;
-      QueryPerformanceCounter(&t0);
-      if (dl_gpu_show(dl_dirty, true)) dl_dirty = false;
-      QueryPerformanceCounter(&t1);
-      waited = (t1.QuadPart - t0.QuadPart) * 1000 / fq.QuadPart >= 4; // not when the driver skips the wait
+      // the setup screen over a paused game: the sky moves at 60 pictures a second at most, however
+      // fast the screen; a change shows at once
+      QueryPerformanceCounter(&now);
+      if (dl_dirty || now.QuadPart >= menu_next.QuadPart) {
+        menu_next.QuadPart = now.QuadPart + (LONGLONG)(fq.QuadPart / 60.0) - fq.QuadPart / 1000; // a little early: the refresh after it
+        if (dl_gpu_show(dl_dirty, true)) dl_dirty = false;
+      }
     } else if (!run && dl_dirty) {
       HDC dc = GetDC(dl_hwnd);
       dl_draw_menu(dc);
@@ -892,10 +936,17 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     }
     audio_pump();
     QueryPerformanceCounter(&now);
-    double left_ms = run ? (steps > 1 ? 0 : pace ? 2 : (next.QuadPart - now.QuadPart) * 1000.0 / fq.QuadPart) : waited ? 0 : 10;
-    if (left_ms > 1.5) Sleep(left_ms > 10 ? 10 : (DWORD)(left_ms - 1));
+    if (run && pace && audio_event) { // paced by the sound: until a buffer has been played (one lasts 10 to 16 ms)
+      MsgWaitForMultipleObjects(1, &audio_event, FALSE, (DWORD)(ABUF_FRAMES * 1000 / dl_game->audio_rate + 2), QS_ALLINPUT);
+      continue;
+    }
+    double left_ms = run ? (steps > 1 ? 0 : pace ? 2 : (next.QuadPart - now.QuadPart) * 1000.0 / fq.QuadPart)
+                   : hidden ? 100
+                   : dl_gpu_ready() ? (menu_next.QuadPart - now.QuadPart) * 1000.0 / fq.QuadPart
+                   : 10;
+    wait_ms(left_ms, run);
   }
-  timeEndPeriod(1);
+  wait_stop();
   if (bench_secs) { dl_gpu_stop(); if (wave_out) { waveOutReset(wave_out); waveOutClose(wave_out); } return 0; } // nothing is saved
   if (!is_fullscreen) {
     RECT wr;

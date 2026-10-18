@@ -166,9 +166,10 @@ WORD GetUserDefaultUILanguage(void) {
 }
 
 // ---- handles: a folder being read, a process
-enum { H_FIND = 1, H_PROC };
+enum { H_FIND = 1, H_PROC, H_TIMER };
 typedef struct {
   int kind;
+  Uint64 due; // a timer: when it is due, in SDL's nanoseconds
   DIR *dir;
   char path[MAX_PATH], pattern[MAX_PATH];
   pid_t pid;
@@ -768,6 +769,7 @@ BOOL DestroyWindow(HWND h) {
 }
 
 BOOL ShowWindow(HWND h, int how) { (void)how; return h && SDL_ShowWindow(((Win *)h)->win); }
+BOOL IsIconic(HWND h) { return h && (SDL_GetWindowFlags(((Win *)h)->win) & SDL_WINDOW_MINIMIZED); }
 LRESULT DefWindowProcW(HWND w, UINT msg, WPARAM wp, LPARAM lp) { (void)w, (void)msg, (void)wp, (void)lp; return 0; }
 void PostQuitMessage(int code) { (void)code; }
 BOOL InvalidateRect(HWND w, const RECT *r, BOOL erase) { (void)w, (void)r, (void)erase; post(WM_PAINT, 0, 0); return TRUE; }
@@ -997,6 +999,39 @@ BOOL PeekMessageW(MSG *m, HWND w, UINT lo, UINT hi, UINT remove) {
   q_head = (q_head + 1) % 256;
   q_n--;
   return TRUE;
+}
+
+// The main loop's waits: a timer, and the wait for it or for a message (an event from SDL, or a
+// message already waiting), as on Windows.
+HANDLE CreateEventW(void *attributes, BOOL manual, BOOL initial, LPCWSTR name) { (void)attributes, (void)manual, (void)initial, (void)name; return NULL; }
+
+HANDLE CreateWaitableTimerExW(void *attributes, LPCWSTR name, DWORD flags, DWORD access) {
+  (void)attributes, (void)name, (void)flags, (void)access;
+  Handle *h = calloc(1, sizeof *h);
+  if (h) h->kind = H_TIMER;
+  return h;
+}
+
+BOOL SetWaitableTimer(HANDLE h, const LARGE_INTEGER *due, LONG period, void *routine, void *arg, BOOL resume) {
+  (void)period, (void)routine, (void)arg, (void)resume;
+  Handle *t = h;
+  if (!t || t->kind != H_TIMER || due->QuadPart > 0) return FALSE; // only a time from now (negative, in 100 ns)
+  t->due = SDL_GetTicksNS() + (Uint64)(-due->QuadPart) * 100;
+  return TRUE;
+}
+
+DWORD MsgWaitForMultipleObjects(DWORD n, const HANDLE *hs, BOOL all, DWORD ms, DWORD wake) {
+  (void)all, (void)wake;
+  Uint64 now = SDL_GetTicksNS(), end = ms == INFINITE ? now + 1000000000ull : now + (Uint64)ms * 1000000; // never more than a second
+  Handle *t = n == 1 && hs && hs[0] && ((Handle *)hs[0])->kind == H_TIMER ? hs[0] : NULL;
+  if (t && t->due < end) end = t->due;
+  while ((now = SDL_GetTicksNS()) < end) {
+    if (q_n) return WAIT_OBJECT_0 + n;
+    Uint64 left = end - now;
+    if (left <= 2000000 || !sdl_up()) { SDL_DelayPrecise(left); break; }
+    if (SDL_WaitEventTimeout(NULL, (Sint32)((left - 1000000) / 1000000))) return WAIT_OBJECT_0 + n;
+  }
+  return t ? WAIT_OBJECT_0 : WAIT_TIMEOUT;
 }
 
 BOOL TranslateMessage(const MSG *m) { (void)m; return TRUE; } // WM_CHAR comes from SDL's text events

@@ -176,6 +176,16 @@ DWORD GetTickCount(void);
 void Sleep(DWORD ms);
 UINT timeBeginPeriod(UINT ms);
 UINT timeEndPeriod(UINT ms);
+#define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
+#define TIMER_ALL_ACCESS 0x1F0003
+#define INFINITE 0xFFFFFFFF
+#define WAIT_OBJECT_0 0
+#define WAIT_TIMEOUT 258
+#define QS_ALLINPUT 0x04FF
+HANDLE CreateWaitableTimerExW(void *attributes, LPCWSTR name, DWORD flags, DWORD access);
+BOOL SetWaitableTimer(HANDLE h, const LARGE_INTEGER *due, LONG period, void *routine, void *arg, BOOL resume);
+DWORD MsgWaitForMultipleObjects(DWORD n, const HANDLE *handles, BOOL all, DWORD ms, DWORD wake);
+HANDLE CreateEventW(void *attributes, BOOL manual, BOOL initial, LPCWSTR name); // none on Linux: NULL
 DWORD GetCurrentProcessId(void);
 #define PROCESS_QUERY_LIMITED_INFORMATION 0x1000
 #define STILL_ACTIVE 259
@@ -310,6 +320,7 @@ BOOL GetWindowRect(HWND w, RECT *r);
 BOOL AdjustWindowRect(RECT *r, DWORD style, BOOL menu);
 BOOL SetWindowPos(HWND w, HWND after, int x, int y, int cx, int cy, UINT flags);
 HWND GetForegroundWindow(void);
+BOOL IsIconic(HWND w);
 LONG GetWindowLongW(HWND w, int index);
 LONG SetWindowLongW(HWND w, int index, LONG value);
 BOOL GetWindowPlacement(HWND w, WINDOWPLACEMENT *p);
@@ -326,6 +337,7 @@ long DwmFlush(void);
 #define WAVE_MAPPER ((UINT)-1)
 #define WAVE_FORMAT_PCM 1
 #define CALLBACK_NULL 0
+#define CALLBACK_EVENT 0x00050000
 #define MMSYSERR_NOERROR 0
 #define WHDR_DONE 1
 #define WHDR_PREPARED 2
