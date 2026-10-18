@@ -269,14 +269,15 @@ void Setup()
 // rounded corners and a bright rim, the choice lit by a bar; its backdrops are luminous veils over
 // dark blue; its logo is tall upright serif capitals; the texts of its menus a narrow sans serif; its
 // world is one of crystals. So: that blue, the cream gold of its crystals for the values, rounded
-// frames, a bar for the selection, a gradient with a glow behind, an upright title, a crystal chime.
+// frames, a bar for the selection, a starry night behind (the sparkle of its crystals), an upright title,
+// a crystal chime.
 const DlTheme kTheme = {
     0x32617F,                     // colour: the blue of the game's windows
     0xDFD296,                     // value: the cream gold of its crystals and gold windows
     L"Constantia",                // title_font: upright serif capitals, as the logo
     L"Bahnschrift SemiCondensed", // text_font: a narrow sans serif, as the texts of its menus
     nullptr, nullptr, nullptr, nullptr,
-    DL_FRAME_ROUND, DL_CURSOR_BAR, DL_SKY_GRADIENT, DL_TITLE_FLAT, DL_BEEP_CRYSTAL,
+    DL_FRAME_ROUND, DL_CURSOR_BAR, DL_SKY_STARS, DL_TITLE_FLAT, DL_BEEP_CRYSTAL,
 };
 
 // ---- The game ----
