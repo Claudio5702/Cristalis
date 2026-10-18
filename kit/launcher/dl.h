@@ -28,6 +28,14 @@ enum {
   DL_L = 1 << 8, DL_R = 1 << 9, DL_START = 1 << 10, DL_SELECT = 1 << 11,
 };
 typedef struct { uint32_t buttons; } DlInput;
+// Where the game's buttons are on a controller at first (DlGame.pad_layout): in the places of a Super
+// Nintendo pad's (DL_A the right face button, DL_B the bottom one), or of an Xbox pad's (DL_A the
+// bottom one, DL_B the right one, DL_X the left one, DL_Y the top one), PlayStation pads alike.
+enum { DL_PAD_SNES, DL_PAD_XBOX };
+// What opens the pause menu on a controller at first (DlGame.pad_menu): View, which is also the game's
+// Select; View held for a moment (a short press stays the game's Select); no button (Esc on the
+// keyboard; the player may still choose one on the Controls page).
+enum { DL_MENU_VIEW, DL_MENU_HOLD, DL_MENU_NONE };
 
 // A picture laid over the game's (high-resolution text, a panel...): w x h pixels 0xAARRGGBB, colours
 // already multiplied by their opacity, at x,y in the window.
@@ -148,6 +156,8 @@ typedef struct DlGame {
   bool (*gpu_draw)(void *dev, void *ctx, void *rtv, int x, int y, int w, int h, float hdr, int step, int steps);
 
   const DlTheme *theme; // the setup screen's look from the game (may be NULL)
+  int pad_layout;       // DL_PAD_*: the controller's first assignment (0: Super Nintendo places)
+  int pad_menu;         // DL_MENU_*: what opens the pause menu on a controller (0: View)
 
   // The languages of the game's own texts (its DlTexts, and the tables it reads with dl_lang()): bits
   // 1 << DL_LANG_*, or DL_LANGS_ALL. 0: the first six (jp to de), the languages before Italian. The

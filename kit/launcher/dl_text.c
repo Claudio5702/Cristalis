@@ -362,6 +362,19 @@ const wchar_t *const dl_texts[T_COUNT][DL_LANGS] = {
     [T_QUIT] = {L"終了", L"Quitter", L"Quit", L"Salir", L"Sair", L"Beenden", L"Esci"},
     [T_H_QUIT] = {L"プログラムを終了します。", L"Ferme le programme.", L"Closes the program.", L"Cierra el programa.", L"Fecha o programa.", L"Beendet das Programm.", L"Chiude il programma."},
 
+    // controllers set up by the game (DlGame.pad_layout, pad_menu)
+    [T_PH_DEFAULTS_GAME] = {L"ゲームが決めた初期の配置に戻します。", L"Remet la disposition d'origine, celle choisie par le jeu.",
+                            L"Restores the original layout, the one the game chose.", L"Restaura la disposición original, la que eligió el juego.",
+                            L"Restaura a disposição original, a escolhida pelo jogo.", L"Stellt die ursprüngliche Belegung wieder her, die das Spiel gewählt hat.",
+                            L"Ripristina la disposizione originale, quella scelta dal gioco."},
+    [T_PH_MENU_HOLD] = {L"しばらく押し続けるとポーズメニューを開くボタンです。Delete で「なし」に戻します。",
+                        L"Bouton à maintenir un instant pour ouvrir le menu de pause. Suppr : le remettre sur Aucun.",
+                        L"Button to hold for a moment to open the pause menu. Delete: set it back to None.",
+                        L"Botón que se mantiene un momento para abrir el menú de pausa. Supr: dejarlo en Ninguno.",
+                        L"Botão a segurar por um instante para abrir o menu de pausa. Delete: voltar para Nenhum.",
+                        L"Taste, die kurz gehalten das Pausenmenü öffnet. Entf: wieder auf Keine setzen.",
+                        L"Pulsante da tenere premuto un attimo per aprire il menu di pausa. Canc: rimettilo su Nessuno."},
+
     // the footer's words beside the controller's buttons
     [T_FT_MOVE] = {L"移動", L"naviguer", L"move", L"mover", L"mover", L"bewegen", L"muovi"},
     [T_FT_OK] = {L"決定", L"valider", L"select", L"aceptar", L"confirmar", L"wählen", L"conferma"},

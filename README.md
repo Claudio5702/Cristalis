@@ -98,10 +98,10 @@ changed on the Controls page.
 | Game (Xbox 360) | Keyboard (QWERTY positions) | Controller |
 | --- | --- | --- |
 | D-pad | Arrows | D-pad / left stick |
-| A (confirm) / B (back) | Z / X | A / B |
-| X / Y | A / S | X / Y |
+| A (confirm) / B (back) | X / Z | A / B |
+| X / Y | S / A | X / Y |
 | LB / RB | Q / W | LB / RB |
-| Start / Back | Enter / Right Shift | Start / Back (View), which also opens the pause menu |
+| Start / Back | Enter / Right Shift | Start / Back (View); held, View opens the pause menu |
 
 `Esc`: pause menu — `F11` or `Alt+Enter`: full screen — `F12`: screenshot into `captures\` —
 `Tab` (held): fast-forward.

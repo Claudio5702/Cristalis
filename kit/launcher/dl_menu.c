@@ -144,13 +144,13 @@ static const DlRow keys_rows[] = {
     {.kind = DL_ACTION, .label = dl_texts[T_GFXDEF], .help = dl_texts[T_KH_DEFAULTS], .run = dl_keys_default},
 };
 #define PAD_ROW(k) {.kind = DL_PADKEY, .label = dl_texts[T_BTN_UP + (k)], .help = dl_texts[T_PH_BTN], .value = &dl_pad_code[k]}
-static const DlRow pad_rows[] = {
+static DlRow pad_rows[] = { // not const: the help of "Default values" follows the game's choices
     PAD_ROW(0), PAD_ROW(1), PAD_ROW(2), PAD_ROW(3), PAD_ROW(4), PAD_ROW(5), PAD_ROW(6), PAD_ROW(7), PAD_ROW(8), PAD_ROW(9), PAD_ROW(10), PAD_ROW(11),
     {.kind = DL_PAGE, .label = dl_texts[T_PADFN], .help = dl_texts[T_PH_FN], .page = PG_PADFN},
     {.kind = DL_ACTION, .label = dl_texts[T_GFXDEF], .help = dl_texts[T_PH_DEFAULTS], .run = dl_pads_default},
 };
 #define FN_ROW(k, t, h) {.kind = DL_PADKEY, .label = dl_texts[t], .help = dl_texts[h], .value = &dl_pad_code[k], .max = 1}
-static const DlRow padfn_rows[] = { // the save-state rows come second, left out when the game has none
+static DlRow padfn_rows[] = { // the save-state rows come second, left out when the game has none
     FN_ROW(FN_TURBO, T_BTN_TURBO, T_PH_TURBO), FN_ROW(FN_SAVE, T_HK_SAVE, T_PH_ACT), FN_ROW(FN_LOAD, T_HK_LOAD, T_PH_ACT),
     FN_ROW(FN_SHOT, T_HK_SHOT, T_PH_ACT), FN_ROW(FN_MENU, T_FN_MENU, T_PH_ACT),
 };
@@ -163,6 +163,8 @@ static const DlRow hot_rows[] = { // the save-state rows and the rewind are left
 
 void dl_menu_init(void) {
   bool saves = dl_game->save_state && dl_game->load_state;
+  if (dl_game->pad_layout || dl_game->pad_menu) pad_rows[sizeof pad_rows / sizeof pad_rows[0] - 1].help = dl_texts[T_PH_DEFAULTS_GAME];
+  if (dl_game->pad_menu == DL_MENU_HOLD) padfn_rows[4].help = dl_texts[T_PH_MENU_HOLD]; // FN_MENU's row
   dl_page(dl_texts[T_TAB_LANGS], langs_rows, 1);
   dl_page(dl_texts[T_TAB_IMAGE], image_rows, sizeof image_rows / sizeof image_rows[0]);
   dl_page(dl_texts[T_TAB_SOUND], sound_rows, sizeof sound_rows / sizeof sound_rows[0]);

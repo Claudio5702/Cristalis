@@ -1,12 +1,12 @@
-DarkLauncher 335a45a, copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h 5909A5633B70353F
+DarkLauncher 0ded407, copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h C1D990E1DA6DC441
 file dl_achieve.c 9D17C7A3D737EE21
 file dl_app.c 40088B2A62127204
 file dl_draw.c 5D10309DEC48C32D
 file dl_gpu.c B0C74AE61AB65583
-file dl_input.c 198BDDDDC1951E93
-file dl_int.h 03AB8B80BF18A040
-file dl_menu.c 5394F745A996AE35
+file dl_input.c DD8A8C1E522DD23C
+file dl_int.h 391B644AD9C9B734
+file dl_menu.c 54C1D6C06AEF0B09
 file dl_packs.c CFF34E139BC788AF
 file dl_saves.c 9AEBE4DEF54BE845
-file dl_text.c A25A65DC58EADF42
+file dl_text.c 76777841C0EA6134

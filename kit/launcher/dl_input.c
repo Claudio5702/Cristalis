@@ -30,8 +30,21 @@ void dl_keys_default(void) {
 // controllers: the game's buttons in the places of a Super Nintendo pad's (its A is the right face
 // button, its B the bottom one), LB/RB for L/R; View opens the menu
 // (the game's functions have no controller button at first)
-static const int pad_def[FN_ALL] = {0, 1, 2, 3, 13, 12, 15, 14, 8, 9, 4, 5, -1, -1, -1, -1, 5, -1, -1, -1, -1, -1, -1, -1, -1};
-static const int joy_def[FN_ALL] = {-1, -1, -1, -1, 2, 1, 3, 0, 4, 5, 9, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+// (the game may ask for the Xbox places, and for another menu button: see layout_defaults)
+static int pad_def[FN_ALL] = {0, 1, 2, 3, 13, 12, 15, 14, 8, 9, 4, 5, -1, -1, -1, -1, 5, -1, -1, -1, -1, -1, -1, -1, -1};
+static int joy_def[FN_ALL] = {-1, -1, -1, -1, 2, 1, 3, 0, 4, 5, 9, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+
+// DlGame.pad_layout and pad_menu: the game's A B X Y in the Xbox places (XInput A B X Y; on other
+// controllers, DirectInput order square cross circle triangle: cross, circle, square, triangle), and no
+// button for the menu at first.
+static void layout_defaults(void) {
+  if (dl_game->pad_layout == DL_PAD_XBOX) {
+    static const int xb[4] = {12, 13, 14, 15}, joy[4] = {1, 2, 0, 3};
+    memcpy(pad_def + 4, xb, sizeof xb);
+    memcpy(joy_def + 4, joy, sizeof joy);
+  }
+  if (dl_game->pad_menu == DL_MENU_NONE) pad_def[FN_MENU] = -1;
+}
 
 void dl_pads_default(void) {
   if (dl_joy_mode()) memcpy(dl_joy_code, joy_def, sizeof joy_def);
@@ -47,6 +60,7 @@ void dl_hot_default(void) {
 }
 
 void dl_input_init(void) {
+  layout_defaults();
   static const char *const key_names[DL_BTNS + 1] = {"key_up", "key_down", "key_left", "key_right", "key_a", "key_b", "key_x",
                                                      "key_y", "key_l", "key_r", "key_start", "key_select", "key_turbo"};
   // the names of Kahna's settings file, so that a port moving to the kit keeps its players' settings
@@ -329,7 +343,16 @@ void dl_pad_poll(void) {
   prev_dirs = dirs;
 #define FN_PRESSED(k) ((dl_pad_code[k] >= 0 && (pressed & (1u << dl_pad_code[k]))) || (joy && dl_joy_code[k] >= 0 && (jpressed & (1u << dl_joy_code[k]))))
   if (dl_mode == M_GAME) {
-    if (FN_PRESSED(FN_MENU)) dl_pause_open();
+    bool menu = FN_PRESSED(FN_MENU);
+    if (dl_game->pad_menu == DL_MENU_HOLD) { // only once held 0.6 s; a short press stays the game's
+      static DWORD since;
+      static bool opened;
+      menu = false;
+      if (!fn_held(FN_MENU)) since = 0, opened = false;
+      else if (!since) since = GetTickCount() | 1;
+      else if (!opened && GetTickCount() - since >= 600) opened = menu = true;
+    }
+    if (menu) dl_pause_open();
     else if (FN_PRESSED(FN_SAVE)) dl_quick_save();
     else if (FN_PRESSED(FN_LOAD)) dl_quick_load();
     else if (FN_PRESSED(FN_SHOT)) dl_screenshot();

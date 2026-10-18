@@ -29,8 +29,8 @@ its own:
   DarkLauncher (`DlBridgePresent` in `dl_bridge.h`), and the game waits there until DarkLauncher asks
   for the next one. So the game goes at DarkLauncher's pace, and stops while its menu is open;
 - the sound mixer fills a reserve that DarkLauncher's frame empties, about 800 sample frames each;
-- DarkLauncher's buttons become the game's XInput buttons. DarkLauncher names them after a Super
-  Nintendo pad (its A is the controller's right face button), so they are passed on by position;
+- DarkLauncher's buttons become the game's XInput buttons, laid out as on an Xbox controller
+  (`DL_PAD_XBOX`); View held opens the pause menu, a short press stays the game's Back (`DL_MENU_HOLD`);
 - the game's own pages: its language (the program starts again with `dl_relaunch`), the internal
   resolution, vibration and the console's offline notices, the achievements as a list;
 - the theme (`DlTheme`) follows the game's art direction and is drawn by DarkLauncher: nothing is
