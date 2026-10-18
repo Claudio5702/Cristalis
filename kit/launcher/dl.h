@@ -7,6 +7,10 @@
 // Every name of the project comes from project.h (found on the include path).
 #ifndef DL_H
 #define DL_H
+
+// The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
+// (2.0) when a game has to change its code for it.
+#define DL_VERSION "1.0"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

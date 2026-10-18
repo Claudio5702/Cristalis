@@ -672,12 +672,14 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   char *slash = strrchr(dl_base_dir, '\\');
   if (slash) slash[1] = 0;
   snprintf(ini_path, sizeof ini_path, "%s" FILE_STEM ".ini", dl_base_dir);
+  bool version = false;
   for (int k = 1; k < argc; k++) {
     if (!strcmp(argv[k], "--ui-audit") && k + 1 < argc) dl_audit_dir = argv[++k];
     else if (!strcmp(argv[k], "--gpu-check") && k + 1 < argc) gpu_check_dir = argv[++k];
     else if (!strcmp(argv[k], "--bench") && k + 1 < argc) bench_secs = atoi(argv[++k]);
     else if (!strcmp(argv[k], "--play")) play_now = true;
     else if (!strcmp(argv[k], "--nomouse")) dl_no_mouse = true;
+    else if (!strcmp(argv[k], "--version")) version = true;
     else if (!strcmp(argv[k], "--ini") && k + 1 < argc) snprintf(ini_path, sizeof ini_path, "%s", argv[++k]);
   }
   { // started from a terminal: print there (--ui-audit reports)
@@ -686,6 +688,11 @@ int dl_run(const DlGame *game, int argc, char **argv) {
       freopen("CONOUT$", "w", stdout);
       freopen("CONOUT$", "w", stderr);
     }
+  }
+  if (version) { // --version: DarkLauncher's, then nothing else
+    printf("DarkLauncher " DL_VERSION "\n");
+    fflush(stdout);
+    return 0;
   }
   SetProcessDPIAware();
   dl_pic = calloc((size_t)game->width * game->height, 4);

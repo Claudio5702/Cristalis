@@ -725,6 +725,8 @@ void dl_draw_menu(HDC wdc) {
     ui_text(dc, f_small, 17, 382, TX(T_FOOTER), RGB(0, 0, 0), TA_LEFT);
     ui_text(dc, f_small, 16, 381, TX(T_FOOTER), RGB(255, 255, 255), TA_LEFT);
   } else pad_footer(dc);
+  ui_text(dc, f_small, 625, 382, L"DarkLauncher " DL_VERSION_W, RGB(0, 0, 0), TA_RIGHT); // the version, bottom right
+  ui_text(dc, f_small, 624, 381, L"DarkLauncher " DL_VERSION_W, ui_tint(RGB(222, 230, 252)), TA_RIGHT);
   if (dl_layer) GdiFlush();
   else BitBlt(wdc, 0, 0, cw, ch, mem, 0, 0, SRCCOPY);
 }
