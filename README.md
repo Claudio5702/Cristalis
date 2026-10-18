@@ -2,6 +2,8 @@
 
 **Crystal Defenders (Xbox 360) — unofficial native port by static recompilation**
 
+***English** · [Français](README.fr.md) · [Deutsch](README.de.md) · [Español](README.es.md) · [Italiano](README.it.md) · [日本語](README.ja.md)*
+
 ![The settings screen, DarkLauncher in the colours of the game](docs/screenshots/launcher-en.png)
 
 This project runs Crystal Defenders, the Xbox Live Arcade game, as a native Windows program: the
@@ -171,7 +173,7 @@ copying saves between the console and the PC has not been tried.
 
 ## Roadmap
 
-- Linux with DarkLauncher, and a real test on a Steam Deck.
+- A real test on a Linux PC and on a Steam Deck.
 - The menu sounds and more of the game's art direction in DarkLauncher's theme.
 - More testing with controllers and on other computers.
 
