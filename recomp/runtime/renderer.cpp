@@ -28,7 +28,10 @@ static ID3D11RenderTargetView* g_frameView;
 static ID3D11DepthStencilView* g_depthView;
 static ID3D11PixelShader* g_pixelShaders[2]; // plain, sharp
 static ID3D11RasterizerState* g_rasterStates[8];
-static uint32_t g_scale;                     // the frame is 1280x720 times this
+static uint32_t g_halves;                    // the frame is 1280x720 times this, counted in halves
+                                             // (2: 1280x720, 3: 1920x1080, 4: 2560x1440, 6: 3840x2160)
+static uint32_t FrameWidth() { return kHostWidth * g_halves / 2; }
+static uint32_t FrameHeight() { return kHostHeight * g_halves / 2; }
 static std::map<uint32_t, ID3D11DepthStencilState*> g_depthStates;
 static ID3D11Buffer* g_vertexBuffer;
 static ID3D11SamplerState* g_samplers[2]; // point, linear
@@ -527,7 +530,7 @@ static void CreateBackBufferView()
 
 // The frame the game draws into, and its depth buffer, at a multiple of the
 // console's 1280x720.
-static void CreateFrameTargets(uint32_t scale)
+static void CreateFrameTargets(uint32_t halves)
 {
     static ID3D11Texture2D* depthTexture;
     g_context->OMSetRenderTargets(0, nullptr, nullptr);
@@ -538,10 +541,10 @@ static void CreateFrameTargets(uint32_t scale)
             old->Release();
     }
 
-    g_scale = scale;
+    g_halves = halves;
     D3D11_TEXTURE2D_DESC frameDesc{};
-    frameDesc.Width = kHostWidth * scale;
-    frameDesc.Height = kHostHeight * scale;
+    frameDesc.Width = FrameWidth();
+    frameDesc.Height = FrameHeight();
     frameDesc.MipLevels = 1;
     frameDesc.ArraySize = 1;
     frameDesc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -577,8 +580,8 @@ bool RendererInit()
         Log("Renderer: D3D11CreateDevice failed (%08lX)", result);
         return false;
     }
-    CreateFrameTargets(DlBridgeScale());
-    Log("Renderer: off screen for DarkLauncher, drawing at %ux%u", kHostWidth * g_scale, kHostHeight * g_scale);
+    CreateFrameTargets(DlBridgeHalves());
+    Log("Renderer: off screen for DarkLauncher, drawing at %ux%u", FrameWidth(), FrameHeight());
 #else
     std::thread(WindowThread).detach();
     while (g_window.load() == nullptr)
@@ -603,7 +606,7 @@ bool RendererInit()
         return false;
     }
 
-    CreateFrameTargets(1);
+    CreateFrameTargets(2);
 
     // The window handles Alt+Enter itself (borderless), not DXGI.
     IDXGIFactory* factory = nullptr;
@@ -920,10 +923,10 @@ void RendererDraw(const HostDraw& draw)
     int sampler = draw.texture.linear ? 1 : 0;
     // Only textures the game wants smoothed need the sharp filter; the others
     // are already sampled to the nearest texel.
-    bool sharp = g_scale > 1 && draw.texture.present && draw.texture.linear;
+    bool sharp = g_halves > 2 && draw.texture.present && draw.texture.linear;
     int scissor[4];
     for (int i = 0; i < 4; i++)
-        scissor[i] = draw.scissor[i] * int(g_scale);
+        scissor[i] = (draw.scissor[i] * int(g_halves) + 1) / 2; // the far edges round up at 1.5 times
 
     bool sameState = texture == g_batch.texture && blend == g_batch.blend && depth == g_batch.depth && sampler == g_batch.sampler &&
         sharp == g_batch.sharp && draw.cull == g_batch.cull && memcmp(scissor, g_batch.scissor, sizeof(scissor)) == 0;
@@ -1634,7 +1637,7 @@ static void ShowFrame()
         // Back to drawing the game's frame. It cannot stay bound as a texture
         // while it is the render target.
         ID3D11ShaderResourceView* none = nullptr;
-        D3D11_VIEWPORT frame{ 0, 0, float(kHostWidth * g_scale), float(kHostHeight * g_scale), 0, 1 };
+        D3D11_VIEWPORT frame{ 0, 0, float(FrameWidth()), float(FrameHeight()), 0, 1 };
         g_context->PSSetShaderResources(0, 1, &none);
         g_context->OMSetRenderTargets(1, &g_frameView, g_depthView);
         g_context->RSSetViewports(1, &frame);
@@ -1652,14 +1655,14 @@ static void DarkLauncherPresent()
 {
     FlushBatch();
     static ID3D11Texture2D* staging;
-    static uint32_t stagingScale;
-    if (staging == nullptr || stagingScale != g_scale)
+    static uint32_t stagingHalves;
+    if (staging == nullptr || stagingHalves != g_halves)
     {
         if (staging != nullptr)
             staging->Release();
         D3D11_TEXTURE2D_DESC desc{};
-        desc.Width = kHostWidth * g_scale;
-        desc.Height = kHostHeight * g_scale;
+        desc.Width = FrameWidth();
+        desc.Height = FrameHeight();
         desc.MipLevels = desc.ArraySize = 1;
         desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
         desc.SampleDesc.Count = 1;
@@ -1667,7 +1670,7 @@ static void DarkLauncherPresent()
         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
         staging = nullptr;
         g_device->CreateTexture2D(&desc, nullptr, &staging);
-        stagingScale = g_scale;
+        stagingHalves = g_halves;
     }
     D3D11_MAPPED_SUBRESOURCE mapped{};
     if (staging != nullptr)
@@ -1675,17 +1678,17 @@ static void DarkLauncherPresent()
         g_context->CopyResource(staging, g_frameTexture);
         if (SUCCEEDED(g_context->Map(staging, 0, D3D11_MAP_READ, 0, &mapped)))
         {
-            DlBridgePresent(mapped.pData, kHostWidth * g_scale, kHostHeight * g_scale, mapped.RowPitch);
+            DlBridgePresent(mapped.pData, FrameWidth(), FrameHeight(), mapped.RowPitch);
             g_context->Unmap(staging, 0);
         }
     }
 
     g_context->ClearDepthStencilView(g_depthView, D3D11_CLEAR_DEPTH, 1.0f, 0);
-    uint32_t wanted = DlBridgeScale();
-    if (wanted != g_scale)
+    uint32_t wanted = DlBridgeHalves();
+    if (wanted != g_halves)
     {
         CreateFrameTargets(wanted);
-        Log("Renderer: drawing at %ux%u", kHostWidth * wanted, kHostHeight * wanted);
+        Log("Renderer: drawing at %ux%u", FrameWidth(), FrameHeight());
     }
     g_context->ClearRenderTargetView(g_frameView, g_clearColor);
 }
@@ -1786,10 +1789,10 @@ void RendererPresent()
     static const char* forced = getenv("CD_SCALE");
     if (forced != nullptr && atoi(forced) >= 1 && atoi(forced) <= 4)
         wanted = uint32_t(atoi(forced));
-    if (wanted != g_scale)
+    if (wanted * 2 != g_halves)
     {
-        CreateFrameTargets(wanted);
-        Log("Renderer: drawing at %ux%u", kHostWidth * wanted, kHostHeight * wanted);
+        CreateFrameTargets(wanted * 2);
+        Log("Renderer: drawing at %ux%u", FrameWidth(), FrameHeight());
     }
 
     // Pace to the console's 60 Hz ourselves: the driver's vertical sync does not

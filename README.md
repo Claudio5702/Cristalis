@@ -57,7 +57,7 @@ is not.
   all of it; nothing is taken from the game's files.
 - **Six languages of the game** (French, English, German, Spanish, Italian, Japanese), chosen in the
   settings; the game restarts in the new one.
-- **Display through the graphics card**: the game drawn at 1280×720 or 2560×1440, then sharp,
+- **Display through the graphics card**: the game drawn at 1280×720, 1920×1080, 2560×1440 or 3840×2160, then sharp,
   smooth or smooth-edged at any window size; scanlines, a flat or curved CRT look, HDR.
 - **Achievements stored on the computer**, with a notice over the game and a list in the settings.
 - **The console's own offline behaviour on request**: the "Not connected to Xbox LIVE" notice and
@@ -81,7 +81,7 @@ it. Enter or Right goes into it, Esc comes back.
   (both as on an offline console; from the next start).
 - **Achievements**: the game's twelve achievements, with the date each was earned and what each asks for.
 - **Languages**: the game's language (the game restarts in it) and the menu's.
-- **Picture**: the internal resolution (1280×720 or 2560×1440), full screen, integer scaling,
+- **Picture**: the internal resolution (1280×720, 1920×1080, 2560×1440 or 3840×2160), full screen, integer scaling,
   display through the graphics card or in software, filter, scanlines, CRT, HDR, vertical sync,
   frame rate, and "Try it full size".
 - **Sound**: the volume and the sounds of the menu.

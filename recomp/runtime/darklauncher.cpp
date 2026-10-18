@@ -34,7 +34,10 @@ namespace
 {
 
 constexpr uint32_t kWidth = 1280, kHeight = 720; // the console's picture
-constexpr uint32_t kMaxScale = 2;
+// The sizes the game can draw at, in halves of 1280 x 720 (see DlBridgeHalves).
+constexpr uint32_t kSizeHalves[] = { 2, 3, 4, 6 };
+constexpr int kSizeCount = int(sizeof(kSizeHalves) / sizeof(kSizeHalves[0]));
+constexpr uint32_t kMaxHalves = 6;
 constexpr int kRate = 48000;
 
 // ---- Bridge ----
@@ -58,7 +61,7 @@ void (*g_runGuest)();
 
 // ---- Settings ----
 
-int g_scaleSetting = 0;        // 0: 1280 x 720, 1: 2560 x 1440
+int g_scaleSetting = 0;        // an index in kSizeHalves: 1280 x 720, 1920 x 1080, 2560 x 1440, 3840 x 2160
 int g_languageSetting = 0;     // 0: Windows, then kGameLanguages
 int g_vibration = 1, g_liveNotice = 0, g_storageChoice = 0;
 
@@ -226,13 +229,13 @@ void DeclareAchievements()
 
 const wchar_t* ScaleText(int value)
 {
-    static const wchar_t* const sizes[] = { L"1280 × 720", L"2560 × 1440" };
-    return sizes[value < 0 ? 0 : value > 1 ? 1 : value];
+    static const wchar_t* const sizes[kSizeCount] = { L"1280 \u00D7 720", L"1920 \u00D7 1080", L"2560 \u00D7 1440", L"3840 \u00D7 2160" };
+    return sizes[std::clamp(value, 0, kSizeCount - 1)];
 }
 
 const DlRow kPictureRows[] =
 {
-    { DL_CHOICE, t_resolution, t_hResolution, &g_scaleSetting, int(kMaxScale) - 1, nullptr, ScaleText },
+    { DL_CHOICE, t_resolution, t_hResolution, &g_scaleSetting, kSizeCount - 1, nullptr, ScaleText },
 };
 
 // ---- The game's page ----
@@ -266,7 +269,7 @@ void Setup()
     dl_section(game, 0xE7FC, t_game, t_hGame);
     DeclareAchievements();
 
-    dl_setting("internal_scale", &g_scaleSetting, 0, int(kMaxScale) - 1, false);
+    dl_setting("internal_size", &g_scaleSetting, 0, kSizeCount - 1, false);
     dl_setting("game_language", &g_languageSetting, 0, kGameLanguageCount, true);
     dl_setting("vibration", &g_vibration, 0, 1, false);
     dl_setting("live_notice", &g_liveNotice, 0, 1, false);
@@ -395,9 +398,9 @@ void DlBridgePresent(const void* pixels, uint32_t width, uint32_t height, uint32
     g_signal.wait(lock, [&] { return g_asked != asked; });
 }
 
-uint32_t DlBridgeScale()
+uint32_t DlBridgeHalves()
 {
-    return uint32_t(std::clamp(g_scaleSetting, 0, int(kMaxScale) - 1)) + 1;
+    return kSizeHalves[std::clamp(g_scaleSetting, 0, kSizeCount - 1)];
 }
 
 uint16_t DlBridgeButtons()
@@ -431,8 +434,8 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
 {
     g_runGuest = runGuest;
     static DlGame game{};
-    game.width = int(kWidth * kMaxScale);
-    game.height = int(kHeight * kMaxScale);
+    game.width = int(kWidth * kMaxHalves / 2);
+    game.height = int(kHeight * kMaxHalves / 2);
     game.aspect = 16.0 / 9.0;
     game.fps = 60;
     game.audio_rate = kRate;
