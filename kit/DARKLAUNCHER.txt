@@ -1,5 +1,5 @@
-DarkLauncher 1.1 (commit 6652ea0), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h C2A8DA8C6795391F
+DarkLauncher 1.11 (commit f675d42), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h 734CB99FC5086E7B
 file dl_achieve.c BE8376E324B02072
 file dl_app.c D1BFF9FCBD049916
 file dl_draw.c 5D10309DEC48C32D
@@ -11,7 +11,7 @@ file dl_packs.c 10AE1C0391C7EF4F
 file dl_saves.c AEC5A38EBEB8C35F
 file dl_sony.c AD231D89B5ECF6E7
 file dl_text.c 754912CF79B0E3C0
-file linux/dl_gdi.c 0F338CCC949CD299
+file linux/dl_gdi.c 949092C9F24DC204
 file linux/dl_gl.c FCC09AE41F66D61D
 file linux/dl_icons.c E4F2AC1F462F8241
 file linux/dl_pads.c 8E993CA41AF3586A

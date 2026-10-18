@@ -5,6 +5,8 @@
 // code calls, the way it calls it.
 #include "win32.h"
 #include <math.h>
+#include <stdio.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <fontconfig/fontconfig.h>
 #include <ft2build.h>
@@ -502,7 +504,8 @@ static bool ft_ready(void) {
 }
 
 static FT_Face face_for(const char *family, bool bold, bool italic, bool *got_bold, bool *got_italic) {
-  FcPattern *p = FcNameParse((const FcChar8 *)family);
+  FcPattern *p = FcPatternCreate();
+  FcPatternAddString(p, FC_FAMILY, (const FcChar8 *)family);
   FcPatternAddInteger(p, FC_WEIGHT, bold ? FC_WEIGHT_BOLD : FC_WEIGHT_REGULAR);
   FcPatternAddInteger(p, FC_SLANT, italic ? FC_SLANT_ITALIC : FC_SLANT_ROMAN);
   FcConfigSubstitute(NULL, p, FcMatchPattern);
@@ -525,13 +528,60 @@ static FT_Face face_for(const char *family, bool bold, bool italic, bool *got_bo
   return f;
 }
 
-// Windows' faces, by what they look like.
-static const char *family_of(const wchar_t *face, bool *japanese) {
+// Whether fontconfig has this very family (installed with the game, or Microsoft's fonts).
+static bool has_family(const char *family) {
+  FcPattern *p = FcPatternCreate();
+  FcPatternAddString(p, FC_FAMILY, (const FcChar8 *)family);
+  FcConfigSubstitute(NULL, p, FcMatchPattern);
+  FcDefaultSubstitute(p);
+  FcResult res;
+  FcPattern *m = FcFontMatch(NULL, p, &res);
+  FcPatternDestroy(p);
+  FcChar8 *got;
+  bool same = m && FcPatternGetString(m, FC_FAMILY, 0, &got) == FcResultMatch && !strcasecmp((const char *)got, family);
+  if (m) FcPatternDestroy(m);
+  return same;
+}
+
+// What stands in for Windows' faces Linux lacks: one of the same look, as wide as the Windows face, so
+// that the texts fitted on Windows fit here too. The widths are a text in the seven languages in the
+// Windows face over the same in the stand-in (Noto Sans, Noto Serif, Noto Sans Mono), regular and bold,
+// measured with GDI and with this file. A wider face keeps the stand-in's width (the texts have room).
+static const struct { const wchar_t *face; const char *family; float wide, wide_bold; } stand_ins[] = {
+  {L"Verdana", "sans-serif", 1, 1}, {L"Lucida Sans Unicode", "sans-serif", 1, 1},
+  {L"Tahoma", "sans-serif", 0.945f, 1}, {L"Segoe UI", "sans-serif", 0.931f, 0.942f},
+  {L"Segoe UI Semibold", "sans-serif", 0.957f, 0.957f}, {L"Segoe UI Semilight", "sans-serif", 0.904f, 0.904f},
+  {L"Arial", "sans-serif", 0.964f, 0.968f}, {L"Microsoft Sans Serif", "sans-serif", 0.964f, 0.930f},
+  {L"Arial Narrow", "sans-serif", 0.79f, 0.79f}, {L"Calibri", "sans-serif", 0.867f, 0.834f},
+  {L"Candara", "sans-serif", 0.896f, 0.856f}, {L"Corbel", "sans-serif", 0.882f, 0.871f},
+  {L"Trebuchet MS", "sans-serif", 0.962f, 0.945f}, {L"Franklin Gothic Medium", "sans-serif", 0.917f, 0.885f},
+  {L"Bahnschrift", "sans-serif", 0.956f, 0.902f}, {L"Bahnschrift SemiCondensed", "sans-serif", 0.822f, 0.776f},
+  {L"Bahnschrift Condensed", "sans-serif", 0.703f, 0.663f},
+  {L"Palatino Linotype", "serif", 0.937f, 0.901f}, {L"Georgia", "serif", 0.936f, 1},
+  {L"Times New Roman", "serif", 0.856f, 0.853f}, {L"Constantia", "serif", 0.912f, 0.935f},
+  {L"Cambria", "serif", 0.901f, 0.909f}, {L"Sylfaen", "serif", 0.884f, 0.848f},
+  {L"Consolas", "monospace", 0.917f, 0.917f}, {L"Courier New", "monospace", 1, 1},
+};
+
+// Windows' faces turned into fontconfig's: the face itself when Linux has it, otherwise its stand-in
+// (*wide: how much narrower it is drawn), guessed from the name for a face not in the list.
+static const char *family_of(const wchar_t *face, bool bold, char own[128], bool *japanese, double *wide) {
   *japanese = false;
-  if (!face) return "sans-serif";
+  *wide = 1;
+  if (!face || !*face) return "sans-serif";
   if (!wcscmp(face, L"Yu Gothic UI")) { *japanese = true; return "Noto Sans CJK JP"; }
   if (!wcscmp(face, L"Yu Mincho")) { *japanese = true; return "Noto Serif CJK JP"; }
-  if (!wcscmp(face, L"Palatino Linotype") || !wcscmp(face, L"Georgia") || !wcscmp(face, L"Times New Roman")) return "serif";
+  if (snprintf(own, 128, "%ls", face) > 0 && has_family(own)) return own;
+  for (size_t i = 0; i < sizeof stand_ins / sizeof *stand_ins; i++)
+    if (!wcscmp(face, stand_ins[i].face)) {
+      *wide = bold ? stand_ins[i].wide_bold : stand_ins[i].wide;
+      return stand_ins[i].family;
+    }
+  if (wcsstr(face, L"Condensed")) *wide = wcsstr(face, L"Semi") ? 0.82 : 0.70;
+  else if (wcsstr(face, L"Narrow")) *wide = 0.79;
+  if (wcsstr(face, L"Mono") || wcsstr(face, L"Courier") || wcsstr(face, L"Console")) return "monospace";
+  if (wcsstr(face, L"Serif") && !wcsstr(face, L"Sans")) return "serif";
+  if (wcsstr(face, L"Roman") || wcsstr(face, L"Garamond") || wcsstr(face, L"Antiqua") || wcsstr(face, L"Book")) return "serif";
   return "sans-serif";
 }
 
@@ -550,7 +600,9 @@ HFONT CreateFontW(int height, int width, int escapement, int orientation, int we
     return o;
   }
   bool jp = false, got_bold = false, got_italic = false, bold = weight >= 600;
-  const char *family = o->icons ? "Noto Sans CJK JP" : family_of(face, &jp);
+  char own[128];
+  double wide;
+  const char *family = family_of(face, bold, own, &jp, &wide);
   o->face = face_for(family, bold, italic, &got_bold, &got_italic);
   if (!o->face) return o;
   o->bold = bold;
@@ -563,6 +615,7 @@ HFONT CreateFontW(int height, int width, int escapement, int orientation, int we
     double avg = os2 && os2->xAvgCharWidth > 0 ? os2->xAvgCharWidth * (double)o->em / o->face->units_per_EM : o->em * 0.5;
     o->sx = width / avg;
   } else if (jp) o->sx = 0.86; // Yu Gothic UI's characters are narrower than Noto Sans CJK's: the texts were fitted to them
+  else o->sx = wide;
   o->ascent = (int)ceil(o->face->size->metrics.ascender / 64.0);
   o->descent = (int)ceil(-o->face->size->metrics.descender / 64.0);
   if (jp) { // and its lines closer, as Yu Gothic UI's (Noto Sans CJK leaves room for every script's accents)
