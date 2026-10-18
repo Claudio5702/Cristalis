@@ -16,6 +16,8 @@ void DlBridgePresent(const void* pixels, uint32_t width, uint32_t height, uint32
 // The size the game should draw at (Picture page, "Internal resolution"), as a multiple of 1280 x 720
 // counted in halves: 2 for 1280 x 720, 3 for 1920 x 1080, 4 for 2560 x 1440, 6 for 3840 x 2160.
 uint32_t DlBridgeHalves();
+// The game's rumble (XInput's motor speeds, left the heavy one), sent on by DarkLauncher.
+void DlBridgeRumble(uint16_t left, uint16_t right);
 // The game's controller buttons now (XINPUT_GAMEPAD bits).
 uint16_t DlBridgeButtons();
 // From the sound mixer: stereo 16-bit frames at 48 kHz. Waits while enough sound is already waiting.

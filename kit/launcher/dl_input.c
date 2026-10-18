@@ -109,8 +109,12 @@ void dl_function(const wchar_t *const *label, const wchar_t *const *help, const 
 
 // ---- reading the controllers
 typedef DWORD(WINAPI *XInputGetStateFn)(DWORD, XINPUT_STATE *);
+typedef DWORD(WINAPI *XInputSetStateFn)(DWORD, XINPUT_VIBRATION *);
 static XInputGetStateFn xinput_get;
-static bool xinput_present, joy_present;
+static XInputSetStateFn xinput_set;
+static bool xinput_present, joy_present, sony_present;
+static bool xi_connected[4];
+static u32 sony_raw;     // the PlayStation pads read directly, as XInput codes
 static u32 pad_raw;      // XInput codes held (bit n: code n), and the left stick:
 #define STICK_UP (1u << 18)
 #define STICK_DOWN (1u << 19)
@@ -131,6 +135,7 @@ void dl_input_used(int kind) {
 // one (DirectInput order: square, cross, circle, triangle), as their numbers otherwise.
 int dl_pad_glyph(bool confirm) {
   if (dl_input_kind == DL_IN_XBOX) return confirm ? GL_XA : GL_XB;
+  if (dl_input_kind == DL_IN_PS_HID) return confirm ? GL_PS_CROSS : GL_PS_CIRCLE; // as XInput's A and B
   int n = dl_joy_code[confirm ? 4 : 5];
   if (n < 0) n = confirm ? 1 : 0;
   if (dl_input_kind == DL_IN_PS && n < 4) return GL_PS_SQUARE + n;
@@ -146,13 +151,14 @@ static void xinput_load(void) {
   for (int k = 0; k < 3 && !xinput_get; k++) {
     HMODULE m = LoadLibraryA(dlls[k]);
     if (m) xinput_get = (XInputGetStateFn)(void *)GetProcAddress(m, "XInputGetState");
+    if (m && xinput_get) xinput_set = (XInputSetStateFn)(void *)GetProcAddress(m, "XInputSetState");
   }
 }
 
 // Every connected XInput pad merged into one, so it does not matter which slot the real one sits in;
 // empty slots are probed again once a second only (probing them on every picture is slow).
 static u32 xinput_poll(void) {
-  static bool connected[4];
+  bool *connected = xi_connected;
   static DWORD last_scan;
   u32 raw = 0;
   xinput_load();
@@ -294,6 +300,34 @@ const wchar_t *dl_key_name(int vk) {
   return o;
 }
 
+// ---- vibration (dl_rumble): what the game wants, sent when it changes, nothing outside the game
+static int rumble_l, rumble_r, sent_l = -1, sent_r = -1;
+
+void dl_rumble(int left, int right) {
+  rumble_l = left < 0 ? 0 : left > 65535 ? 65535 : left;
+  rumble_r = right < 0 ? 0 : right > 65535 ? 65535 : right;
+}
+
+static void rumble_send(int l, int r) {
+  sent_l = l;
+  sent_r = r;
+  XINPUT_VIBRATION v = {(WORD)l, (WORD)r};
+  for (DWORD slot = 0; slot < 4 && xinput_set; slot++)
+    if (xi_connected[slot]) xinput_set(slot, &v);
+  if (sony_present) dl_sony_rumble(l >> 8, r >> 8);
+}
+
+static void rumble_follow(void) {
+  bool on = dl_cfg.rumble && dl_mode == M_GAME && dl_started && GetForegroundWindow() == dl_hwnd;
+  int l = on ? rumble_l : 0, r = on ? rumble_r : 0;
+  if (l != sent_l || r != sent_r) rumble_send(l, r);
+}
+
+void dl_rumble_stop(void) {
+  rumble_l = rumble_r = 0;
+  if (sent_l || sent_r) rumble_send(0, 0);
+}
+
 const wchar_t *dl_pad_name(int *value) {
   static const wchar_t *const names[18] = {NULL, NULL, NULL, NULL, L"Start", L"Back", NULL, NULL, L"LB", L"RB", L"?", L"?",
                                            L"A", L"B", L"X", L"Y", L"LT", L"RT"};
@@ -308,6 +342,12 @@ const wchar_t *dl_pad_name(int *value) {
   }
   if (code >= 0 && code < 4) return TX(T_PAD_UP + code);
   if (code == 6 || code == 7) return TX(T_PAD_LCLICK + code - 6);
+  if (dl_input_kind == DL_IN_PS_HID || (sony_present && !xinput_present)) { // a PlayStation pad's own names
+    static const wchar_t *const ps[18] = {NULL, NULL, NULL, NULL, L"Options", L"Share", NULL, NULL, L"L1", L"R1", L"PS", NULL, NULL, NULL, NULL, NULL, L"L2", L"R2"};
+    if (code >= 12 && code <= 15) return TX(T_PS_CROSS + code - 12);
+    if (code == 11) return TX(T_PS_TOUCH);
+    if (code >= 0 && code < 18 && ps[code]) return ps[code];
+  }
   return code >= 0 && code < 18 ? names[code] : TX(T_NONE);
 }
 
@@ -319,8 +359,14 @@ void dl_pad_poll(void) {
   static DWORD prev_joy, repeat_at;
   static bool held;
   pad_raw = xinput_poll();
-  if (!xinput_present) joy_poll();
+  sony_present = dl_sony_poll(&sony_raw);
+  pad_raw |= sony_raw;
+  if (!xinput_present && !sony_present) joy_poll(); // a PlayStation pad read directly is not read again by WinMM
   else joy_present = false;
+  rumble_follow();
+  static u32 prev_sony;
+  bool from_sony = (sony_raw & ~prev_sony) != 0;
+  prev_sony = sony_raw;
   u32 pressed = pad_raw & ~prev;
   DWORD jpressed = joy_raw & ~prev_joy;
   prev = pad_raw;
@@ -339,7 +385,7 @@ void dl_pad_poll(void) {
   bool joy = dl_joy_mode();
   static u32 prev_dirs;
   u32 dirs = (pad_raw & 0x3C000Fu) | joy_dirs;
-  if (pressed || jpressed || (dirs & ~prev_dirs)) dl_input_used(!joy ? DL_IN_XBOX : joy_ps ? DL_IN_PS : DL_IN_PAD); // the footer shows its buttons
+  if (pressed || jpressed || (dirs & ~prev_dirs)) dl_input_used(from_sony ? DL_IN_PS_HID : !joy ? DL_IN_XBOX : joy_ps ? DL_IN_PS : DL_IN_PAD); // the footer shows its buttons
   prev_dirs = dirs;
 #define FN_PRESSED(k) ((dl_pad_code[k] >= 0 && (pressed & (1u << dl_pad_code[k]))) || (joy && dl_joy_code[k] >= 0 && (jpressed & (1u << dl_joy_code[k]))))
   if (dl_mode == M_GAME) {

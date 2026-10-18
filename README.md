@@ -63,13 +63,13 @@ is not.
 - **The console's own offline behaviour on request**: the "Not connected to Xbox LIVE" notice and
   the choice of the storage device are off by default, and can be turned on.
 - **Screenshots** of the picture as shown, filters included, and a gallery in the settings.
-- **Keys and controller buttons** chosen on the Controls page; any XInput (Xbox-type) controller.
+- **Controllers**: Xbox (XInput), and PlayStation 4 and 5 read directly (USB or Bluetooth), with vibration on both; keys and buttons chosen on the Controls page. A PlayStation 3 pad needs the DsHidMini driver.
 - **An installer and an uninstaller**, in six languages.
 
 ## Settings screen
 
 At start-up DarkLauncher shows its settings screen, with the game running in the preview. **Play**
-starts it; in game, **Esc** (or the controller's View button) opens a pause menu over the paused
+starts it; in game, **Esc** (or the controller's View button, held) opens a pause menu over the paused
 picture: resume, screenshot, settings, quit.
 
 A bar on the left lists the sections; the page of the section under the selection is shown beside
@@ -77,7 +77,7 @@ it. Enter or Right goes into it, Esc comes back.
 
 - **Screenshots**: the screenshots taken, newest first. Enter opens one, Delete twice moves it to the
   Recycle Bin.
-- **Game**: vibration, the "Not connected to Xbox LIVE" notice and the choice of the storage device
+- **Game**: the "Not connected to Xbox LIVE" notice and the choice of the storage device
   (both as on an offline console; from the next start).
 - **Achievements**: the game's twelve achievements, with the date each was earned and what each asks for.
 - **Languages**: the game's language (the game restarts in it) and the menu's.
@@ -85,7 +85,7 @@ it. Enter or Right goes into it, Esc comes back.
   display through the graphics card or in software, filter, scanlines, CRT, HDR, vertical sync,
   frame rate, and "Try it full size".
 - **Sound**: the volume and the sounds of the menu.
-- **Controls**: the keyboard keys and controller buttons of the game, and the shortcuts.
+- **Controls**: the keyboard keys and controller buttons of the game, vibration, and the shortcuts.
 - At the bottom: the game folder, the default settings, quit.
 
 ![The Picture page](docs/screenshots/picture-en.png)
@@ -95,13 +95,13 @@ it. Enter or Right goes into it, Esc comes back.
 Keys follow the **physical position** (the same on AZERTY and QWERTY keyboards); all of them can be
 changed on the Controls page.
 
-| Game (Xbox 360) | Keyboard (QWERTY positions) | Controller |
+| Game (Xbox 360) | Keyboard (QWERTY positions) | Controller (PlayStation) |
 | --- | --- | --- |
 | D-pad | Arrows | D-pad / left stick |
-| A (confirm) / B (back) | X / Z | A / B |
-| X / Y | S / A | X / Y |
-| LB / RB | Q / W | LB / RB |
-| Start / Back | Enter / Right Shift | Start / Back (View); held, View opens the pause menu |
+| A (confirm) / B (back) | X / Z | A / B (cross / circle) |
+| X / Y | S / A | X / Y (square / triangle) |
+| LB / RB | Q / W | LB / RB (L1 / R1) |
+| Start / Back | Enter / Right Shift | Start / Back (Options / Share); held, Back opens the pause menu |
 
 `Esc`: pause menu — `F11` or `Alt+Enter`: full screen — `F12`: screenshot into `captures\` —
 `Tab` (held): fast-forward.
@@ -147,7 +147,7 @@ Proton.
 - No online leaderboards: they needed Xbox LIVE.
 - No save states: the game is a whole Xbox 360 program with its own threads; it saves by itself.
 - Music loops are handled by the runtime rather than by the console's own mechanism.
-- Tested by very few people so far; controllers have been tried less than the keyboard.
+- Tested by very few people so far; controllers have been tried less than the keyboard, and PlayStation pads and vibration not yet on real hardware.
 
 ## For developers
 

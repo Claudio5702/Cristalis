@@ -63,7 +63,8 @@ void (*g_runGuest)();
 
 int g_scaleSetting = 0;        // an index in kSizeHalves: 1280 x 720, 1920 x 1080, 2560 x 1440, 3840 x 2160
 int g_languageSetting = 0;     // 0: Windows, then kGameLanguages
-int g_vibration = 1, g_liveNotice = 0, g_storageChoice = 0;
+int g_liveNotice = 0, g_storageChoice = 0;
+std::atomic<uint32_t> g_motors; // the game's rumble, left << 16 | right, passed on in Frame
 
 // The game's languages: Xbox language ids and their names, each written in itself.
 const struct { uint32_t id; const wchar_t* name; } kGameLanguages[] =
@@ -76,7 +77,7 @@ void ApplySettings()
 {
     Config& config = MutableConfig();
     config.language = g_languageSetting > 0 && g_languageSetting <= kGameLanguageCount ? kGameLanguages[g_languageSetting - 1].id : 0;
-    config.vibration = g_vibration != 0;
+    config.vibration = true; // DarkLauncher's Vibration switch (Controls page) decides
     config.liveWarning = g_liveNotice != 0;
     config.storageDialog = g_storageChoice != 0;
     config.volume = 100;             // DarkLauncher's Sound page sets the volume
@@ -115,16 +116,12 @@ const DlText t_hResolution = { L"ゲームが画像を描く大きさです。�
 
 const DlText t_game = { L"ゲーム", L"Jeu", L"Game", L"Juego", L"Jogo", L"Spiel", L"Opzioni" };
 const DlText t_tabGame = { L"ゲーム", L"JEU", L"GAME", L"JUEGO", L"JOGO", L"SPIEL", L"OPZIONI" };
-const DlText t_hGame = { L"振動と、オフラインの本体と同じ表示に関する設定です。",
-    L"Vibrations, et ce que le jeu affiche comme sur une console hors ligne.",
-    L"Vibration, and what the game shows as on an offline console.",
-    L"Vibración y lo que el juego muestra como en una consola sin conexión.",
-    L"Vibração e o que o jogo mostra como num console offline.",
-    L"Vibration und was das Spiel wie auf einer Konsole ohne Verbindung zeigt.", L"Vibrazione e ciò che il gioco mostra come su una console non connessa." };
-const DlText t_vibration = { L"振動", L"Vibrations", L"Vibration", L"Vibración", L"Vibração", L"Vibration", L"Vibrazione" };
-const DlText t_hVibration = { L"ゲームの指示でコントローラーが振動します。", L"La manette vibre quand le jeu le demande.",
-    L"The controller vibrates when the game asks for it.", L"El mando vibra cuando el juego lo pide.", L"O controle vibra quando o jogo pede.",
-    L"Der Controller vibriert, wenn das Spiel es verlangt.", L"Il controller vibra quando il gioco lo richiede." };
+const DlText t_hGame = { L"オフラインの本体と同じ表示に関する設定です。",
+    L"Ce que le jeu affiche comme sur une console hors ligne.",
+    L"What the game shows as on an offline console.",
+    L"Lo que el juego muestra como en una consola sin conexión.",
+    L"O que o jogo mostra como num console offline.",
+    L"Was das Spiel wie auf einer Konsole ohne Verbindung zeigt.", L"Ciò che il gioco mostra come su una console non connessa." };
 const DlText t_live = { L"Xbox LIVE の通知", L"Avertissement Xbox LIVE", L"Xbox LIVE notice", L"Aviso de Xbox LIVE", L"Aviso da Xbox LIVE", L"Xbox-LIVE-Hinweis", L"Avviso Xbox LIVE" };
 const DlText t_hLive = { L"起動時に「Xbox LIVE に接続されていません」を表示します（オフラインの本体と同じ）。次の起動から有効です。",
     L"Affiche au démarrage « Non connecté à Xbox LIVE », comme une console hors ligne. Au prochain lancement.",
@@ -244,7 +241,6 @@ void SettingsChanged() { ApplySettings(); }
 
 const DlRow kGameRows[] =
 {
-    { DL_SWITCH, t_vibration, t_hVibration, &g_vibration, 1, nullptr, nullptr, SettingsChanged },
     { DL_SWITCH, t_live, t_hLive, &g_liveNotice, 1, nullptr, nullptr, SettingsChanged },
     { DL_SWITCH, t_storage, t_hStorage, &g_storageChoice, 1, nullptr, nullptr, SettingsChanged },
 };
@@ -271,7 +267,6 @@ void Setup()
 
     dl_setting("internal_size", &g_scaleSetting, 0, kSizeCount - 1, false);
     dl_setting("game_language", &g_languageSetting, 0, kGameLanguageCount, true);
-    dl_setting("vibration", &g_vibration, 0, 1, false);
     dl_setting("live_notice", &g_liveNotice, 0, 1, false);
     dl_setting("storage_choice", &g_storageChoice, 0, 1, false);
 }
@@ -356,6 +351,11 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
         }
     }
 
+    // the game's rumble, to Xbox and PlayStation controllers alike (DarkLauncher sends only changes, and
+    // nothing outside the game)
+    uint32_t motors = g_motors;
+    dl_rumble(int(motors >> 16), int(motors & 0xFFFF));
+
     {
         std::lock_guard lock(g_unlockMutex);
         for (uint32_t id : g_unlocks)
@@ -401,6 +401,11 @@ void DlBridgePresent(const void* pixels, uint32_t width, uint32_t height, uint32
 uint32_t DlBridgeHalves()
 {
     return kSizeHalves[std::clamp(g_scaleSetting, 0, kSizeCount - 1)];
+}
+
+void DlBridgeRumble(uint16_t left, uint16_t right)
+{
+    g_motors = uint32_t(left) << 16 | right;
 }
 
 uint16_t DlBridgeButtons()
@@ -449,6 +454,7 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     // pause menu, so a short press stays the game's Back.
     game.pad_layout = DL_PAD_XBOX;
     game.pad_menu = DL_MENU_HOLD;
+    game.rumble = true; // DarkLauncher's Vibration switch, and dl_rumble to every kind of controller
     // --no-theme: DarkLauncher's own look (to compare)
     bool themed = true;
     for (int i = 1; i < argc; i++)

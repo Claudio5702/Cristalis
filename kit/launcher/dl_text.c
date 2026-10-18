@@ -375,6 +375,25 @@ const wchar_t *const dl_texts[T_COUNT][DL_LANGS] = {
                         L"Taste, die kurz gehalten das Pausenmenü öffnet. Entf: wieder auf Keine setzen.",
                         L"Pulsante da tenere premuto un attimo per aprire il menu di pausa. Canc: rimettilo su Nessuno."},
 
+    // vibration, PlayStation controllers
+    [T_RUMBLE] = {L"振動", L"Vibration", L"Vibration", L"Vibración", L"Vibração", L"Vibration", L"Vibrazione"},
+    [T_H_RUMBLE] = {L"ゲームが求めるとコントローラーが振動します（Xbox・PS4・PS5 のコントローラー）。", L"La manette vibre quand le jeu le demande (manettes Xbox, PS4 et PS5).",
+                    L"The controller vibrates when the game asks for it (Xbox, PS4 and PS5 controllers).", L"El mando vibra cuando el juego lo pide (mandos de Xbox, PS4 y PS5).",
+                    L"O controle vibra quando o jogo pede (controles de Xbox, PS4 e PS5).", L"Der Controller vibriert, wenn das Spiel es verlangt (Xbox-, PS4- und PS5-Controller).",
+                    L"Il controller vibra quando il gioco lo richiede (controller Xbox, PS4 e PS5)."},
+    [T_PS_NOTE] = {L"PS4・PS5 のコントローラーは USB でも Bluetooth でもそのまま使えます。PS3 のコントローラーは DsHidMini ドライバーを入れると Xbox コントローラーとして使えます。",
+                   L"Manettes PS4 et PS5 : en USB ou en Bluetooth, elles marchent telles quelles. Manette PS3 : avec le pilote DsHidMini, elle marche comme une manette Xbox.",
+                   L"PS4 and PS5 controllers work as they are, by USB or Bluetooth. A PS3 controller works as an Xbox one with the DsHidMini driver.",
+                   L"Los mandos de PS4 y PS5 funcionan tal cual, por USB o Bluetooth. Un mando de PS3 funciona como uno de Xbox con el controlador DsHidMini.",
+                   L"Controles de PS4 e PS5 funcionam direto, por USB ou Bluetooth. Um controle de PS3 funciona como um de Xbox com o driver DsHidMini.",
+                   L"PS4- und PS5-Controller funktionieren direkt, per USB oder Bluetooth. Ein PS3-Controller funktioniert mit dem Treiber DsHidMini wie ein Xbox-Controller.",
+                   L"I controller PS4 e PS5 funzionano così come sono, via USB o Bluetooth. Un controller PS3 funziona come uno Xbox con il driver DsHidMini."},
+    [T_PS_CROSS] = {L"バツ", L"Croix", L"Cross", L"Equis", L"Xis", L"Kreuz", L"Croce"},
+    [T_PS_CIRCLE] = {L"マル", L"Rond", L"Circle", L"Círculo", L"Círculo", L"Kreis", L"Cerchio"},
+    [T_PS_SQUARE] = {L"シカク", L"Carré", L"Square", L"Cuadrado", L"Quadrado", L"Quadrat", L"Quadrato"},
+    [T_PS_TRIANGLE] = {L"サンカク", L"Triangle", L"Triangle", L"Triángulo", L"Triângulo", L"Dreieck", L"Triangolo"},
+    [T_PS_TOUCH] = {L"タッチパッド", L"Pavé tactile", L"Touchpad", L"Panel táctil", L"Touchpad", L"Touchpad", L"Touchpad"},
+
     // the footer's words beside the controller's buttons
     [T_FT_MOVE] = {L"移動", L"naviguer", L"move", L"mover", L"mover", L"bewegen", L"muovi"},
     [T_FT_OK] = {L"決定", L"valider", L"select", L"aceptar", L"confirmar", L"wählen", L"conferma"},

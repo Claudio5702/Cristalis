@@ -341,6 +341,11 @@ static void* XInputFunction(const char* name)
 
 void RendererRumble(uint16_t left, uint16_t right)
 {
+#ifdef CD_DARKLAUNCHER
+    // DarkLauncher drives every kind of controller, and has the Vibration switch.
+    DlBridgeRumble(left, right);
+    return;
+#endif
     struct XInputVibration
     {
         WORD left, right;

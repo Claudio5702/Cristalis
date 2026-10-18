@@ -6,7 +6,7 @@
 #include <mmsystem.h>
 #include <dwmapi.h>
 
-DlCfg dl_cfg = {.ui_lang = 2, .volume = 10, .menu_sound = 1, .gpu = 1, .turbo = 0, .pause_menu = 1, .bg_pause = 1};
+DlCfg dl_cfg = {.ui_lang = 2, .volume = 10, .menu_sound = 1, .gpu = 1, .turbo = 0, .pause_menu = 1, .bg_pause = 1, .rumble = 1};
 HWND dl_hwnd;
 char dl_base_dir[MAX_PATH];
 const DlGame *dl_game;
@@ -602,6 +602,7 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     case WM_CLOSE: dl_running = false; return 0;
     case WM_DESTROY: PostQuitMessage(0); return 0;
     case WM_SIZE: dl_dirty = true; break;
+    case WM_DEVICECHANGE: dl_sony_rescan(); break; // a controller may have come
     case WM_PAINT: {
       PAINTSTRUCT ps;
       HDC dc = BeginPaint(h, &ps);
@@ -712,6 +713,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   add_setting("turbo", &dl_cfg.turbo, 0, 4, 2);
   add_setting("pause_menu", &dl_cfg.pause_menu, 0, 1, 2);
   add_setting("bg_pause", &dl_cfg.bg_pause, 0, 1, 2);
+  if (game->rumble) add_setting("rumble", &dl_cfg.rumble, 0, 1, 2);
   add_setting("state_slot", &dl_slot, 0, DL_SLOTS - 1, 0);
   add_setting("a11y_contrast", &dl_cfg.contrast, 0, 1, 0); // kept by "Defaults": a player who needs them keeps them
   add_setting("a11y_cvd", &dl_cfg.cvd, 0, 3, 0);
@@ -892,6 +894,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     RECT wr;
     if (GetWindowRect(dl_hwnd, &wr)) { dl_cfg.win_x = wr.left; dl_cfg.win_y = wr.top; dl_cfg.win_w = wr.right - wr.left; dl_cfg.win_h = wr.bottom - wr.top; }
   }
+  dl_rumble_stop();
   dl_session_keep();
   if (game->quit) game->quit();
   settings_save();

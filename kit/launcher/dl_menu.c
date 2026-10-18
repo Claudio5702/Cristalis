@@ -129,9 +129,16 @@ static const DlRow sound_rows[] = {
     {DL_BAR, dl_texts[T_VOL], dl_texts[T_H_VOL], &dl_cfg.volume, 10},
     {DL_SWITCH, dl_texts[T_MENUSND], dl_texts[T_H_MENUSND], &dl_cfg.menu_sound, 1},
 };
+static const wchar_t *ps_more(void) { // PlayStation pads, under the help of "Controller buttons"
+  static wchar_t out[400];
+  _snwprintf(out, 399, L"\n\n%ls", TX(T_PS_NOTE));
+  out[399] = 0;
+  return out;
+}
+static const DlRow rumble_row = {DL_SWITCH, dl_texts[T_RUMBLE], dl_texts[T_H_RUMBLE], &dl_cfg.rumble, 1};
 static const DlRow ctrl_rows[] = {
     {.kind = DL_PAGE, .label = dl_texts[T_KEYS], .help = dl_texts[T_H_KEYS], .page = PG_KEYS},
-    {.kind = DL_PAGE, .label = dl_texts[T_PAD], .help = dl_texts[T_H_PAD], .page = PG_PAD},
+    {.kind = DL_PAGE, .label = dl_texts[T_PAD], .help = dl_texts[T_H_PAD], .page = PG_PAD, .more = ps_more},
     {.kind = DL_PAGE, .label = dl_texts[T_HOT], .help = dl_texts[T_H_HOT], .page = PG_HOT},
     {.kind = DL_CHOICE, .label = dl_texts[T_TURBO], .help = dl_texts[T_H_TURBO], .value = &dl_cfg.turbo, .max = 4, .show = show_turbo, .run = turbo_changed},
     {.kind = DL_SWITCH, .label = dl_texts[T_PAUSEMENU], .help = dl_texts[T_H_PAUSEMENU], .value = &dl_cfg.pause_menu, .max = 1},
@@ -169,6 +176,7 @@ void dl_menu_init(void) {
   dl_page(dl_texts[T_TAB_IMAGE], image_rows, sizeof image_rows / sizeof image_rows[0]);
   dl_page(dl_texts[T_TAB_SOUND], sound_rows, sizeof sound_rows / sizeof sound_rows[0]);
   dl_page(dl_texts[T_TAB_CTRL], ctrl_rows, sizeof ctrl_rows / sizeof ctrl_rows[0]);
+  if (dl_game->rumble) dl_page_insert(PG_CTRL, 3, &rumble_row); // after the three pages of assignments
   dl_page(dl_texts[T_TAB_KEYS], keys_rows, sizeof keys_rows / sizeof keys_rows[0]);
   dl_page(dl_texts[T_TAB_PAD], pad_rows, sizeof pad_rows / sizeof pad_rows[0]);
   DlPage *pf = &dl_pages[dl_page(dl_texts[T_TAB_PADFN], padfn_rows, 1)];
@@ -831,8 +839,8 @@ int dl_audit(void) {
         dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
       }
     }
-    static const char *const kinds[] = {"", "xbox", "ps", "pad"};
-    for (int kind = DL_IN_XBOX; kind <= DL_IN_PAD; kind++) { // the footer with each kind of controller
+    static const char *const kinds[] = {"", "xbox", "ps", "pad", "ps_direct"};
+    for (int kind = DL_IN_XBOX; kind <= DL_IN_PS_HID; kind++) { // the footer with each kind of controller
       dl_input_kind = kind;
       dl_side = 0;
       dl_draw_menu(wdc);

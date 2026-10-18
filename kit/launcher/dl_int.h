@@ -17,6 +17,7 @@ typedef struct {
   int gpu, crt, hdr, vsync; // graphics card (0: GDI), CRT filter (0 off, 1 flat, 2 curved), HDR white (0 off, 1-4), vertical sync
   int turbo, pause_menu, bg_pause; // fast forward (0 max, 2 2x, 4 4x), Esc opens the pause menu, pause behind another window
   int win_x, win_y, win_w, win_h;
+  int rumble;                         // the controller vibrates when the game asks (dl_rumble)
   int contrast, cvd, still, big_help; // accessibility: high contrast, colour-blind filter (0 off, 1 protan, 2 deutan, 3 tritan), still sky, large help text
 } DlCfg;
 extern DlCfg dl_cfg;
@@ -71,12 +72,18 @@ void dl_pads_default(void);
 void dl_hot_default(void);
 bool dl_joy_mode(void);
 // What the player used last in the menus: the footer shows its buttons.
-enum { DL_IN_KEYS, DL_IN_XBOX, DL_IN_PS, DL_IN_PAD };
+enum { DL_IN_KEYS, DL_IN_XBOX, DL_IN_PS, DL_IN_PAD, DL_IN_PS_HID }; // DL_IN_PS: by WinMM, DL_IN_PS_HID: read directly (dl_sony.c)
 extern int dl_input_kind;
 void dl_input_used(int kind);
 // Pictures of controller buttons (ui_pad_glyph): GL_NUM + n is button n + 1 of another controller.
 enum { GL_DPAD, GL_XA, GL_XB, GL_XX, GL_XY, GL_PS_SQUARE, GL_PS_CROSS, GL_PS_CIRCLE, GL_PS_TRIANGLE, GL_NUM };
 int dl_pad_glyph(bool confirm); // the button that chooses (true) or goes back in the menus, for dl_input_kind
+void dl_rumble_stop(void);      // at closing time
+// PlayStation pads read directly (dl_sony.c): their buttons as XInput codes, their rumble (0-255), and
+// looking for them again (Windows says devices came or went).
+bool dl_sony_poll(u32 *raw);
+void dl_sony_rumble(int left, int right);
+void dl_sony_rescan(void);
 u32 dl_game_buttons(void);         // DL_* bits held now
 void dl_input_release(void);       // the game gets no button until every one has been released
 bool dl_turbo_held(void);
@@ -213,6 +220,7 @@ enum {
   T_SOUND, T_TAB_SOUND, T_H_SOUND, T_VOL, T_H_VOL, T_MENUSND, T_H_MENUSND,
   T_FOLDER, T_H_FOLDER, T_DEFAULTS, T_H_DEFAULTS, T_RESET, T_H_RESET, T_QUIT, T_H_QUIT,
   T_FT_MOVE, T_FT_OK, T_FT_BACK, T_PH_DEFAULTS_GAME, T_PH_MENU_HOLD,
+  T_RUMBLE, T_H_RUMBLE, T_PS_NOTE, T_PS_CROSS, T_PS_CIRCLE, T_PS_SQUARE, T_PS_TRIANGLE, T_PS_TOUCH,
   T_A11Y, T_TAB_A11Y, T_H_A11Y, T_CONTRAST, T_H_CONTRAST, T_CVD, T_H_CVD, T_CVD_PROTAN, T_CVD_DEUTAN, T_CVD_TRITAN, T_STILL, T_H_STILL,
   T_BIG_HELP, T_H_BIG_HELP,
   T_PK_ON, T_PK_OFF, T_PK_FOLDER, T_H_PK_FOLDER, T_PK_RESTART, T_H_PK_RESTART, T_H_PK, T_PK_DIR, T_PK_FILE,

@@ -32,7 +32,7 @@ its own:
 - DarkLauncher's buttons become the game's XInput buttons, laid out as on an Xbox controller
   (`DL_PAD_XBOX`); View held opens the pause menu, a short press stays the game's Back (`DL_MENU_HOLD`);
 - the game's own pages: its language (the program starts again with `dl_relaunch`), the internal
-  resolution, vibration and the console's offline notices, the achievements as a list;
+  resolution and the console's offline notices; the achievements go to DarkLauncher's page (`dl_achievements`, `dl_unlock`) and the game's rumble to `dl_rumble`, which drives Xbox and PlayStation pads;
 - the theme (`DlTheme`) follows the game's art direction and is drawn by DarkLauncher: nothing is
   read from the game's files for it;
 - under DarkLauncher, the runtime's own window, start screen (`launcher.cpp`) and settings file are

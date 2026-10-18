@@ -158,6 +158,7 @@ typedef struct DlGame {
   const DlTheme *theme; // the setup screen's look from the game (may be NULL)
   int pad_layout;       // DL_PAD_*: the controller's first assignment (0: Super Nintendo places)
   int pad_menu;         // DL_MENU_*: what opens the pause menu on a controller (0: View)
+  bool rumble;          // the game makes the controller vibrate (dl_rumble): a Vibration switch on the Controls page
 
   // The languages of the game's own texts (its DlTexts, and the tables it reads with dl_lang()): bits
   // 1 << DL_LANG_*, or DL_LANGS_ALL. 0: the first six (jp to de), the languages before Italian. The
@@ -254,6 +255,11 @@ typedef struct DlPacks {
 int dl_packs(const DlPacks *p);
 int dl_pack_count(void);         // the packs turned on, the one that comes first first
 const char *dl_pack_path(int k); // full path of pack k (a folder or a file), in the Windows code page
+
+// The controller's vibration the game wants now: left the heavy motor, right the light one, 0-65535 (as
+// XInput's). Sent to the Xbox pads and the PlayStation ones; nothing while the menus are shown, the window
+// is behind another or the player has turned Vibration off. Call it again with 0, 0 to stop.
+void dl_rumble(int left, int right);
 
 int dl_lang(void);                              // language of the setup screen (DL_LANG_*), one of DlGame.langs
 const wchar_t *dl_tr(const wchar_t *const *t); // a DlText in that language
