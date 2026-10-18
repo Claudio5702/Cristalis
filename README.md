@@ -79,7 +79,7 @@ it. Enter or Right goes into it, Esc comes back.
   Recycle Bin.
 - **Game**: vibration, the "Not connected to Xbox LIVE" notice and the choice of the storage device
   (both as on an offline console; from the next start).
-- **Achievements**: the game's twelve achievements, earned or not, with what each asks for.
+- **Achievements**: the game's twelve achievements, with the date each was earned and what each asks for.
 - **Languages**: the game's language (the game restarts in it) and the menu's.
 - **Picture**: the internal resolution (1280×720 or 2560×1440), full screen, integer scaling,
   display through the graphics card or in software, filter, scanlines, CRT, HDR, vertical sync,
@@ -113,7 +113,8 @@ Everything stays in the program's folder:
 | | |
 | --- | --- |
 | `game\` | the game's data, taken out of your copy on the first start |
-| `userdata\` | the game's saves and the achievements earned |
+| `userdata\` | the game's saves and its record of the achievements earned |
+| `saves\` | DarkLauncher's list of the achievements, with their dates |
 | `captures\` | screenshots |
 | `crystal_defenders.ini` | settings |
 | `crystal_defenders.log` | log of the last session (`.prev.log`: the one before) |

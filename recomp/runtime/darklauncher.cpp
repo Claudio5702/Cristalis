@@ -21,6 +21,7 @@ extern "C"
 #include <windows.h>
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <condition_variable>
 #include <cstring>
@@ -50,8 +51,8 @@ std::mutex g_soundMutex;
 std::deque<int16_t> g_sound;       // interleaved stereo frames waiting to be played
 constexpr size_t kSoundReserve = 3072; // frames (64 ms): the mixer waits beyond this
 
-std::mutex g_noteMutex;
-std::vector<std::wstring> g_notes;
+std::mutex g_unlockMutex;
+std::vector<uint32_t> g_unlocks; // achievements to pass on to DarkLauncher
 
 void (*g_runGuest)();
 
@@ -136,13 +137,6 @@ const DlText t_hStorage = { L"本体と同じように保存先を尋ねます�
     L"O jogo pergunta onde salvar, como no console; senão usa a pasta userdata. A partir do próximo início.",
     L"Das Spiel fragt wie auf der Konsole nach dem Speicherort, sonst nutzt es den Ordner userdata. Ab dem nächsten Start.", L"Il gioco chiede dove salvare, come sulla console; altrimenti usa la cartella userdata. Dal prossimo avvio." };
 
-const DlText t_achievements = { L"実績", L"Succès", L"Achievements", L"Logros", L"Conquistas", L"Erfolge", L"Obiettivi" };
-const DlText t_tabAchievements = { L"実績", L"SUCCÈS", L"ACHIEVEMENTS", L"LOGROS", L"CONQUISTAS", L"ERFOLGE", L"OBIETTIVI" };
-const DlText t_hAchievements = { L"ゲームで獲得した実績です（このパソコンに保存）。", L"Les succès gagnés dans le jeu, enregistrés sur cet ordinateur.",
-    L"Achievements earned in the game, stored on this computer.", L"Logros obtenidos en el juego, guardados en este ordenador.",
-    L"Conquistas obtidas no jogo, salvas neste computador.", L"Im Spiel errungene Erfolge, auf diesem Computer gespeichert.", L"Obiettivi ottenuti nel gioco, salvati su questo computer." };
-const DlText t_noAchievements = { L"実績はありません。", L"Aucun succès.", L"No achievements.", L"No hay logros.", L"Nenhuma conquista.", L"Keine Erfolge.", L"Nessun obiettivo." };
-const DlText t_earned = { L"獲得", L"gagné", L"earned", L"obtenido", L"obtida", L"errungen", L"ottenuto" };
 
 // ---- The game's language: a page of actions, one per language ----
 
@@ -187,31 +181,46 @@ const DlRow kLanguageRows[] =
     { DL_ACTION, t_lang[5], t_hLanguageRow, nullptr, 0, nullptr, MarkN<6>, ChooseLanguageN<6> },
 };
 
-// ---- Achievements: a list page ----
+// ---- Achievements: DarkLauncher's page, with the game's own names ----
 
-std::vector<AchievementEntry> g_achievementList;
-
-void AchievementsOpen() { g_achievementList = AchievementsList(); }
-int AchievementsCount() { return int(g_achievementList.size()); }
-void AchievementsRow(int k, wchar_t* label, wchar_t* value)
+// "ach<id>": an achievement's name in DarkLauncher's file of them.
+std::string AchievementKey(uint32_t id)
 {
-    const AchievementEntry& entry = g_achievementList[size_t(k)];
-    lstrcpynW(label, entry.name.c_str(), 64);
-    std::wstring text = (entry.unlocked ? L"✓ " : L"") + std::to_wstring(entry.score) + L" G";
-    lstrcpynW(value, text.c_str(), 64);
-}
-const wchar_t* AchievementsHelp(int k)
-{
-    static std::wstring help;
-    const AchievementEntry& entry = g_achievementList[size_t(k)];
-    help = entry.text;
-    if (entry.unlocked)
-        help = std::wstring(dl_tr(t_earned)) + L" – " + help;
-    return help.c_str();
+    return "ach" + std::to_string(id);
 }
 
-const DlList kAchievementList = { AchievementsOpen, AchievementsCount, AchievementsRow, AchievementsHelp, nullptr, nullptr, nullptr,
-    t_noAchievements, nullptr };
+// The game's twelve achievements, their names and how to earn them read from the player's copy of the
+// game in each of its languages (Portuguese, which it does not have, in English), the points after it.
+void DeclareAchievements()
+{
+    // DarkLauncher's languages (jp fr en es br de it) as the game's Xbox language ids
+    static const uint32_t ids[DL_LANGS] = { 2, 4, 1, 5, 1, 3, 6 };
+    static std::deque<std::wstring> texts; // they stay where they are while the program runs
+    static std::vector<std::array<const wchar_t*, DL_LANGS>> names, descriptions;
+    static std::vector<std::string> keys;
+    static std::vector<DlAchievement> list;
+    std::vector<AchievementEntry> byLanguage[DL_LANGS];
+    for (int l = 0; l < DL_LANGS; l++)
+        byLanguage[l] = AchievementsIn(ids[l]);
+    size_t count = byLanguage[0].size();
+    names.resize(count);
+    descriptions.resize(count);
+    keys.resize(count);
+    list.resize(count);
+    for (size_t k = 0; k < count; k++)
+    {
+        for (int l = 0; l < DL_LANGS; l++)
+        {
+            const AchievementEntry& entry = k < byLanguage[l].size() ? byLanguage[l][k] : byLanguage[0][k];
+            names[k][size_t(l)] = texts.emplace_back(entry.name).c_str();
+            descriptions[k][size_t(l)] = texts.emplace_back(entry.howTo + L" (" + std::to_wstring(entry.score) + L" G)").c_str();
+        }
+        keys[k] = AchievementKey(byLanguage[0][k].id);
+        list[k] = { keys[k].c_str(), names[k].data(), descriptions[k].data() };
+    }
+    if (count != 0)
+        dl_achievements(list.data(), int(count));
+}
 
 // ---- Picture page: the internal resolution ----
 
@@ -255,7 +264,7 @@ void Setup()
 
     int game = dl_page(t_tabGame, kGameRows, int(sizeof(kGameRows) / sizeof(kGameRows[0])));
     dl_section(game, 0xE7FC, t_game, t_hGame);
-    dl_section(dl_list_page(t_tabAchievements, &kAchievementList), 0xE734, t_achievements, t_hAchievements);
+    DeclareAchievements();
 
     dl_setting("internal_scale", &g_scaleSetting, 0, int(kMaxScale) - 1, false);
     dl_setting("game_language", &g_languageSetting, 0, kGameLanguageCount, true);
@@ -300,6 +309,13 @@ DWORD WINAPI GuestThread(void*)
 bool Start()
 {
     ApplySettings();
+    // Achievements earned before, as the runtime records them: DarkLauncher learns them (it says
+    // nothing for those it already knows).
+    for (const AchievementEntry& entry : AchievementsList())
+    {
+        if (entry.unlocked)
+            DlBridgeUnlock(entry.id);
+    }
     // The same stack as the game's other threads (see ExCreateThread).
     HANDLE thread = CreateThread(nullptr, 4 * 1024 * 1024, GuestThread, nullptr, 0, nullptr);
     if (thread == nullptr)
@@ -341,10 +357,10 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
     }
 
     {
-        std::lock_guard lock(g_noteMutex);
-        for (auto& note : g_notes)
-            dl_note(note.c_str());
-        g_notes.clear();
+        std::lock_guard lock(g_unlockMutex);
+        for (uint32_t id : g_unlocks)
+            dl_unlock(AchievementKey(id).c_str()); // nothing for one already unlocked
+        g_unlocks.clear();
     }
 
     // The sound of one picture (800 frames at 60 per second); a little more when too much waits.
@@ -408,10 +424,10 @@ void DlBridgeAudio(const int16_t* samples, uint32_t frames)
     }
 }
 
-void DlBridgeNote(const wchar_t* text)
+void DlBridgeUnlock(uint32_t id)
 {
-    std::lock_guard lock(g_noteMutex);
-    g_notes.push_back(text);
+    std::lock_guard lock(g_unlockMutex);
+    g_unlocks.push_back(id);
 }
 
 int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())

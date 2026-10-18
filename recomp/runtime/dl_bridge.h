@@ -19,5 +19,5 @@ uint32_t DlBridgeScale();
 uint16_t DlBridgeButtons();
 // From the sound mixer: stereo 16-bit frames at 48 kHz. Waits while enough sound is already waiting.
 void DlBridgeAudio(const int16_t* samples, uint32_t frames);
-// A few words over the game (an achievement), shown on DarkLauncher's thread.
-void DlBridgeNote(const wchar_t* text);
+// An achievement the game has just unlocked (its id in the game), passed on to DarkLauncher's thread.
+void DlBridgeUnlock(uint32_t id);

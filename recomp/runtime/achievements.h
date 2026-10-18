@@ -16,7 +16,11 @@ struct AchievementEntry
     std::wstring text; // what it was earned for, or how to earn it
     uint32_t score;
     bool unlocked;
+    uint32_t id;
+    std::wstring howTo; // how to earn it, whether earned or not
 };
 std::vector<AchievementEntry> AchievementsList();
+// The same with the texts of one of the game's languages (an Xbox language id).
+std::vector<AchievementEntry> AchievementsIn(uint32_t language);
 // For the log, which is UTF-8.
 std::string Utf8(const std::wstring& wide);

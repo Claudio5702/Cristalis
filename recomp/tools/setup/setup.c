@@ -456,16 +456,18 @@ static int uninstall(const char *self, const char *dir, bool all) {
                                         "LISEZMOI.txt", "README.txt", "crystal_defenders.log", "crystal_defenders.prev.log", "Jouer.bat",
                                         "gpu_shaders.bin"}; // DarkLauncher's compiled shaders
   for (size_t k = 0; k < sizeof program / sizeof program[0]; k++) removed += delete_file(d, program[k]);
-  static const char *const data[] = {"game", "userdata", "captures"}; // the game's data, the saves and achievements, screenshots
+  // the game's data, its saves and achievements, screenshots, DarkLauncher's list of the achievements
+  static const char *const data[] = {"game", "userdata", "captures", "saves"};
+  const int data_count = (int)(sizeof data / sizeof data[0]);
   if (all) {
     removed += delete_file(d, "crystal_defenders.ini");
-    for (int k = 0; k < 3; k++) {
+    for (int k = 0; k < data_count; k++) {
       snprintf(path, sizeof path, "%s\\%s", d, data[k]);
       removed += delete_tree(path);
     }
   }
   // folders left empty go too (RemoveDirectory never removes a folder that still holds something)
-  for (int k = 0; k < 3; k++) {
+  for (int k = 0; k < data_count; k++) {
     snprintf(path, sizeof path, "%s\\%s", d, data[k]);
     RemoveDirectoryA(path);
   }

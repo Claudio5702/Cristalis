@@ -225,12 +225,6 @@ static LRESULT CALLBACK ToastProc(HWND window, UINT message, WPARAM wParam, LPAR
 // the keyboard focus away from the game.
 static void ShowToast(std::wstring title, std::wstring body)
 {
-#ifdef CD_DARKLAUNCHER
-    for (wchar_t& c : body)
-        c = c == L'\n' ? L' ' : c;
-    DlBridgeNote((title + L" : " + body).c_str());
-    return;
-#endif
     std::thread([title = std::move(title), body = std::move(body)]
     {
         static std::mutex oneAtATime;
@@ -311,6 +305,15 @@ void AchievementsUnlock(const std::vector<uint32_t>& ids)
             return;
         SaveUnlocked();
     }
+#ifdef CD_DARKLAUNCHER
+    // DarkLauncher announces it over the game and lists it (see darklauncher.cpp).
+    for (uint32_t id : fresh)
+    {
+        Log("Achievements: unlocked %u", id);
+        DlBridgeUnlock(id);
+    }
+    return;
+#endif
 
     std::wstring body;
     for (uint32_t id : fresh)
@@ -360,6 +363,11 @@ std::wstring AchievementsSummary(std::wstring& title)
 
 std::vector<AchievementEntry> AchievementsList()
 {
+    return AchievementsIn(GuestLanguage());
+}
+
+std::vector<AchievementEntry> AchievementsIn(uint32_t language)
+{
     std::set<uint32_t> unlocked;
     {
         std::lock_guard lock(g_mutex);
@@ -367,10 +375,11 @@ std::vector<AchievementEntry> AchievementsList()
         unlocked = g_unlocked;
     }
     std::vector<AchievementEntry> entries;
-    for (auto& achievement : ReadAchievements(GuestLanguage()))
+    for (auto& achievement : ReadAchievements(language))
     {
         bool done = unlocked.count(achievement.id) != 0;
-        entries.push_back({ achievement.name, done ? achievement.description : achievement.howTo, achievement.score, done });
+        entries.push_back({ achievement.name, done ? achievement.description : achievement.howTo, achievement.score, done, achievement.id,
+            achievement.howTo });
     }
     return entries;
 }
