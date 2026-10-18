@@ -1,0 +1,44 @@
+Import variable xboxkrnl.exe!__imp__ExLoadedCommandLine (ordinal 0x1AE) at 820004F4 -> 40002000
+Import variable xboxkrnl.exe!__imp__XexExecutableModuleHandle (ordinal 0x193) at 820004FC -> 40003000
+Import variable xboxkrnl.exe!__imp__ExThreadObjectType (ordinal 0x1B) at 82000538 -> 40004000
+Import variable xboxkrnl.exe!__imp__VdHSIOCalibrationLock (ordinal 0x1C1) at 82000560 -> 40005000
+Import variable xboxkrnl.exe!__imp__VdGpuClockInMHz (ordinal 0x1C0) at 82000588 -> 40006000
+Import variable xboxkrnl.exe!__imp__KeDebugMonitorData (ordinal 0x59) at 820005D0 -> 40007000
+Import variable xboxkrnl.exe!__imp__XboxKrnlVersion (ordinal 0x158) at 820005DC -> 40008000
+Import variable xboxkrnl.exe!__imp__VdGlobalXamDevice (ordinal 0x1BF) at 82000618 -> 40009000
+Import variable xboxkrnl.exe!__imp__VdGlobalDevice (ordinal 0x1BE) at 8200061C -> 4000A000
+Import variable xboxkrnl.exe!__imp__KeCertMonitorData (ordinal 0x266) at 82000624 -> 4000B000
+Import variable xboxkrnl.exe!__imp__KeTimeStampBundle (ordinal 0xAD) at 82000664 -> 4000C000
+Resolved 156 import function slots
+Loaded W:\Crystal Defenders\extracted\default.xex: 10110 functions, entry point 821170C8, 156/156 imports implemented
+Config: fullscreen 0, sharp 1, volume 100, language 0, vibration 1, 14 key binding(s)
+GPU: ring buffer at A0007000, 8192 words
+ExCreateThread: start=8210FF58 context=4002475C stack=0x10000 suspended=0 -> handle F8000004, thread id 104
+ExCreateThread: start=8210FF58 context=400247AC stack=0x10000 suspended=0 -> handle F8000008, thread id 108
+File open: 'game:\Media\all_loading.bin.gz'
+ExCreateThread: start=820ED3D8 context=4002E660 stack=0x4000 suspended=1 -> handle F8000010, thread id 10C
+File open: 'game:\Media\all_font.bin.gz'
+File open: 'game:\Media\text.bin.gz.sdat'
+File open: 'game:\Media\sound.bin'
+Renderer: off screen for DarkLauncher, drawing at 1280x720
+Audio: render driver registered (callback 8222B3C0)
+ExCreateThread: start=822282D8 context=4004D1B0 stack=0x10000 suspended=1 -> handle F8000024, thread id 114
+ExCreateThread: start=821EF1D0 context=40093D90 stack=0x10000 suspended=0 -> handle F8000030, thread id 11C
+File open: 'game:\Media\Xbox360_saveicon.png'
+File open: 'game:\Media\all_common.bin.gz'
+Renderer: Direct3D 11 device and 1280x720 window ready
+GPU: new vertex shader 8BB7E189D92E3DEF, 24 words (1 vertex, 0 pixel so far)
+GPU: new pixel shader 438C2AF84C78A133, 9 words (1 vertex, 1 pixel so far)
+GPU: draws with vertex shader 8BB7E189D92E3DEF are skipped (not implemented)
+GPU: new vertex shader 539EA9E08AA83F0C, 27 words (2 vertex, 1 pixel so far)
+GPU: new pixel shader AFDFF469057FBBF6, 15 words (2 vertex, 2 pixel so far)
+GPU: new vertex shader 3EA824CF4FAA004A, 33 words (3 vertex, 2 pixel so far)
+GPU: new pixel shader 03119CFD11BEB173, 9 words (3 vertex, 3 pixel so far)
+GPU: new vertex shader 5BDC8A4DFF835989, 27 words (4 vertex, 3 pixel so far)
+GPU: new vertex shader A4AE7C2B7C1818C4, 15 words (5 vertex, 3 pixel so far)
+File open: 'game:\Media\all_monster.bin.gz'
+File open: 'game:\Media\all_player.bin.gz'
+File open: 'game:\Media\all_texture.bin.gz'
+XMsgStartIORequest: message 000B0006
+File open: 'game:\Media\all_makerlogo.bin.gz'
+File open: 'game:\Media\all_titlelogo.bin.gz'

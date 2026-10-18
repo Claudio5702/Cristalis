@@ -1,5 +1,5 @@
-DarkLauncher 1.14 (commit 90d0a92), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h 80B95C006E35427B
+DarkLauncher 1.16 (commit f0aac09), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h D6389D4AD5B44311
 file dl_achieve.c BE8376E324B02072
 file dl_app.c C27830C428267A97
 file dl_draw.c 5D10309DEC48C32D
@@ -15,7 +15,7 @@ file linux/dl_gdi.c 51ED378B11D7CDF3
 file linux/dl_gl.c 8982B7E0286161F3
 file linux/dl_icons.c E4F2AC1F462F8241
 file linux/dl_pads.c 8E993CA41AF3586A
-file linux/dl_win32.c 501BA7CCEDCEB4EB
+file linux/dl_win32.c 7A503852B256915E
 file linux/include/d3d11.h 2F5DDD6DA7026E0C
 file linux/include/dwmapi.h 2F5DDD6DA7026E0C
 file linux/include/dxgi1_6.h 2F5DDD6DA7026E0C
@@ -24,4 +24,4 @@ file linux/include/setupapi.h 2F5DDD6DA7026E0C
 file linux/include/shellapi.h 2F5DDD6DA7026E0C
 file linux/include/windows.h 2F5DDD6DA7026E0C
 file linux/include/xinput.h 2F5DDD6DA7026E0C
-file linux/win32.h B7992D80997FEAFD
+file linux/win32.h B2A53596AA1A247B

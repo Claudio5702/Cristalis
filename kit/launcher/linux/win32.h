@@ -185,7 +185,7 @@ UINT timeEndPeriod(UINT ms);
 HANDLE CreateWaitableTimerExW(void *attributes, LPCWSTR name, DWORD flags, DWORD access);
 BOOL SetWaitableTimer(HANDLE h, const LARGE_INTEGER *due, LONG period, void *routine, void *arg, BOOL resume);
 DWORD MsgWaitForMultipleObjects(DWORD n, const HANDLE *handles, BOOL all, DWORD ms, DWORD wake);
-HANDLE CreateEventW(void *attributes, BOOL manual, BOOL initial, LPCWSTR name); // none on Linux: NULL
+HANDLE CreateEventW(void *attributes, BOOL manual, BOOL initial, LPCWSTR name); // auto-reset, for the sound
 DWORD GetCurrentProcessId(void);
 #define PROCESS_QUERY_LIMITED_INFORMATION 0x1000
 #define STILL_ACTIVE 259

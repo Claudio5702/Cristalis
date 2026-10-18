@@ -166,10 +166,11 @@ WORD GetUserDefaultUILanguage(void) {
 }
 
 // ---- handles: a folder being read, a process
-enum { H_FIND = 1, H_PROC, H_TIMER };
+enum { H_FIND = 1, H_PROC, H_TIMER, H_EVENT };
 typedef struct {
   int kind;
   Uint64 due; // a timer: when it is due, in SDL's nanoseconds
+  bool set;   // an event: set (by the sound, when a buffer has been played), until a wait takes it
   DIR *dir;
   char path[MAX_PATH], pattern[MAX_PATH];
   pid_t pid;
@@ -264,14 +265,46 @@ DWORD GetFileType(HANDLE h) { (void)h; return FILE_TYPE_CHAR; } // the terminal'
 BOOL AttachConsole(DWORD pid) { (void)pid; return FALSE; }
 void SetProcessDPIAware(void) {}
 
-// ---- libraries: XInput (dl_pads.c) and GDI+'s picture reading (PNG and BMP through SDL)
+// ---- libraries: XInput (dl_pads.c) and GDI+'s picture reading (PNG and BMP through SDL, JPG and GIF
+// through stb_image, a header given at build time: without it, JPG and GIF are not read)
+#if __has_include(<stb/stb_image.h>)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-function"
+#pragma GCC diagnostic ignored "-Wsign-compare"
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_JPEG
+#define STBI_ONLY_GIF
+#define STBI_NO_HDR
+#define STBI_NO_LINEAR
+#include <stb/stb_image.h>
+#pragma GCC diagnostic pop
+#define DL_STB 1
+#endif
+
 static int WINAPI gp_startup(ULONG_PTR *token, const void *in, void *out) { (void)in, (void)out; *token = 1; return 0; }
+
+// A JPG or the first picture of a GIF, as an SDL surface.
+static SDL_Surface *load_stb(const char *path) {
+#ifdef DL_STB
+  int w, h, n;
+  unsigned char *px = stbi_load(path, &w, &h, &n, 4);
+  if (!px) return NULL;
+  SDL_Surface *s = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_RGBA32, px, w * 4), *out = s ? SDL_DuplicateSurface(s) : NULL;
+  SDL_DestroySurface(s);
+  stbi_image_free(px);
+  return out;
+#else
+  (void)path;
+  return NULL;
+#endif
+}
 
 static int WINAPI gp_from_file(const wchar_t *path, void **img) {
   char p[MAX_PATH * 3];
   wide_to_utf8(path, -1, p, sizeof p);
   const char *dot = strrchr(p, '.');
-  SDL_Surface *s = !dot ? NULL : !strcasecmp(dot, ".png") ? SDL_LoadPNG(p) : !strcasecmp(dot, ".bmp") ? SDL_LoadBMP(p) : NULL;
+  SDL_Surface *s = !dot ? NULL : !strcasecmp(dot, ".png") ? SDL_LoadPNG(p) : !strcasecmp(dot, ".bmp") ? SDL_LoadBMP(p)
+                 : !strcasecmp(dot, ".jpg") || !strcasecmp(dot, ".jpeg") || !strcasecmp(dot, ".gif") ? load_stb(p) : NULL;
   if (!s) return 2;
   *img = SDL_ConvertSurface(s, SDL_PIXELFORMAT_ARGB8888);
   SDL_DestroySurface(s);
@@ -574,7 +607,8 @@ typedef struct {
   SDL_AudioStream *s;
   WAVEHDR *pend[WAVE_MAX];
   long long end[WAVE_MAX], total;
-  int n, frame_bytes;
+  int n, frame_bytes, rate;
+  Handle *event; // CALLBACK_EVENT: set whenever buffers have been played
 } Wave;
 static Wave *waves[4];
 
@@ -582,6 +616,7 @@ static void wave_follow(Wave *w) {
   long long played = w->total - SDL_GetAudioStreamQueued(w->s);
   int k = 0;
   while (k < w->n && w->end[k] <= played) w->pend[k++]->dwFlags |= WHDR_DONE;
+  if (k && w->event) w->event->set = true;
   if (k) {
     memmove(w->pend, w->pend + k, sizeof w->pend[0] * (size_t)(w->n - k));
     memmove(w->end, w->end + k, sizeof w->end[0] * (size_t)(w->n - k));
@@ -594,8 +629,21 @@ static void audio_follow(void) {
     if (waves[k]) wave_follow(waves[k]);
 }
 
+// In how many nanoseconds the next buffer of the sounds that set this event will have been played.
+static Uint64 wave_next_ns(const Handle *ev) {
+  Uint64 best = UINT64_MAX;
+  for (int k = 0; k < 4; k++) {
+    Wave *w = waves[k];
+    if (!w || w->event != ev || !w->n || w->rate <= 0) continue;
+    long long left = w->end[0] - (w->total - SDL_GetAudioStreamQueued(w->s));
+    Uint64 ns = left <= 0 ? 0 : (Uint64)(left / w->frame_bytes) * 1000000000ull / (Uint64)w->rate;
+    if (ns < best) best = ns;
+  }
+  return best;
+}
+
 UINT waveOutOpen(HWAVEOUT *h, UINT device, const WAVEFORMATEX *fmt, DWORD_PTR cb, DWORD_PTR inst, DWORD flags) {
-  (void)device, (void)cb, (void)inst, (void)flags;
+  (void)device, (void)inst;
   if (!sdl_up()) return 1;
   SDL_AudioSpec spec = {SDL_AUDIO_S16, fmt->nChannels, (int)fmt->nSamplesPerSec};
   SDL_AudioStream *s = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
@@ -604,6 +652,8 @@ UINT waveOutOpen(HWAVEOUT *h, UINT device, const WAVEFORMATEX *fmt, DWORD_PTR cb
   Wave *w = calloc(1, sizeof *w);
   w->s = s;
   w->frame_bytes = fmt->nBlockAlign;
+  w->rate = (int)fmt->nSamplesPerSec;
+  if (flags == CALLBACK_EVENT && cb && ((Handle *)cb)->kind == H_EVENT) w->event = (Handle *)cb;
   for (int k = 0; k < 4; k++)
     if (!waves[k]) { waves[k] = w; break; }
   *h = w;
@@ -1003,7 +1053,13 @@ BOOL PeekMessageW(MSG *m, HWND w, UINT lo, UINT hi, UINT remove) {
 
 // The main loop's waits: a timer, and the wait for it or for a message (an event from SDL, or a
 // message already waiting), as on Windows.
-HANDLE CreateEventW(void *attributes, BOOL manual, BOOL initial, LPCWSTR name) { (void)attributes, (void)manual, (void)initial, (void)name; return NULL; }
+// An event, set by the sound (waveOutOpen with CALLBACK_EVENT) and taken by a wait: auto-reset only.
+HANDLE CreateEventW(void *attributes, BOOL manual, BOOL initial, LPCWSTR name) {
+  (void)attributes, (void)manual, (void)name;
+  Handle *h = calloc(1, sizeof *h);
+  if (h) h->kind = H_EVENT, h->set = initial;
+  return h;
+}
 
 HANDLE CreateWaitableTimerExW(void *attributes, LPCWSTR name, DWORD flags, DWORD access) {
   (void)attributes, (void)name, (void)flags, (void)access;
@@ -1023,13 +1079,30 @@ BOOL SetWaitableTimer(HANDLE h, const LARGE_INTEGER *due, LONG period, void *rou
 DWORD MsgWaitForMultipleObjects(DWORD n, const HANDLE *hs, BOOL all, DWORD ms, DWORD wake) {
   (void)all, (void)wake;
   Uint64 now = SDL_GetTicksNS(), end = ms == INFINITE ? now + 1000000000ull : now + (Uint64)ms * 1000000; // never more than a second
-  Handle *t = n == 1 && hs && hs[0] && ((Handle *)hs[0])->kind == H_TIMER ? hs[0] : NULL;
+  Handle *h = n == 1 && hs && hs[0] ? hs[0] : NULL, *t = h && h->kind == H_TIMER ? h : NULL, *e = h && h->kind == H_EVENT ? h : NULL;
   if (t && t->due < end) end = t->due;
   while ((now = SDL_GetTicksNS()) < end) {
+    if (e) { // the sound's event: the stream is followed, and the wait ends when the next buffer should be played
+      audio_follow();
+      if (e->set) { e->set = false; return WAIT_OBJECT_0; }
+    }
     if (q_n) return WAIT_OBJECT_0 + n;
     Uint64 left = end - now;
-    if (left <= 2000000 || !sdl_up()) { SDL_DelayPrecise(left); break; }
+    if (e) {
+      Uint64 next = wave_next_ns(e);
+      if (next < left) left = next < 1000000 ? 1000000 : next; // a millisecond at least: the device takes the sound in pieces
+      if (left > end - now) left = end - now;
+    }
+    if (left <= 2000000 || !sdl_up()) {
+      SDL_DelayPrecise(left);
+      if (!e) break;
+      continue;
+    }
     if (SDL_WaitEventTimeout(NULL, (Sint32)((left - 1000000) / 1000000))) return WAIT_OBJECT_0 + n;
+  }
+  if (e) {
+    audio_follow();
+    if (e->set) { e->set = false; return WAIT_OBJECT_0; }
   }
   return t ? WAIT_OBJECT_0 : WAIT_TIMEOUT;
 }
