@@ -349,6 +349,11 @@ static void Draw(uint32_t initiator, uint32_t indexBase)
     }
     if (layout == nullptr)
     {
+        // A single point drawn once, on the first frame, with every colour channel masked and no
+        // depth or stencil: it writes nothing (the console's setup), so there is nothing to draw.
+        if (g_currentShader[0] == 0x8BB7E189D92E3DEFull && (ReadRegister(0x2104) & 0xF) == 0 &&
+            ReadRegister(0x2200) == 0)
+            return;
         WarnUnknownShader("vertex", g_currentShader[0]);
         return;
     }
