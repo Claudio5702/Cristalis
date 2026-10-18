@@ -210,8 +210,12 @@ const wchar_t* AchievementsHelp(int k)
     return help.c_str();
 }
 
-const DlList kAchievementList = { AchievementsOpen, AchievementsCount, AchievementsRow, AchievementsHelp, nullptr, nullptr, nullptr,
-    t_noAchievements, nullptr };
+// Nothing to do when the selection moves; given anyway, as DarkLauncher dfd88a5 calls it without
+// checking when the mouse moves over a row (dl_menu.c), and a missing one crashed the program.
+void AchievementsMoved() {}
+
+const DlList kAchievementList = { AchievementsOpen, AchievementsCount, AchievementsRow, AchievementsHelp, nullptr, nullptr,
+    AchievementsMoved, t_noAchievements, nullptr };
 
 // ---- Picture page: the internal resolution ----
 
