@@ -21,11 +21,9 @@ extern "C"
 }
 
 #include <windows.h>
-#ifndef _WIN32
-#include <unistd.h> // _exit
-#endif
 
 #include <algorithm>
+#include <cstdlib> // std::_Exit
 #include <array>
 #include <atomic>
 #include <condition_variable>
@@ -551,10 +549,8 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     }
     int code = dl_run(&game, argc, argv);
     // The game's threads are still waiting (for a picture asked for, for sound to be played): the
-    // program ends here rather than unwinding them. On Linux an ordinary exit could wait for them.
+    // program ends here rather than unwinding them. On Linux an ordinary exit could wait for them; on
+    // Windows it freed what they still use and crashed on the way out.
     fflush(nullptr);
-#ifndef _WIN32
-    _exit(code);
-#endif
-    return code;
+    std::_Exit(code);
 }
