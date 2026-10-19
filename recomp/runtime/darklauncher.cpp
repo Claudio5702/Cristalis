@@ -345,20 +345,13 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"最初の公開版|Cristalis はリリースページから、インストーラー付きでそのまま入手できます。\n"
-    L"すっきりした「画面」ページ|ブラウン管フィルターとスキャンラインはなくなりました。この HD のゲームは薄型の画面向けに作られています。",
-    L"Première version publique|Cristalis est proposé tout prêt sur la page des releases, avec son installeur.\n"
-    L"Page Image simplifiée|Le filtre CRT et les scanlines ne sont plus proposés : ce jeu HD a été fait pour les écrans plats.",
-    L"First public version|Cristalis comes ready to use on the Releases page, with its installer.\n"
-    L"Simpler Picture page|The CRT filter and the scanlines are no longer offered: this HD game was made for flat screens.",
-    L"Primera versión pública|Cristalis se ofrece listo en la página de releases, con su instalador.\n"
-    L"Página Imagen más simple|El filtro CRT y las scanlines ya no se ofrecen: este juego HD se hizo para pantallas planas.",
-    L"Primeira versão pública|Cristalis é oferecido pronto na página de releases, com seu instalador.\n"
-    L"Página Imagem mais simples|O filtro CRT e as scanlines não são mais oferecidos: este jogo HD foi feito para telas planas.",
-    L"Erste öffentliche Version|Cristalis gibt es fertig auf der Release-Seite, mit Installationsprogramm.\n"
-    L"Einfachere Seite Bild|Röhren-Filter und Scanlines werden nicht mehr angeboten: Dieses HD-Spiel wurde für Flachbildschirme gemacht.",
-    L"Prima versione pubblica|Cristalis è disponibile già pronto nella pagina delle release, con il suo programma di installazione.\n"
-    L"Pagina Immagine più semplice|Il filtro CRT e le scanline non sono più proposti: questo gioco HD è stato fatto per schermi piatti." };
+    L"終了時のクラッシュを修正|ゲームを終了するときにクラッシュしなくなりました。次の起動がセーフモードで始まることもありません。",
+    L"Fermeture corrigée|Le jeu ne plante plus en se fermant : le lancement suivant ne s'ouvre plus en mode sans échec.",
+    L"Closing fixed|The game no longer crashes when it closes: the next start no longer opens in safe mode.",
+    L"Cierre corregido|El juego ya no falla al cerrarse: el siguiente arranque ya no se abre en modo seguro.",
+    L"Fechamento corrigido|O jogo não trava mais ao fechar: a próxima abertura não começa mais no modo de segurança.",
+    L"Beenden behoben|Das Spiel stürzt beim Beenden nicht mehr ab: Der nächste Start öffnet nicht mehr im abgesicherten Modus.",
+    L"Chiusura corretta|Il gioco non va più in crash alla chiusura: l'avvio successivo non si apre più in modalità provvisoria." };
 
 // ---- The game ----
 

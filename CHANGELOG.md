@@ -6,6 +6,12 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## 1.05
+
+- **No more crash when the program closes** (Windows): after DarkLauncher had saved everything, the
+  program wound down while the game's threads still ran, and could crash on the way out; the next
+  start then opened in safe mode (software display, in a window). It now ends at once, as on Linux.
+
 ## 1.04
 
 The first public version: ready-made programs on the Releases page, as Unleashed Recompiled

@@ -14,7 +14,7 @@ natif : le code PowerPC du jeu est traduit à l'avance en C++ avec
 **Aucune ressource du jeu n'est fournie**, ni dans ce dépôt ni dans les releases : les images, les
 sons, la musique et les textes sont lus dans votre propre copie du jeu. Le dépôt ne contient pas non
 plus de code du jeu : le code traduit est produit à partir d'un `default.xex` au moment de compiler le
-programme, et les programmes de la [page des releases](https://github.com/Claudio5702/Cristalis/releases/latest) sont compilés ainsi. **Version 1.04,
+programme, et les programmes de la [page des releases](https://github.com/Claudio5702/Cristalis/releases/latest) sont compilés ainsi. **Version 1.05,
 une bêta** : jouée par peu de personnes jusqu'ici.
 
 **Vous devez fournir votre propre copie de Crystal Defenders (Xbox 360).** Crystal Defenders
@@ -182,7 +182,7 @@ compatibilité. La version Windows tourne aussi avec Proton.
 Le fonctionnement du projet, comment le compiler, traduire à nouveau le code du jeu, le vérifier et
 faire l'installeur : [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (en anglais).
 
-Ce qui a changé à chaque version (actuellement 1.04) : [CHANGELOG.md](CHANGELOG.md) (en anglais).
+Ce qui a changé à chaque version (actuellement 1.05) : [CHANGELOG.md](CHANGELOG.md) (en anglais).
 
 ## Questions fréquentes
 
