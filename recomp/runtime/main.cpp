@@ -622,6 +622,10 @@ static LONG CALLBACK CrashHandler(EXCEPTION_POINTERS* info)
         Log("FATAL: access violation at host address %p in sub_%08X+0x%zX (host)", (void*)address, guestFunction,
             size_t(uintptr_t(record->ExceptionAddress) - best));
     DumpGuestState();
+    // The filter for errors nobody handles, DarkLauncher's when it runs: it notes the error for the
+    // crash report it writes at the next start.
+    if (LPTOP_LEVEL_EXCEPTION_FILTER filter = SetUnhandledExceptionFilter(nullptr))
+        filter(info);
     ExitProcess(3);
 }
 
