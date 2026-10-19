@@ -252,9 +252,21 @@ static struct sigaction fatal_before[sizeof fatal_sigs / sizeof fatal_sigs[0]];
 static void on_fatal_signal(int sig, siginfo_t *si, void *ctx) {
   for (size_t k = 0; k < sizeof fatal_sigs / sizeof fatal_sigs[0]; k++) { // the game's own handler first
     if (fatal_sigs[k] != sig) continue;
-    struct sigaction *b = &fatal_before[k];
-    if ((b->sa_flags & SA_SIGINFO) && b->sa_sigaction) { b->sa_sigaction(sig, si, ctx); return; }
-    if (!(b->sa_flags & SA_SIGINFO) && b->sa_handler != SIG_DFL && b->sa_handler != SIG_IGN) { b->sa_handler(sig); return; }
+    struct sigaction h = fatal_before[k];
+    bool info = h.sa_flags & SA_SIGINFO;
+    if (info ? !h.sa_sigaction : h.sa_handler == SIG_DFL || h.sa_handler == SIG_IGN) break;
+    if (h.sa_flags & SA_RESETHAND) { // a handler for once, as the system would keep it: the next time is DarkLauncher's
+      memset(&fatal_before[k], 0, sizeof fatal_before[k]);
+      fatal_before[k].sa_handler = SIG_DFL;
+    }
+    if (info) h.sa_sigaction(sig, si, ctx);
+    else h.sa_handler(sig);
+    // Back from it: the game mended the error (an emulator's guest memory, say) and the program goes
+    // on, or it keeps the signal for itself. Only when it gave the signal back to the system will the
+    // error come again and end the program: its line first.
+    struct sigaction now;
+    if (sigaction(sig, NULL, &now) || (now.sa_flags & SA_SIGINFO) || now.sa_handler != SIG_DFL) return;
+    break;
   }
   EXCEPTION_RECORD r = {0};
   EXCEPTION_POINTERS ep = {&r, ctx};
@@ -267,6 +279,7 @@ static void on_fatal_signal(int sig, siginfo_t *si, void *ctx) {
   r.ExceptionAddress = si->si_addr;
 #endif
   (void)si;
+  alarm(5); // a lock held where the error came from cannot keep the program waiting
   if (crash_filter_fn) crash_filter_fn(&ep);
   signal(sig, SIG_DFL);
   raise(sig);
@@ -275,16 +288,25 @@ static void on_fatal_signal(int sig, siginfo_t *si, void *ctx) {
 LPTOP_LEVEL_EXCEPTION_FILTER SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER f) {
   LPTOP_LEVEL_EXCEPTION_FILTER old = crash_filter_fn;
   crash_filter_fn = f;
+  // A stack of its own for this thread's handler (the one that runs dl_run), unless it has one already:
+  // running out of stack is reported too.
+  stack_t now;
+  if (!sigaltstack(NULL, &now) && (now.ss_flags & SS_DISABLE)) {
+    static void *alt;
+    if (!alt) alt = malloc(64 * 1024);
+    stack_t ss = {.ss_sp = alt, .ss_size = 64 * 1024};
+    if (alt) sigaltstack(&ss, NULL);
+  }
   struct sigaction sa;
   memset(&sa, 0, sizeof sa);
   sa.sa_sigaction = on_fatal_signal;
-  sa.sa_flags = SA_SIGINFO;
-  sigemptyset(&sa.sa_mask);
+  sa.sa_flags = SA_SIGINFO | SA_ONSTACK;
   for (size_t k = 0; k < sizeof fatal_sigs / sizeof fatal_sigs[0]; k++) {
     struct sigaction before;
     if (sigaction(fatal_sigs[k], NULL, &before)) continue;
     if (before.sa_sigaction == on_fatal_signal) continue; // set already
     fatal_before[k] = before;
+    sa.sa_mask = before.sa_mask; // what the game's handler expects held back while it runs
     sigaction(fatal_sigs[k], &sa, NULL);
   }
   return old;

@@ -165,21 +165,40 @@ static void run_mark_write(void) {
 }
 
 // An error that ends the program: what and where, added to the marker; then the filter that was there
-// before (the game's, if it set one), or what Windows does as usual.
+// before (the game's, if it set one), or what Windows does as usual. The line is written without the C
+// library's heap or its FILE locks: the error may have come from inside them.
 static LPTOP_LEVEL_EXCEPTION_FILTER crash_before;
 static LONG WINAPI crash_filter(EXCEPTION_POINTERS *ep) {
-  FILE *f = fopen(run_mark, "a");
-  if (f && ep && ep->ExceptionRecord) {
+  if (ep && ep->ExceptionRecord) {
     void *at = ep->ExceptionRecord->ExceptionAddress;
     HMODULE m = NULL;
-    char mod[MAX_PATH] = "?";
+    char mod[MAX_PATH] = "?", line[MAX_PATH + 64];
     if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (const char *)at, &m) && m)
       GetModuleFileNameA(m, mod, sizeof mod);
     const char *leaf = strrchr(mod, DL_SEPC);
-    fprintf(f, "error 0x%08lX at %s+0x%llX\n", (unsigned long)ep->ExceptionRecord->ExceptionCode, leaf ? leaf + 1 : mod,
-            (unsigned long long)((uintptr_t)at - (uintptr_t)m));
+#ifdef _WIN32
+    const char *eol = "\r\n"; // as the rest of the marker, written as text
+#else
+    const char *eol = "\n";
+#endif
+    int n = snprintf(line, sizeof line, "error 0x%08lX at %s+0x%llX%s", (unsigned long)ep->ExceptionRecord->ExceptionCode, leaf ? leaf + 1 : mod,
+                     (unsigned long long)((uintptr_t)at - (uintptr_t)m), eol);
+    if (n >= (int)sizeof line) n = (int)sizeof line - 1;
+#ifdef _WIN32
+    HANDLE h = CreateFileA(run_mark, FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (h != INVALID_HANDLE_VALUE) {
+      DWORD done;
+      if (n > 0) WriteFile(h, line, (DWORD)n, &done, NULL);
+      CloseHandle(h);
+    }
+#else
+    int fd = open(run_mark, O_WRONLY | O_APPEND);
+    if (fd >= 0) {
+      if (n > 0 && write(fd, line, (size_t)n) < 0) {}
+      close(fd);
+    }
+#endif
   }
-  if (f) fclose(f);
   return crash_before ? crash_before(ep) : EXCEPTION_CONTINUE_SEARCH;
 }
 

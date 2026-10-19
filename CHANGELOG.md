@@ -6,6 +6,12 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## Next version (not numbered yet)
+
+- **DarkLauncher 1.33**: a sturdier crash report (the error line is written without the C library's
+  heap, a lock that blocks it no longer hangs the program, a stack overflow is reported). Nothing
+  changes for the player; the report still names the error on Windows (checked with a forced crash).
+
 ## 1.01
 
 - **DarkLauncher 1.32**: a lighter bar (Play, Screenshots, Game, Achievements, Settings, and Quit at
