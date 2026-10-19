@@ -278,7 +278,6 @@ extern const wchar_t *const dl_lang_names[DL_LANGS];
 #define TX(id) (dl_tr(dl_texts[id]))
 #define DL_WIDEN2(s) L##s
 #define DL_WIDEN(s) DL_WIDEN2(s)
-#define DL_VERSION_W DL_WIDEN(DL_VERSION) // DL_VERSION as a wide string
 #define DL_SEP_W DL_WIDEN(DL_SEP)
 bool dl_lang_ok(int lang); // one of the game's languages (DlGame.langs)
 int dl_lang_default(void); // the language of Windows if the game has it, otherwise English (or its first)

@@ -17,6 +17,8 @@ on DarkLauncher's "What's new" page.
 - **New versions**: DarkLauncher can now say when a newer version is out (Settings, Internet; off
   until the player turns it on). It reads `version.txt` in this repository: the version on its first
   line, the Releases page on the second; nothing else is sent.
+- **DarkLauncher 2.07**: its version is no longer written at the bottom right of the menus (it is
+  still in `--version` and in the crash report).
 
 ## 1.06
 
