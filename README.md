@@ -190,7 +190,9 @@ copying saves between the console and the PC has not been tried.
 ## License
 
 The source code of this project is under the MIT license (see [LICENSE](LICENSE)). That license does
-not cover the game, its data or its code.
+not cover the game, its data or its code, nor DarkLauncher (`kit/launcher`), given as built files
+under its own license ([kit/launcher/LICENSE.txt](kit/launcher/LICENSE.txt)): free to use and to pass on
+unchanged with the game, but not open source.
 
 ## Credits
 

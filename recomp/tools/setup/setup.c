@@ -474,7 +474,7 @@ static int uninstall(const char *self, const char *dir, bool all) {
     if (box(T_TITLE_UNINSTALL, T_UN_RUNNING, MB_RETRYCANCEL | MB_ICONWARNING, NULL) != IDRETRY) return 0;
   }
   int removed = 0;
-  static const char *const program[] = {EXE, "avcodec-62.dll", "avutil-60.dll", "swresample-6.dll", "FFmpeg-LICENSE.txt", "LICENSE.txt",
+  static const char *const program[] = {EXE, "avcodec-62.dll", "avutil-60.dll", "swresample-6.dll", "FFmpeg-LICENSE.txt", "LICENSE.txt", "DarkLauncher.dll", "DarkLauncher-LICENSE.txt",
                                         "LISEZMOI.txt", "README.txt", "crystal_defenders.log", "crystal_defenders.prev.log", "Jouer.bat",
                                         "gpu_shaders.bin", // DarkLauncher's compiled shaders
                                         "crystal_defenders.ini.crash.txt", "crystal_defenders.ini.running"}; // its crash report and run marker

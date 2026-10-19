@@ -4,17 +4,34 @@
 // mouse, controller), languages, picture filters, sound output, save states, screenshots, pause menu,
 // --ui-audit.
 //
-// Every name of the project comes from project.h (found on the include path).
+// DarkLauncher comes built: DarkLauncher.dll on Windows (with its import library libdarklauncher.dll.a),
+// libdarklauncher.so on Linux. The game includes this file, links to the library and ships it beside the
+// program. Every name of the project comes from project.h (found on the include path), given to the
+// library by dl_run.
 #ifndef DL_H
 #define DL_H
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "1.33"
+#define DL_VERSION "2.0"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <wchar.h>
+
+// What the library gives (DL_BUILD: the library itself is being built).
+#ifdef _WIN32
+#ifdef DL_BUILD
+#define DL_API __declspec(dllexport)
+#else
+#define DL_API __declspec(dllimport)
+#endif
+#else
+#define DL_API __attribute__((visibility("default")))
+#endif
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // Languages of the setup screen, in the order of every table of texts: jp, fr, en, es, br, de, it.
 enum { DL_LANG_JP, DL_LANG_FR, DL_LANG_EN, DL_LANG_ES, DL_LANG_BR, DL_LANG_DE, DL_LANG_IT };
@@ -242,28 +259,28 @@ typedef struct DlList {
 enum { DL_PAGE_LANGS, DL_PAGE_IMAGE, DL_PAGE_SOUND };
 
 // A new page (a "Back" row is added after its rows); returns its id.
-int dl_page(const wchar_t *const *tab, const DlRow *rows, int count);
-int dl_list_page(const wchar_t *const *tab, const DlList *list);
+DL_API int dl_page(const wchar_t *const *tab, const DlRow *rows, int count);
+DL_API int dl_list_page(const wchar_t *const *tab, const DlList *list);
 // Rows put at the top of an existing page.
-void dl_add_rows(int page, const DlRow *rows, int count);
+DL_API void dl_add_rows(int page, const DlRow *rows, int count);
 // An entry of the navigation bar opening a page (icon: a character of the Segoe MDL2 Assets font).
-void dl_section(int page, unsigned icon, const wchar_t *const *label, const wchar_t *const *help);
+DL_API void dl_section(int page, unsigned icon, const wchar_t *const *label, const wchar_t *const *help);
 // A row at the end of the Saves page (before "Back") opening one of the game's pages: its own saves, for
 // instance (a cartridge's), next to the save states rather than in an entry of the bar of their own.
 // Esc on that page comes back to this row. One such row; a second call replaces it.
-void dl_saves_more(int page, const wchar_t *const *label, const wchar_t *const *help);
+DL_API void dl_saves_more(int page, const wchar_t *const *label, const wchar_t *const *help);
 // Before the game writes over one of its own saves (a cartridge's...): DarkLauncher keeps the version
 // there now in saves\backup\ (3 versions of each file at most, a new one when the last is 10 minutes
 // old), and the "Backups" row of the Saves page puts one back (the program then starts again, so that
 // the game reads it). The save states and the session are kept that way by DarkLauncher itself.
-void dl_backup(const char *path);
+DL_API void dl_backup(const char *path);
 // A value kept in the settings file; its value now is its default ("Defaults" puts it back unless keep).
-void dl_setting(const char *name, int *value, int lo, int hi, bool keep);
+DL_API void dl_setting(const char *name, int *value, int lo, int hi, bool keep);
 // A function of the game (going back to the start of a turn, a panel...): run by a keyboard key and a
 // controller button chosen on the Controls pages, and from the pause menu when in_pause. hot: its key's
 // name in the settings file (default key: key, 0 none), NULL: no key; pad: the end of its controller
 // buttons' names ("_turn": pad_turn and joy_turn), NULL: no button. At most 8.
-void dl_function(const wchar_t *const *label, const wchar_t *const *help, const char *hot, int key, const char *pad,
+DL_API void dl_function(const wchar_t *const *label, const wchar_t *const *help, const char *hot, int key, const char *pad,
                  void (*run)(void), bool in_pause);
 
 // ---- achievements (optional)
@@ -275,10 +292,10 @@ typedef struct DlAchievement {
 // In setup(): the game's achievements (at most 128). DarkLauncher adds the Achievements page and its
 // entry in the bar, and keeps which are unlocked and when in saves\<FILE_STEM>.achievements next to the
 // program. The list must stay valid while the program runs.
-void dl_achievements(const DlAchievement *list, int count);
+DL_API void dl_achievements(const DlAchievement *list, int count);
 // Unlocks one, once: "Achievement unlocked" and its name over the game for a few seconds, with a sound.
-void dl_unlock(const char *id);
-bool dl_unlocked(const char *id);
+DL_API void dl_unlock(const char *id);
+DL_API bool dl_unlocked(const char *id);
 
 // ---- packs and mods (optional): folders, or files of the game's kinds, that the player drops into a
 // folder; a page turns each on or off and orders them (the ones above come before the ones below)
@@ -293,52 +310,82 @@ typedef struct DlPacks {
 } DlPacks;
 // In setup(): the Packs page (its id is returned) and its entry in the bar; the packs are read at once,
 // and their choice is kept in "<settings file>.packs".
-int dl_packs(const DlPacks *p);
-int dl_pack_count(void);         // the packs turned on, the one that comes first first
-const char *dl_pack_path(int k); // full path of pack k (a folder or a file), in the Windows code page
+DL_API int dl_packs(const DlPacks *p);
+DL_API int dl_pack_count(void);         // the packs turned on, the one that comes first first
+DL_API const char *dl_pack_path(int k); // full path of pack k (a folder or a file), in the Windows code page
 
 // The controller's vibration the game wants now: left the heavy motor, right the light one, 0-65535 (as
 // XInput's). Sent to the Xbox pads and the PlayStation ones; nothing while the menus are shown, the window
 // is behind another or the player has turned Vibration off. Call it again with 0, 0 to stop.
-void dl_rumble(int left, int right);
+DL_API void dl_rumble(int left, int right);
 
-int dl_lang(void);                              // language of the setup screen (DL_LANG_*), one of DlGame.langs
-const wchar_t *dl_tr(const wchar_t *const *t); // a DlText in that language
-void dl_redraw(void);                           // the setup screen has to be drawn again
-void dl_note(const wchar_t *text);              // a few words over the game (or in the pause menu) for a moment
-void dl_restart(void);                          // the game from the beginning ("Restart"; shown only when the game has reset)
+DL_API int dl_lang(void);                              // language of the setup screen (DL_LANG_*), one of DlGame.langs
+DL_API const wchar_t *dl_tr(const wchar_t *const *t); // a DlText in that language
+DL_API void dl_redraw(void);                           // the setup screen has to be drawn again
+DL_API void dl_note(const wchar_t *text);              // a few words over the game (or in the pause menu) for a moment
+DL_API void dl_restart(void);                          // the game from the beginning ("Restart"; shown only when the game has reset)
 // Closes the program as usual (the session and the settings are kept), then starts it again with the
 // same command line: for a change the game can only take at start (another language of its data...).
-void dl_relaunch(void);
-bool dl_in_game(void);                          // the game is being played (not the setup screen, not the preview before it)
-bool dl_running_ahead(void);                    // from frame(): this frame is one run ahead, to be taken back (DlGame.run_ahead)
-bool dl_gpu_on(void);                           // the picture goes through the graphics card now
-void dl_open_page(int page);                    // shows a page of the setup screen (from a list, the pause menu...)
+DL_API void dl_relaunch(void);
+DL_API bool dl_in_game(void);                          // the game is being played (not the setup screen, not the preview before it)
+DL_API bool dl_running_ahead(void);                    // from frame(): this frame is one run ahead, to be taken back (DlGame.run_ahead)
+DL_API bool dl_gpu_on(void);                           // the picture goes through the graphics card now
+DL_API void dl_open_page(int page);                    // shows a page of the setup screen (from a list, the pause menu...)
 // The game is not started any more (another game was loaded: another language...): it runs behind the
 // setup screen again, and "Play" begins it (begin, or its session) as at the first start.
-void dl_stop(void);
-void dl_resume(void); // back to the game (from the pause menu or the setup screen), once it is started
+DL_API void dl_stop(void);
+DL_API void dl_resume(void); // back to the game (from the pause menu or the setup screen), once it is started
 // Drawing in a list's preview: logical 640 x 400 coordinates, colours 0xRRGGBB; align 0 left, 1
 // centre, 2 right; small: the smaller font.
-void dl_ui_text(void *dc, double x, double y, const wchar_t *s, uint32_t rgb, int align, bool small);
-void dl_ui_box(void *dc, double x0, double y0, double x1, double y1, uint32_t rgb, double radius);
+DL_API void dl_ui_text(void *dc, double x, double y, const wchar_t *s, uint32_t rgb, int align, bool small);
+DL_API void dl_ui_box(void *dc, double x0, double y0, double x1, double y1, uint32_t rgb, double radius);
 
 // From DlGame.gpu_frame: texture t<slot> (1-7) of the game's shader, w x h texels.
 enum { DL_TEX_BGRA8, DL_TEX_R8, DL_TEX_RGBA32F };
-bool dl_gpu_texture(int slot, int format, const void *data, int w, int h);
+DL_API bool dl_gpu_texture(int slot, int format, const void *data, int w, int h);
 // Refresh rate of the screen that shows the window (read again every two seconds), for gpu_steps.
-int dl_screen_hz(void);
+DL_API int dl_screen_hz(void);
 
 // From frame(): the picture just written is w x h pixels (at most width x height, w pixels per row),
 // shown with the proportions aspect (width / height on screen; 0: square pixels). Until it is called,
 // the picture is width x height with the game's aspect. For a picture that widens (widescreen) or
 // grows (high-resolution graphics) while the game runs.
-void dl_picture_size(int w, int h, double aspect);
+DL_API void dl_picture_size(int w, int h, double aspect);
 // From frame(): the picture is s times the console's own resolution (enlarged graphics); the
 // scanlines and the CRT filter follow the console's lines. 1 until it is called.
-void dl_picture_scale(int s);
+DL_API void dl_picture_scale(int s);
 
+// What project.h gives the library: dl_run fills it from the project's names.
+typedef struct DlProject {
+  const char *version; // DL_VERSION of this file as the game was built with it: the library must be the same
+  size_t game_size;    // sizeof(DlGame), checked too
+  const char *name, *subtitle, *logo_first, *logo_rest, *game_name, *file_stem, *window_class;
+  const char *discord_app_id, *update_url; // "": no Internet row for it
+} DlProject;
+DL_API int dl_run_project(const DlGame *game, const DlProject *project, int argc, char **argv);
+
+#ifdef __cplusplus
+}
+#endif
+
+#ifndef DL_BUILD
+#include "project.h"
+#ifdef DISCORD_APP_ID
+#define DL_DISCORD_APP_ID_ DISCORD_APP_ID
+#else
+#define DL_DISCORD_APP_ID_ ""
+#endif
+#ifdef UPDATE_URL
+#define DL_UPDATE_URL_ UPDATE_URL
+#else
+#define DL_UPDATE_URL_ ""
+#endif
 // Runs the program: window, setup screen, game. Returns the exit code.
-int dl_run(const DlGame *game, int argc, char **argv);
+static inline int dl_run(const DlGame *game, int argc, char **argv) {
+  DlProject p = {DL_VERSION, sizeof(DlGame), PROJECT_NAME, PROJECT_SUBTITLE, PROJECT_LOGO_FIRST, PROJECT_LOGO_REST,
+                 GAME_NAME, FILE_STEM, WINDOW_CLASS, DL_DISCORD_APP_ID_, DL_UPDATE_URL_};
+  return dl_run_project(game, &p, argc, argv);
+}
+#endif
 
 #endif

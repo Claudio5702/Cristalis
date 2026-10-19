@@ -69,9 +69,10 @@ copy of the game runs: the script refuses.
 ### Linux
 
 `runtime/linux` supplies the small part of the Windows API the runtime is written against and an
-OpenGL 3.3 renderer (`renderer_sdl.cpp`). With DarkLauncher (the default), DarkLauncher's Linux part
-(`kit/launcher/linux`, copied with `sync_to_project.ps1 -Linux`, on SDL3) has the window, the menus,
-the sound and the controllers; it is built as a library of its own, as it has its own `windows.h`.
+OpenGL 3.3 renderer (`renderer_sdl.cpp`). With DarkLauncher (the default), DarkLauncher's Linux
+library (`kit/launcher/linux/libdarklauncher.so`, copied with `sync_to_project.ps1 -Linux`, on SDL3) has
+the window, the menus, the sound and the controllers; the program finds it, and SDL3, in its `lib`
+folder (the build puts it there).
 The game draws in an OpenGL context of its own without a window (EGL), and each picture is read back
 for DarkLauncher, as on Windows. SDL2 is then not used at all (two SDLs cannot be in one program);
 `-DCD_DARKLAUNCHER=OFF` builds the earlier version on SDL2, with its own window and F1 menu.
@@ -131,6 +132,6 @@ C:\scratch\cd\Uninstall.exe /S /ALL     # removes everything
 | `recomp/runtime` | the runtime (see above); `linux/` for the Linux build |
 | `recomp/tools` | scripts used during the port, packaging, the installer (`setup/`) |
 | `recomp/resources` | the program's icon (an original crystal, drawn by `tools/make_icon.ps1`) |
-| `kit/launcher` | DarkLauncher, copied from its repository (not changed here) |
+| `kit/launcher` | DarkLauncher 2.0 and later: `dl.h` and the built library (`DarkLauncher.dll` and its import library, `linux/libdarklauncher.so`), copied by its `sync_to_project.ps1`, under its own license (`LICENSE.txt`); not changed here |
 | `project.h` | this project's names for DarkLauncher and its installer |
 | `build.ps1`, `recompile.ps1` | build, and translate the game's code again |

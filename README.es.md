@@ -200,7 +200,9 @@ del juego; copiar partidas entre la consola y el PC no se ha probado.
 ## Licencia
 
 El código fuente de este proyecto está bajo la licencia MIT (ver [LICENSE](LICENSE)). Esa licencia
-no cubre el juego, sus datos ni su código.
+no cubre el juego, sus datos ni su código, ni DarkLauncher (`kit/launcher`), que se incluye compilado
+bajo su propia licencia ([kit/launcher/LICENSE.txt](kit/launcher/LICENSE.txt)): libre de usar y de
+redistribuir sin cambios con el juego, pero no de código abierto.
 
 ## Agradecimientos
 

@@ -22,3 +22,9 @@ SOFTWARE.
 
 This license covers the code in this repository only. It grants no rights to
 Crystal Defenders itself, which belongs to Square Enix and is not included.
+
+---
+
+This license covers this project's own files. It does not cover kit/launcher (DarkLauncher), given
+as built files under its own license: see kit/launcher/LICENSE.txt. Nor does it cover the game, its
+data or its code.

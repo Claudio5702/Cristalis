@@ -18,6 +18,8 @@ cp "$build/crystal_defenders" "$dest/"
 strip "$dest/crystal_defenders"
 sdl=$(ldd "$build/crystal_defenders" | awk '/libSDL3/ {print $3}')
 [ -n "$sdl" ] && cp -L "$sdl" "$dest/lib/"
+# DarkLauncher's library (built, under its own license), beside SDL3
+cp "$build/lib/libdarklauncher.so" "$dest/lib/"
 
 # The window's icon: the 256 x 256 picture of the program's .ico (kept there as PNG), beside the
 # program, where DarkLauncher looks for it.
@@ -42,8 +44,10 @@ cd "$(dirname "$(readlink -f "$0")")" && exec ./crystal_defenders "$@"
 EOF
 chmod +x "$dest/crystal_defenders.sh" "$dest/crystal_defenders"
 
-# The licenses: this project's (MIT), FFmpeg's (LGPL 2.1, built in) and SDL3's (zlib), when found.
+# The licenses: this project's (MIT), DarkLauncher's, FFmpeg's (LGPL 2.1, built in) and SDL3's (zlib),
+# when found.
 cp "$here/../../LICENSE" "$dest/LICENSE.txt"
+cp "$here/../../kit/launcher/LICENSE.txt" "$dest/DarkLauncher-LICENSE.txt"
 [ -n "$ffmpeg_src" ] && [ -f "$ffmpeg_src/COPYING.LGPLv2.1" ] && cp "$ffmpeg_src/COPYING.LGPLv2.1" "$dest/FFmpeg-LICENSE.txt"
 for f in /usr/share/licenses/sdl3/LICENSE /usr/share/licenses/sdl3/LICENSE.txt /usr/share/doc/libsdl3*/copyright; do [ -f "$f" ] && cp "$f" "$dest/SDL3-LICENSE.txt" && break; done
 

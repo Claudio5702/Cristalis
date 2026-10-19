@@ -1,0 +1,22 @@
+DarkLauncher
+Copyright (c) 2026 DarkLauncher contributors. All rights reserved.
+
+DarkLauncher is given as built files only: DarkLauncher.dll, libdarklauncher.dll.a, libdarklauncher.so
+and dl.h (the "Files"). Its source code is not provided.
+
+Permission is granted, free of charge, to use the Files to build a program, and to redistribute them,
+unchanged, with that program (in its source repository, its archives and its installers), on these
+conditions:
+
+1. This notice is kept with the Files.
+2. The Files are not modified, and are not reverse engineered, decompiled or disassembled, except where
+   the law allows it notwithstanding this condition.
+3. The Files are not sold, rented or distributed on their own, apart from a program that uses them.
+
+dl.h may be included in the program's source code and read in order to use the Files.
+
+THE FILES ARE PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT
+LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO
+EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE FILES OR THE
+USE OR OTHER DEALINGS IN THE FILES.

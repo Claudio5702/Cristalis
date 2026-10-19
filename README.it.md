@@ -202,7 +202,9 @@ proprio del gioco; copiare salvataggi tra la console e il PC non è stato provat
 ## Licenza
 
 Il codice sorgente di questo progetto è sotto licenza MIT (vedi [LICENSE](LICENSE)). Questa licenza
-non copre il gioco, i suoi dati né il suo codice.
+non copre il gioco, i suoi dati né il suo codice, né DarkLauncher (`kit/launcher`), fornito compilato
+con una propria licenza ([kit/launcher/LICENSE.txt](kit/launcher/LICENSE.txt)): libero da usare e da
+ridistribuire senza modifiche con il gioco, ma non open source.
 
 ## Ringraziamenti
 

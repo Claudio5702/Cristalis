@@ -209,7 +209,9 @@ eigenen Format des Spiels; Spielstände zwischen Konsole und PC zu kopieren wurd
 ## Lizenz
 
 Der Quellcode dieses Projekts steht unter der MIT-Lizenz (siehe [LICENSE](LICENSE)). Diese Lizenz
-gilt nicht für das Spiel, seine Daten oder seinen Code.
+gilt nicht für das Spiel, seine Daten oder seinen Code, und nicht für DarkLauncher (`kit/launcher`),
+das kompiliert unter eigener Lizenz beiliegt ([kit/launcher/LICENSE.txt](kit/launcher/LICENSE.txt)):
+frei nutzbar und unverändert mit dem Spiel weitergebbar, aber nicht quelloffen.
 
 ## Danksagungen
 

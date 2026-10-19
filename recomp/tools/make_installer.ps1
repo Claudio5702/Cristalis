@@ -28,6 +28,8 @@ $files = [ordered]@{
     'swresample-6.dll' = Join-Path $build 'swresample-6.dll'
     'FFmpeg-LICENSE.txt' = Join-Path $ffmpeg 'LICENSE.txt'
     'LICENSE.txt' = Join-Path (Split-Path (Split-Path $PSScriptRoot)) 'LICENSE' # this project's (MIT)
+    'DarkLauncher.dll' = Join-Path $build 'DarkLauncher.dll'
+    'DarkLauncher-LICENSE.txt' = Join-Path (Split-Path (Split-Path $PSScriptRoot)) 'kit\launcher\LICENSE.txt' # its own
     'LISEZMOI.txt' = Join-Path $PSScriptRoot 'setup\LISEZMOI.txt'
     'README.txt' = Join-Path $PSScriptRoot 'setup\README.txt'
 }
