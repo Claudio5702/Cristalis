@@ -14,6 +14,9 @@ on DarkLauncher's "What's new" page.
   them); `userdata` goes once empty.
 - The `saves` and `captures` folders are made at the first start, so that they can be seen before the
   first save or screenshot.
+- **New versions**: DarkLauncher can now say when a newer version is out (Settings, Internet; off
+  until the player turns it on). It reads `version.txt` in this repository: the version on its first
+  line, the Releases page on the second; nothing else is sent.
 
 ## 1.06
 
