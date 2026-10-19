@@ -11,6 +11,9 @@ on DarkLauncher's "What's new" page.
 The first public version: ready-made programs on the Releases page, as Unleashed Recompiled
 does (no game asset in them; the player's own copy is still needed).
 
+- **DarkLauncher 2.04**: on Linux its help texts no longer name Windows (the system's language, the
+  image viewer, the trash, the file manager); the game's own "Automatic (Windows)" became "Automatic
+  (system)" there, and the Linux subtitle says "(experimental)".
 - **DarkLauncher 2.03**: the CRT filter and the scanlines are no longer offered on the Picture page
   (`game.hide`): a 2009 HD game made for flat screens gains little from a tube's look. They are not
   applied either; the settings file keeps their values. The READMEs and their picture follow.

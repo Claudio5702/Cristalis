@@ -32,10 +32,17 @@ const wchar_t *const dl_texts[T_COUNT][DL_LANGS] = {
                    L"O idioma deste menu e o do jogo, se ele tiver vários.", L"Die Sprache dieses Menüs und die des Spiels, falls es mehrere hat.",
                    L"La lingua di questo menu e quella del gioco, se ne ha più d'una."},
     [T_UILANG] = {L"メニューの言語", L"Langue du menu", L"Menu language", L"Idioma del menú", L"Idioma do menu", L"Menüsprache", L"Lingua del menu"},
+#ifdef _WIN32
     [T_H_UILANG] = {L"この画面の言語です。初めて起動したときは Windows の言語になります。", L"Langue de cet écran. Au premier lancement, c'est celle de Windows.",
                     L"Language of this screen. On the first start, it is the language of Windows.", L"Idioma de esta pantalla. La primera vez, es el de Windows.",
                     L"Idioma desta tela. Na primeira vez, é o do Windows.", L"Sprache dieses Bildschirms. Beim ersten Start ist es die Sprache von Windows.",
                     L"Lingua di questa schermata. Al primo avvio è quella di Windows."},
+#else // Linux: the system, its picture viewer and file manager, the desktop's trash
+    [T_H_UILANG] = {L"この画面の言語です。初めて起動したときはシステムの言語になります。", L"Langue de cet écran. Au premier lancement, c'est celle du système.",
+                    L"Language of this screen. On the first start, it is the language of the system.", L"Idioma de esta pantalla. La primera vez, es el del sistema.",
+                    L"Idioma desta tela. Na primeira vez, é o do sistema.", L"Sprache dieses Bildschirms. Beim ersten Start ist es die Sprache des Systems.",
+                    L"Lingua di questa schermata. Al primo avvio è quella del sistema."},
+#endif
 
     [T_IMAGE] = {L"画面", L"Image", L"Picture", L"Imagen", L"Imagem", L"Bild", L"Immagine"},
     [T_TAB_IMAGE] = {L"画面", L"GRAPHISMES", L"PICTURE", L"GRÁFICOS", L"GRÁFICOS", L"GRAFIK", L"GRAFICA"},
@@ -274,10 +281,24 @@ const wchar_t *const dl_texts[T_COUNT][DL_LANGS] = {
                    L"Gli screenshot presi nel gioco, dal più recente al più vecchio, con un'anteprima."},
     [T_SHH_SIZE] = {L"%d × %d ピクセルの画像。", L"Image de %d × %d pixels. ", L"Picture of %d × %d pixels. ", L"Imagen de %d × %d píxeles. ", L"Imagem de %d × %d pixels. ", L"Bild mit %d × %d Pixeln. ",
                     L"Immagine di %d × %d pixel. "},
+#ifdef _WIN32
     [T_SHH_OPEN] = {L"Enter：Windows のビューアーで開く。Delete（コントローラーは Y）：ごみ箱へ移動。", L"Entrée : l'ouvrir dans la visionneuse de Windows. Suppr (ou Y sur la manette) : la mettre à la corbeille.", L"Enter: open it in the Windows viewer. Delete (or Y on the controller): move it to the Recycle Bin.", L"Intro: abrirla en el visor de Windows. Supr (o Y en el mando): enviarla a la papelera.", L"Enter: abrir no visualizador do Windows. Delete (ou Y no controle): mandar para a Lixeira.", L"Enter: in der Windows-Fotoanzeige öffnen. Entf (oder Y am Controller): in den Papierkorb verschieben.",
                     L"Invio: aprilo nel visualizzatore di Windows. Canc (o Y sul controller): spostalo nel Cestino."},
+#else // Linux: the system, its picture viewer and file manager, the desktop's trash
+    [T_SHH_OPEN] = {L"Enter：画像ビューアーで開く。Delete（コントローラーは Y）：ごみ箱へ移動。", L"Entrée : l'ouvrir dans la visionneuse d'images. Suppr (ou Y sur la manette) : la mettre à la corbeille.",
+                    L"Enter: open it in the picture viewer. Delete (or Y on the controller): move it to the trash.", L"Intro: abrirla en el visor de imágenes. Supr (o Y en el mando): enviarla a la papelera.",
+                    L"Enter: abrir no visualizador de imagens. Delete (ou Y no controle): mandar para a lixeira.", L"Enter: in der Bildanzeige öffnen. Entf (oder Y am Controller): in den Papierkorb verschieben.",
+                    L"Invio: aprilo nel visualizzatore di immagini. Canc (o Y sul controller): spostalo nel cestino."},
+#endif
+#ifdef _WIN32
     [T_SHH_CONFIRM] = {L"このキャプチャをごみ箱へ移動しますか？ もう一度 Delete で確定、ほかのキーで取り消します。", L"Mettre cette capture à la corbeille ? Appuyez encore sur Suppr pour confirmer, ou sur une autre touche pour annuler.", L"Move this screenshot to the Recycle Bin? Press Delete again to confirm, or another key to cancel.", L"¿Enviar esta captura a la papelera? Pulsa Supr otra vez para confirmar, u otra tecla para cancelar.", L"Mandar esta captura para a Lixeira? Pressione Delete de novo para confirmar, ou outra tecla para cancelar.", L"Diesen Screenshot in den Papierkorb verschieben? Zum Bestätigen noch einmal Entf drücken, zum Abbrechen eine andere Taste.",
                        L"Spostare questo screenshot nel Cestino? Premi di nuovo Canc per confermare, o un altro tasto per annullare."},
+#else // Linux: the system, its picture viewer and file manager, the desktop's trash
+    [T_SHH_CONFIRM] = {L"このキャプチャをごみ箱へ移動しますか？ もう一度 Delete で確定、ほかのキーで取り消します。", L"Mettre cette capture à la corbeille ? Appuyez encore sur Suppr pour confirmer, ou sur une autre touche pour annuler.",
+                       L"Move this screenshot to the trash? Press Delete again to confirm, or another key to cancel.", L"¿Enviar esta captura a la papelera? Pulsa Supr otra vez para confirmar, u otra tecla para cancelar.",
+                       L"Mandar esta captura para a lixeira? Pressione Delete de novo para confirmar, ou outra tecla para cancelar.", L"Diesen Screenshot in den Papierkorb verschieben? Zum Bestätigen noch einmal Entf drücken, zum Abbrechen eine andere Taste.",
+                       L"Spostare questo screenshot nel cestino? Premi di nuovo Canc per confermare, o un altro tasto per annullare."},
+#endif
     [T_SHH_NONE] = {L"キャプチャはまだありません。ゲーム中にスクリーンショットのキーか、ポーズメニューで撮れます。", L"Aucune capture pour l'instant. En jeu, utilisez la touche de capture d'écran ou le menu de pause.", L"No screenshots yet. In the game, use the screenshot key or the pause menu.", L"Aún no hay capturas. En el juego, usa la tecla de captura o el menú de pausa.", L"Nenhuma captura ainda. No jogo, use a tecla de captura ou o menu de pausa.", L"Noch keine Screenshots. Im Spiel die Screenshot-Taste oder das Pausenmenü benutzen.",
                     L"Ancora nessuno screenshot. Nel gioco, usa il tasto degli screenshot o il menu di pausa."},
     [T_TAB_PAUSE] = {L"ポーズ", L"PAUSE", L"PAUSE", L"PAUSA", L"PAUSA", L"PAUSE", L"PAUSA"},
@@ -347,9 +368,15 @@ const wchar_t *const dl_texts[T_COUNT][DL_LANGS] = {
                      L"Breve suono quando ci si sposta in questo menu."},
 
     [T_FOLDER] = {L"フォルダー", L"Dossier du jeu", L"Game folder", L"Carpeta", L"Pasta do jogo", L"Spielordner", L"Cartella del gioco"},
+#ifdef _WIN32
     [T_H_FOLDER] = {L"プログラムのフォルダーをエクスプローラーで開きます。", L"Ouvre le dossier du programme dans l'Explorateur.", L"Opens the program's folder in Explorer.",
                     L"Abre la carpeta del programa en el Explorador.", L"Abre a pasta do programa no Explorador.", L"Öffnet den Programmordner im Explorer.",
                     L"Apre la cartella del programma in Esplora file."},
+#else // Linux: the system, its picture viewer and file manager, the desktop's trash
+    [T_H_FOLDER] = {L"プログラムのフォルダーをファイルマネージャーで開きます。", L"Ouvre le dossier du programme dans le gestionnaire de fichiers.", L"Opens the program's folder in the file manager.",
+                    L"Abre la carpeta del programa en el gestor de archivos.", L"Abre a pasta do programa no gerenciador de arquivos.", L"Öffnet den Programmordner im Dateimanager.",
+                    L"Apre la cartella del programma nel file manager."},
+#endif
     [T_DEFAULTS] = {L"初期設定", L"Par défaut", L"Defaults", L"Por defecto", L"Padrão", L"Standard", L"Predefiniti"},
     [T_H_DEFAULTS] = {L"画面と音の設定をインストール時の状態に戻します。言語は変わりません。", L"Remet l'image et le son comme à l'installation. La langue ne change pas.",
                       L"Puts picture and sound back as installed. The language is not changed.", L"Restablece imagen y sonido como tras la instalación. El idioma no cambia.",
