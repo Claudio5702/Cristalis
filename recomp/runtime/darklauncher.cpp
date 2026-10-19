@@ -338,27 +338,20 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"新しい名前：Cristalis|この移植版は Cristalis という名前になり、アイコンも新しくなりました。設定とセーブデータはそのままです。\n"
-    L"Linux の修正|Linux で、ゲームがタイトル画面で止まらなくなりました。\n"
-    L"DarkLauncher 2.01|設定画面はオープンソース（MIT ライセンス）になりました。",
-    L"Nouveau nom : Cristalis|Ce portage s'appelle maintenant Cristalis, avec une nouvelle icône. Vos réglages et vos sauvegardes restent.\n"
-    L"Linux corrigé|Sous Linux, le jeu ne se fige plus sur l'écran titre.\n"
-    L"DarkLauncher 2.01|L'écran de réglages est maintenant open source (licence MIT).",
-    L"New name: Cristalis|This port is now called Cristalis, with a new icon. Your settings and saves stay.\n"
-    L"Linux fixed|On Linux, the game no longer freezes at its title screen.\n"
-    L"DarkLauncher 2.01|The settings screen is now open source (MIT license).",
-    L"Nuevo nombre: Cristalis|Esta adaptación se llama ahora Cristalis, con un icono nuevo. Tus ajustes y partidas se conservan.\n"
-    L"Linux corregido|En Linux, el juego ya no se congela en la pantalla de título.\n"
-    L"DarkLauncher 2.01|La pantalla de ajustes es ahora de código abierto (licencia MIT).",
-    L"Novo nome: Cristalis|Esta versão agora se chama Cristalis, com um ícone novo. Seus ajustes e saves continuam.\n"
-    L"Linux corrigido|No Linux, o jogo não trava mais na tela de título.\n"
-    L"DarkLauncher 2.01|A tela de ajustes agora é de código aberto (licença MIT).",
-    L"Neuer Name: Cristalis|Diese Portierung heißt jetzt Cristalis, mit einem neuen Symbol. Einstellungen und Spielstände bleiben.\n"
-    L"Linux behoben|Unter Linux bleibt das Spiel nicht mehr am Titelbildschirm stehen.\n"
-    L"DarkLauncher 2.01|Der Einstellungsbildschirm ist jetzt quelloffen (MIT-Lizenz).",
-    L"Nuovo nome: Cristalis|Questa conversione ora si chiama Cristalis, con una nuova icona. Impostazioni e salvataggi restano.\n"
-    L"Linux corretto|Su Linux, il gioco non si blocca più alla schermata del titolo.\n"
-    L"DarkLauncher 2.01|La schermata delle impostazioni è ora open source (licenza MIT)." };
+    L"最初の公開版|Cristalis はリリースページから、インストーラー付きでそのまま入手できます。\n"
+    L"すっきりした「画面」ページ|ブラウン管フィルターとスキャンラインはなくなりました。この HD のゲームは薄型の画面向けに作られています。",
+    L"Première version publique|Cristalis est proposé tout prêt sur la page des releases, avec son installeur.\n"
+    L"Page Image simplifiée|Le filtre CRT et les scanlines ne sont plus proposés : ce jeu HD a été fait pour les écrans plats.",
+    L"First public version|Cristalis comes ready to use on the Releases page, with its installer.\n"
+    L"Simpler Picture page|The CRT filter and the scanlines are no longer offered: this HD game was made for flat screens.",
+    L"Primera versión pública|Cristalis se ofrece listo en la página de releases, con su instalador.\n"
+    L"Página Imagen más simple|El filtro CRT y las scanlines ya no se ofrecen: este juego HD se hizo para pantallas planas.",
+    L"Primeira versão pública|Cristalis é oferecido pronto na página de releases, com seu instalador.\n"
+    L"Página Imagem mais simples|O filtro CRT e as scanlines não são mais oferecidos: este jogo HD foi feito para telas planas.",
+    L"Erste öffentliche Version|Cristalis gibt es fertig auf der Release-Seite, mit Installationsprogramm.\n"
+    L"Einfachere Seite Bild|Röhren-Filter und Scanlines werden nicht mehr angeboten: Dieses HD-Spiel wurde für Flachbildschirme gemacht.",
+    L"Prima versione pubblica|Cristalis è disponibile già pronto nella pagina delle release, con il suo programma di installazione.\n"
+    L"Pagina Immagine più semplice|Il filtro CRT e le scanline non sono più proposti: questo gioco HD è stato fatto per schermi piatti." };
 
 // ---- The game ----
 

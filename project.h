@@ -12,7 +12,7 @@
 #define PROJECT_SUBTITLE "Crystal Defenders Recomp" // what it is, beside the name
 #define PROJECT_LOGO_FIRST "C"                    // the setup screen's title: a large initial (also on the icon),
 #define PROJECT_LOGO_REST "RISTALIS"              // then the rest in smaller capitals
-#define GAME_VERSION "1.03"                    // this port's version (CHANGELOG.md): 1.01, 1.02... as DarkLauncher's
+#define GAME_VERSION "1.04"                    // this port's version (CHANGELOG.md): 1.01, 1.02... as DarkLauncher's
 #define GAME_NAME "Crystal Defenders"             // the program as the user sees it: install folder, shortcuts, Windows list of programs
 #define FILE_STEM "crystal_defenders"             // crystal_defenders.exe, crystal_defenders.ini...
 #define WINDOW_CLASS "CrystalDefendersRecomp"     // window class of the program (the name before Cristalis: kept)

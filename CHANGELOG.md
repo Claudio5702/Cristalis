@@ -6,7 +6,10 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
-## Next version (not numbered yet)
+## 1.04
+
+The first public version: ready-made programs on the Releases page, as Unleashed Recompiled
+does (no game asset in them; the player's own copy is still needed).
 
 - **DarkLauncher 2.03**: the CRT filter and the scanlines are no longer offered on the Picture page
   (`game.hide`): a 2009 HD game made for flat screens gains little from a tube's look. They are not
@@ -15,14 +18,17 @@ on DarkLauncher's "What's new" page.
   console's 720 lines (internal 2560 x 1440 or 3840 x 2160), so that the tube's lines follow the
   console's lines; before, at 3840 x 2160 they were drawn at 2160 lines, too fine to be seen, and
   only the glow and the darker corners were left.
+- A last review of the READMEs (six languages), the developers' guide, the license and the texts
+  that come with the game: the Windows list entry's name, the crash report, the game's own high
+  scores, DarkLauncher's MIT license, the View button held for the pause menu.
 - **DarkLauncher 2.02**: the game says when it gives the last picture again (`dl_picture_same`), so
   that `--bench` and `--gpu-check` count the new pictures apart; a game that stops making them, as on
   Linux before 1.03, now shows at once ("new pictures 1187" of 1194 under WSL).
 
 ## 1.03
 
-The first public version: ready-made programs on the Releases page, as Unleashed Recompiled
-does (no game asset in them; the player's own copy is still needed).
+Prepared as the first public version; never published, as the review and the simpler Picture
+page of 1.04 came first.
 
 - **DarkLauncher 2.01**, open source under the MIT license ("DarkLauncher contributors"): its source
   is in `kit/launcher` as before, with its license (`kit/launcher/LICENSE`), which the installer and
