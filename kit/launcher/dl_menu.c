@@ -13,7 +13,7 @@ DlPage dl_pages[DL_MAX_PAGES];
 int dl_page_n;
 DlSection dl_secs[DL_MAX_SECTIONS];
 int dl_sec_n, dl_sec_top;
-static int stack[8], stack_n; // pages opened from a page (DL_PAGE rows), to come back to
+static int stack[8], stack_sel[8], stack_n; // pages opened from a page (DL_PAGE rows, a list's row), to come back to, and the row selected there
 static int list_read = -1;    // list page whose contents were read last (-1: read again when shown)
 
 int dl_lang(void) { return dl_cfg.ui_lang; }
@@ -106,7 +106,38 @@ static const wchar_t *const *const crt_names[] = {dl_texts[T_NO], dl_texts[T_CRT
 static const DlRow langs_rows[] = {
     {DL_CHOICE, dl_texts[T_UILANG], dl_texts[T_H_UILANG], &dl_cfg.ui_lang, DL_LANGS - 1, NULL, show_lang, lang_changed},
 };
+// ---- picture presets: several rows of the Image page at once; "Custom" while they match none
+typedef struct { int integer_scale, smooth, scanlines, crt; } Preset; // smooth: 0 sharp, 1 smooth, 2 smooth edges
+static const Preset presets[4] = {{1, 0, 0, 0}, {0, 2, 0, 0}, {0, 1, 2, 2}, {0, 0, 0, 0}}; // original, large, CRT, performance
+static const int preset_texts[4] = {T_PRE_ORIGINAL, T_PRE_LARGE, T_PRE_CRT, T_PRE_FAST};
+static int preset_pick; // the last preset chosen (< > go on from it)
+static int preset_match(void) { // -1: none
+  for (int k = 0; k < 4; k++) {
+    const Preset *p = &presets[k];
+    if (dl_cfg.integer_scale == p->integer_scale && dl_cfg.smooth == p->smooth && dl_cfg.scanlines == p->scanlines && dl_cfg.crt == p->crt &&
+        (k != 3 || !dl_cfg.ahead)) // Performance: no run-ahead either
+      return k;
+  }
+  return -1;
+}
+static const wchar_t *preset_show(int v) {
+  (void)v;
+  int m = preset_match();
+  if (m < 0) return TX(T_PRE_CUSTOM);
+  preset_pick = m;
+  return TX(preset_texts[m]);
+}
+static void preset_changed(void) {
+  const Preset *p = &presets[preset_pick];
+  dl_cfg.integer_scale = p->integer_scale;
+  dl_cfg.smooth = p->smooth;
+  dl_cfg.scanlines = p->scanlines;
+  dl_cfg.crt = p->crt;
+  if (preset_pick == 3) dl_cfg.ahead = 0;
+  dl_dirty = true;
+}
 static const DlRow image_rows[] = {
+    {DL_CHOICE, dl_texts[T_PRESET], dl_texts[T_H_PRESET], &preset_pick, 3, NULL, preset_show, preset_changed},
     {DL_SWITCH, dl_texts[T_FULL], dl_texts[T_H_FULL], &dl_cfg.fullscreen, 1, NULL, NULL, full_changed},
     {DL_SWITCH, dl_texts[T_INT], dl_texts[T_H_INT], &dl_cfg.integer_scale, 1},
     {DL_CHOICE, dl_texts[T_GPU], dl_texts[T_H_GPU], &dl_cfg.gpu, 1, gpu_names, NULL, gpu_changed},
@@ -140,6 +171,8 @@ static const wchar_t *ps_more(void) { // PlayStation pads, under the help of "Co
   return out;
 }
 static const DlRow rumble_row = {DL_SWITCH, dl_texts[T_RUMBLE], dl_texts[T_H_RUMBLE], &dl_cfg.rumble, 1};
+static const wchar_t *const *const ahead_names[] = {dl_texts[T_NO], dl_texts[T_AHEAD_1], dl_texts[T_AHEAD_2]};
+static const DlRow ahead_row = {DL_CHOICE, dl_texts[T_AHEAD], dl_texts[T_H_AHEAD], &dl_cfg.ahead, 2, ahead_names};
 static const DlRow ctrl_rows[] = {
     {.kind = DL_PAGE, .label = dl_texts[T_KEYS], .help = dl_texts[T_H_KEYS], .page = PG_KEYS},
     {.kind = DL_PAGE, .label = dl_texts[T_PAD], .help = dl_texts[T_H_PAD], .page = PG_PAD, .more = ps_more},
@@ -172,6 +205,99 @@ static const DlRow hot_rows[] = { // the save-state rows and the rewind are left
     {.kind = DL_ACTION, .label = dl_texts[T_GFXDEF], .help = dl_texts[T_H_GFXDEF], .run = dl_hot_default},
 };
 
+// ---- the game's news: one row a line of DlGame.news, shown the first time its version starts
+int dl_news_seen;
+static int news_hash(void) { // of DlGame.version, kept as a setting (0: none)
+  unsigned h = 2166136261u;
+  for (const char *c = dl_game->version; c && *c; c++) h = (h ^ (unsigned char)*c) * 16777619u;
+  return (int)(h & 0x7FFFFFFF) | 1;
+}
+static const wchar_t *news_text(void) { return dl_game->news ? dl_tr(dl_game->news) : L""; }
+static int news_line(int k, const wchar_t **at) { // line k of the news: where it starts, how long
+  const wchar_t *s = news_text();
+  for (int i = 0; i < k && s; i++) {
+    s = wcschr(s, L'\n');
+    if (s) s++;
+  }
+  if (!s || !*s) return -1;
+  const wchar_t *end = wcschr(s, L'\n');
+  *at = s;
+  return end ? (int)(end - s) : lstrlenW(s);
+}
+static void news_open_list(void) {}
+static int news_count(void) {
+  const wchar_t *at;
+  int n = 0;
+  while (news_line(n, &at) >= 0) n++;
+  return n;
+}
+static int news_title(const wchar_t *at, int len) { // its title's length: up to "|"
+  for (int i = 0; i < len; i++)
+    if (at[i] == L'|') return i;
+  return len;
+}
+static void news_row(int k, wchar_t *label, wchar_t *value) {
+  const wchar_t *at;
+  int len = news_line(k, &at), t = news_title(at, len);
+  lstrcpynW(label, at, (t < 63 ? t : 63) + 1);
+  value[0] = 0;
+}
+static const wchar_t *news_help(int k) { // what it is, then which version
+  static wchar_t buf[1024], tail[256];
+  const wchar_t *at;
+  int len = news_line(k, &at), t = news_title(at, len);
+  _snwprintf(tail, 255, TX(T_H_NEWS), dl_game->version ? dl_game->version : "");
+  tail[255] = 0;
+  if (t < len) _snwprintf(buf, 1023, L"%.*ls\n\n%ls", len - t - 1, at + t + 1, tail);
+  else _snwprintf(buf, 1023, L"%ls", tail);
+  buf[1023] = 0;
+  return buf;
+}
+static const DlList news_list = {news_open_list, news_count, news_row, news_help, NULL, NULL, NULL, NULL, NULL};
+
+bool dl_news_open(void) {
+  if (!dl_game->version || !dl_game->news || dl_news_seen == news_hash()) return false;
+  dl_news_seen = news_hash();
+  dl_open_page(PG_NEWS);
+  return true;
+}
+
+// ---- the first start: the language, the controls, the display, then the game
+static void welcome_ctrl(void) { dl_open_page(PG_WELCOME_CTRL); }
+static void welcome_screen(void) { dl_open_page(PG_WELCOME_SCREEN); }
+static const DlRow welcome_rows[] = {
+    {DL_CHOICE, dl_texts[T_UILANG], dl_texts[T_H_UILANG], &dl_cfg.ui_lang, DL_LANGS - 1, NULL, show_lang, lang_changed},
+    {DL_ACTION, dl_texts[T_W_NEXT], dl_texts[T_H_W_LANG], NULL, 0, NULL, NULL, welcome_ctrl},
+};
+static const DlRow welcome_ctrl_rows[] = {
+    {.kind = DL_PAGE, .label = dl_texts[T_KEYS], .help = dl_texts[T_H_KEYS], .page = PG_KEYS},
+    {.kind = DL_PAGE, .label = dl_texts[T_PAD], .help = dl_texts[T_H_PAD], .page = PG_PAD},
+    {DL_ACTION, dl_texts[T_W_NEXT], dl_texts[T_H_W_CTRL], NULL, 0, NULL, NULL, welcome_screen},
+};
+static const DlRow welcome_screen_rows[] = {
+    {DL_SWITCH, dl_texts[T_FULL], dl_texts[T_H_FULL], &dl_cfg.fullscreen, 1, NULL, NULL, full_changed},
+    {DL_CHOICE, dl_texts[T_PRESET], dl_texts[T_H_PRESET], &preset_pick, 3, NULL, preset_show, preset_changed},
+    {DL_ACTION, dl_texts[T_W_PLAY], dl_texts[T_H_W_PLAY], NULL, 0, NULL, NULL, dl_play},
+};
+
+void dl_welcome_open(void) {
+  if (dl_news_seen == 0 && dl_game->version && dl_game->news) dl_news_seen = news_hash(); // a first start has no news to show
+  dl_open_page(PG_WELCOME);
+}
+
+// ---- Internet (both off at first): the status on Discord, the look for a newer version
+static const wchar_t *updates_more(void) {
+  static wchar_t out[160];
+  const wchar_t *t = dl_update_text();
+  _snwprintf(out, 159, L"\n\n%ls", t ? t : L"");
+  out[159] = 0;
+  return t ? out : L"";
+}
+static const DlRow net_discord_row = {DL_SWITCH, dl_texts[T_DISCORD], dl_texts[T_H_DISCORD], &dl_cfg.discord, 1, NULL, NULL, dl_discord_changed};
+static const DlRow net_updates_row = {DL_SWITCH, dl_texts[T_UPDATES], dl_texts[T_H_UPDATES], &dl_cfg.updates, 1, NULL, NULL, dl_online_start, 0, updates_more};
+static const DlRow net_open_row = {DL_ACTION, dl_texts[T_UPD_OPEN], dl_texts[T_H_UPD_OPEN], NULL, 0, NULL, NULL, dl_update_open};
+static const DlRow net_row = {.kind = DL_PAGE, .label = dl_texts[T_NET], .help = dl_texts[T_H_NET], .page = PG_NET};
+
 void dl_menu_init(void) {
   bool saves = dl_game->save_state && dl_game->load_state;
   if (dl_game->pad_layout || dl_game->pad_menu) pad_rows[sizeof pad_rows / sizeof pad_rows[0] - 1].help = dl_texts[T_PH_DEFAULTS_GAME];
@@ -181,6 +307,7 @@ void dl_menu_init(void) {
   dl_page(dl_texts[T_TAB_SOUND], sound_rows, sizeof sound_rows / sizeof sound_rows[0]);
   dl_page(dl_texts[T_TAB_CTRL], ctrl_rows, sizeof ctrl_rows / sizeof ctrl_rows[0]);
   if (dl_game->rumble) dl_page_insert(PG_CTRL, 3, &rumble_row); // after the three pages of assignments
+  if (dl_ahead_ok()) dl_page_insert(PG_CTRL, 3 + (dl_game->rumble ? 1 : 0), &ahead_row);
   dl_page(dl_texts[T_TAB_KEYS], keys_rows, sizeof keys_rows / sizeof keys_rows[0]);
   dl_page(dl_texts[T_TAB_PAD], pad_rows, sizeof pad_rows / sizeof pad_rows[0]);
   DlPage *pf = &dl_pages[dl_page(dl_texts[T_TAB_PADFN], padfn_rows, 1)];
@@ -192,6 +319,15 @@ void dl_menu_init(void) {
   dl_list_page(dl_texts[T_TAB_SAVES], &dl_saves_list);
   dl_list_page(dl_texts[T_TAB_SHOTS], &dl_shots_list);
   dl_page(dl_texts[T_TAB_A11Y], a11y_rows, sizeof a11y_rows / sizeof a11y_rows[0]);
+  dl_list_page(dl_texts[T_TAB_BACKUPS], &dl_backups_list);
+  dl_list_page(dl_texts[T_TAB_NEWS], &news_list);
+  dl_page(dl_texts[T_TAB_WELCOME], welcome_rows, sizeof welcome_rows / sizeof welcome_rows[0]);
+  dl_page(dl_texts[T_TAB_CTRL], welcome_ctrl_rows, sizeof welcome_ctrl_rows / sizeof welcome_ctrl_rows[0]);
+  dl_page(dl_texts[T_TAB_IMAGE], welcome_screen_rows, sizeof welcome_screen_rows / sizeof welcome_screen_rows[0]);
+  DlPage *pn = &dl_pages[dl_page(dl_texts[T_TAB_NET], NULL, 0)];
+  if (DISCORD_APP_ID[0]) pn->rows[pn->n++] = &net_discord_row;
+  if (UPDATE_URL[0]) { pn->rows[pn->n++] = &net_updates_row; pn->rows[pn->n++] = &net_open_row; }
+  if (pn->n) dl_page_insert(PG_CTRL, dl_pages[PG_CTRL].n, &net_row); // the last row of the Controls page
   add_section(SEC_PLAY, -1, 0xE768, dl_texts[T_PLAY], dl_texts[T_H_PLAY]);
   if (saves) add_section(SEC_PAGE, PG_SAVES, 0xE74E, dl_texts[T_SAVES], dl_texts[T_H_SAVES]);
   add_section(SEC_PAGE, PG_SHOTS, 0xE722, dl_texts[T_SHOTS], dl_texts[T_H_SHOTS]);
@@ -205,9 +341,16 @@ static void safe_load(void) {
   if (n == -1) dl_session_resume();
   else if (n >= 0 && dl_state_load(n)) dl_play();
 }
+static const wchar_t *report_where(void) { // under the help of "Copy the crash report": its file
+  static wchar_t out[MAX_PATH + 8];
+  _snwprintf(out, MAX_PATH + 7, L"\n%hs", dl_report_file());
+  out[MAX_PATH + 7] = 0;
+  return out;
+}
 static const DlRow safe_rows[] = {
     {DL_ACTION, dl_texts[T_SAFE_KEEP], dl_texts[T_H_SAFE_KEEP], NULL, 0, NULL, NULL, safe_keep},
     {DL_ACTION, dl_texts[T_SAFE_RESTART], dl_texts[T_H_SAFE_RESTART], NULL, 0, NULL, NULL, dl_safe_restart},
+    {DL_ACTION, dl_texts[T_SAFE_REPORT], dl_texts[T_H_SAFE_REPORT], NULL, 0, NULL, NULL, dl_report_copy, 0, report_where},
 };
 static const DlRow safe_load_row = {DL_ACTION, dl_texts[T_SAFE_LOAD], dl_texts[T_H_SAFE_LOAD], NULL, 0, NULL, NULL, safe_load};
 
@@ -284,7 +427,7 @@ static const wchar_t *row_value(const DlRow *r) {
 }
 
 static void open_page(int page) {
-  if (dl_mode == M_PAGE && stack_n < 8) stack[stack_n++] = dl_cur;
+  if (dl_mode == M_PAGE && stack_n < 8) { stack_sel[stack_n] = dl_sel; stack[stack_n++] = dl_cur; }
   dl_mode = M_PAGE;
   dl_cur = page;
   dl_sel = 0;
@@ -295,7 +438,7 @@ static void page_back(void) {
   if (stack_n) {
     int from = dl_cur;
     dl_cur = stack[--stack_n];
-    dl_sel = 0;
+    dl_sel = stack_sel[stack_n];
     for (int k = 0; k < dl_pages[dl_cur].n; k++) // the row that opened the page we come from
       if (dl_pages[dl_cur].rows[k]->kind == DL_PAGE && dl_pages[dl_cur].rows[k]->page == from) dl_sel = k;
   } else dl_mode = M_SIDE;
@@ -708,6 +851,12 @@ void dl_draw_menu(HDC wdc) {
   } else {
     const DlSection *s = &dl_secs[dl_side];
     help = s->kind == SEC_PLAY && dl_started ? TX(T_H_RESUME) : s->kind == SEC_PLAY && dl_session_exists() ? dl_session_help() : dl_tr(s->help);
+    static wchar_t with_update[1100];
+    if (s->kind == SEC_PLAY && dl_update_text()) { // a newer version: told under "Play"
+      _snwprintf(with_update, 1099, L"%ls\n\n%ls", help, dl_update_text());
+      with_update[1099] = 0;
+      help = with_update;
+    }
   }
 
   // the game's picture: large beside the bar's actions, small beside a page; on a list with
@@ -870,6 +1019,21 @@ int dl_audit(void) {
           dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
         }
       }
+    }
+    if (dl_game->save_state && dl_game->load_state) { // the keyboard on screen (a slot named with a controller)
+      dl_mode = M_PAGE;
+      dl_cur = PG_SAVES;
+      list_read = -1;
+      dl_sel = 0;
+      page_rows(PG_SAVES);
+      dl_saves_osk_sample(true);
+      dl_draw_menu(wdc);
+      if (dl_menu_bits) {
+        GetClientRect(dl_hwnd, &rc);
+        snprintf(path, sizeof path, "%s" DL_SEP "%d_keyboard.png", dl_audit_dir, l);
+        dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
+      }
+      dl_saves_osk_sample(false);
     }
     pause_rows(); // the pause menu, each row selected
     dl_mode = M_PAUSE;

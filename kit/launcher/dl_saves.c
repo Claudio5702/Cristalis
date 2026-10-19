@@ -8,6 +8,8 @@
 // have a page of the setup screen: a list, the picture of the selected row instead of the live preview.
 #include "dl_int.h"
 #include <shellapi.h>
+#include <time.h>
+#include <wctype.h>
 
 int dl_slot;
 bool dl_state_taken; // a state was loaded since the game was last started or stopped
@@ -17,6 +19,7 @@ static wchar_t note_text[160];
 static DWORD note_until;
 
 void dl_notef(const wchar_t *fmt, int n) {
+  if (dl_running_ahead()) return;
   _snwprintf(note_text, 159, fmt, n);
   note_text[159] = 0;
   note_until = GetTickCount() + 2500;
@@ -25,6 +28,7 @@ void dl_notef(const wchar_t *fmt, int n) {
 }
 
 void dl_note(const wchar_t *text) {
+  if (dl_running_ahead()) return;
   lstrcpynW(note_text, text, 160);
   note_until = GetTickCount() + 2500;
   if (!note_until) note_until = 1;
@@ -168,6 +172,7 @@ bool dl_state_save(int n) {
   dl_slot_path(p, n, "");
   dl_slot_path(pic, n, ".png");
   make_parent(p);
+  dl_backup(p);
   if (!dl_game->save_state || !dl_game->save_state(p)) return false;
   dl_save_png(pic, dl_pic, dl_pic_w, dl_pic_h);
   return true;
@@ -221,6 +226,7 @@ void dl_session_keep(void) {
   char p[MAX_PATH];
   dl_slot_path(p, -1, "");
   make_parent(p);
+  dl_backup(p);
   dl_game->save_state(p);
 }
 
@@ -391,7 +397,46 @@ static FILETIME sv_time[SV_MAX];
 static wchar_t sv_name[DL_SLOTS][NAME_MAX + 1], edit_buf[NAME_MAX + 1];
 static int edit_slot = -1; // slot whose name is being typed (F2)
 
-static int saves_count(void) { return DL_SLOTS + (dl_game->auto_slots < 8 ? dl_game->auto_slots : 8); }
+// ---- the keyboard on screen, for a slot's name with a controller (X): three rows of the page of keys
+// in hand, then the page, capitals, space, erase and OK, two cells each
+static bool osk;
+static int osk_x, osk_y, osk_page;
+static bool osk_caps;
+#define OSK_PAGES 4
+static const wchar_t *const osk_rows[OSK_PAGES][3] = {
+    {L"abcdefghij", L"klmnopqrst", L"uvwxyz-'.!"},
+    {L"1234567890", L"&@#+=?:;()", L"/,_~*%$<>\u20AC"},
+    {L"\u00E0\u00E2\u00E4\u00E7\u00E9\u00E8\u00EA\u00EB\u00EE\u00EF", L"\u00F4\u00F6\u00F9\u00FB\u00FC\u00F1\u00DF\u00E3\u00F5\u00E1",
+     L"\u00ED\u00F3\u00FA\u00EC\u00F2\u00E5\u00E6\u00F8\u0153\u00BF"},
+    {L"\u3042\u3044\u3046\u3048\u304A\u304B\u304D\u304F\u3051\u3053", L"\u3055\u3057\u3059\u305B\u305D\u305F\u3061\u3064\u3066\u3068",
+     L"\u306A\u306B\u306C\u306D\u306E\u306F\u3072\u3075\u3078\u307B"},
+};
+static const wchar_t *const osk_page_names[OSK_PAGES] = {L"abc", L"123", L"\u00E0\u00E9", L"\u3042"};
+
+// The character of a key, with capitals (Latin letters) or katakana (kana); 0 for none.
+static wchar_t osk_char(int page, int x, int y) {
+  wchar_t c = osk_rows[page][y][x];
+  if (!osk_caps) return c;
+  if (c >= 0x3041 && c <= 0x3096) return (wchar_t)(c + 0x60); // hiragana to katakana
+  if (c == 0x00DF) return c;
+  return (wchar_t)towupper(c);
+}
+
+static void osk_press(void);
+
+static int states_count(void) { return DL_SLOTS + (dl_game->auto_slots < 8 ? dl_game->auto_slots : 8); }
+// then the row opening a page of the game (dl_saves_more), if it has one
+static int more_page = -1;
+static const wchar_t *const *more_label, *const *more_help;
+void dl_saves_more(int page, const wchar_t *const *label, const wchar_t *const *help) {
+  more_page = page;
+  more_label = label;
+  more_help = help;
+}
+// then "Backups" (the page of the copies kept before the saves were written over)
+static bool is_backups(int k) { return k == states_count(); }
+static bool is_more(int k) { return more_page >= 0 && k == states_count() + 1; }
+static int saves_count(void) { return states_count() + 1 + (more_page >= 0); }
 
 // A slot's name is kept beside it in "<state>.name" (UTF-8).
 static void name_read(int n, wchar_t *out) {
@@ -419,7 +464,7 @@ static void name_write(int n, const wchar_t *name) {
 static void saves_open(void) {
   pic_forget();
   confirm = edit_slot = -1;
-  for (int k = 0; k < saves_count(); k++) {
+  for (int k = 0; k < states_count(); k++) {
     char p[MAX_PATH];
     WIN32_FILE_ATTRIBUTE_DATA fa;
     dl_slot_path(p, k, "");
@@ -429,6 +474,16 @@ static void saves_open(void) {
   }
 }
 static void saves_row(int k, wchar_t *label, wchar_t *value) {
+  if (is_backups(k)) {
+    lstrcpynW(label, TX(T_BACKUPS), 64);
+    value[0] = 0;
+    return;
+  }
+  if (is_more(k)) {
+    lstrcpynW(label, dl_tr(more_label), 64);
+    value[0] = 0;
+    return;
+  }
   if (k == edit_slot) _snwprintf(label, 63, L"%d. %ls_", k, edit_buf);
   else if (k < DL_SLOTS && sv_name[k][0]) _snwprintf(label, 63, L"%d. %ls", k, sv_name[k]);
   else if (k < DL_SLOTS) wsprintfW(label, TX(T_SLOT_N), k);
@@ -440,11 +495,13 @@ static void saves_row(int k, wchar_t *label, wchar_t *value) {
 }
 static const wchar_t *saves_help(int k) {
   static wchar_t buf[512];
-  if (edit_slot >= 0) return TX(T_SVH_NAME);
+  if (edit_slot >= 0) return osk ? TX(T_SVH_OSK) : TX(T_SVH_NAME);
+  if (is_more(k)) return more_help ? dl_tr(more_help) : L"";
+  if (is_backups(k)) return TX(T_H_BACKUPS);
   if (confirm == k) return TX(T_SVH_CONFIRM);
   if (k >= DL_SLOTS) return sv_used[k] ? TX(T_SVH_AUTO) : TX(T_SVH_AUTO_EMPTY);
   if (!sv_used[k]) return dl_started ? TX(T_SVH_SAVE) : TX(T_SVH_EMPTY);
-  _snwprintf(buf, 511, L"%ls%ls", TX(T_SVH_LOAD), TX(T_SVH_F2));
+  _snwprintf(buf, 511, L"%ls%ls", TX(T_SVH_LOAD), dl_input_kind == DL_IN_KEYS ? TX(T_SVH_F2) : TX(T_SVH_X));
   buf[511] = 0;
   return buf;
 }
@@ -487,10 +544,32 @@ static bool state_picture(int k) {
   return ok;
 }
 
+// The keyboard on screen, in the place of the slot's picture.
+static void osk_draw(HDC dc, double x0, double y0, double x1, double y1) {
+  double cw = (x1 - x0 - 8) / 10, ch = (y1 - y0 - 8) / 4;
+  for (int y = 0; y < 4; y++)
+    for (int x = 0; x < 10; x += y < 3 ? 1 : 2) {
+      double cx0 = x0 + 4 + x * cw, cy0 = y0 + 4 + y * ch, cx1 = cx0 + cw * (y < 3 ? 1 : 2) - 2, cy1 = cy0 + ch - 2;
+      bool on = osk_y == y && (y < 3 ? osk_x == x : osk_x / 2 == x / 2);
+      if (on) ui_cursor(dc, cx0, cy0, cx1, cy1);
+      else ui_box(dc, cx0, cy0, cx1, cy1, ui_tint(RGB(6, 18, 58)), 3);
+      wchar_t label[8] = {0};
+      if (y < 3) label[0] = osk_char(osk_page, x, y);
+      else if (x == 0) lstrcpyW(label, osk_page_names[(osk_page + 1) % OSK_PAGES]);
+      else if (x == 2) lstrcpyW(label, osk_caps ? L"aA" : L"Aa");
+      else if (x == 4) lstrcpyW(label, L"_");
+      else if (x == 6) lstrcpyW(label, L"\u2190");
+      else lstrcpyW(label, L"OK");
+      ui_text(dc, f_small, (cx0 + cx1) / 2, (cy0 + cy1) / 2 - 7, label, on ? RGB(255, 255, 255) : COL_VALUE, TA_CENTER);
+    }
+}
+
 static bool saves_preview(void *dcv, int k, double x0, double y0, double x1, double y1) {
   HDC dc = dcv;
+  if (osk && edit_slot >= 0) { osk_draw(dc, x0, y0, x1, y1); return true; }
   char p[MAX_PATH];
   int w, h;
+  if (is_more(k) || is_backups(k)) return false; // the live picture
   if (!sv_used[k]) { empty_text(dc, x0, y0, x1, y1); return true; }
   dl_slot_path(p, k, ".png");
   HBITMAP bmp = pic_of(p, k, &w, &h);
@@ -500,6 +579,8 @@ static bool saves_preview(void *dcv, int k, double x0, double y0, double x1, dou
 }
 static void saves_enter(int k) {
   confirm = -1;
+  if (is_more(k)) { dl_open_page(more_page); return; }
+  if (is_backups(k)) { dl_open_page(PG_BACKUPS); return; }
   if (sv_used[k]) { // load it and play
     if (k < DL_SLOTS) dl_slot = k;
     if (!dl_state_load(k)) { dl_notef(TX(T_M_LOAD_FAIL), k); return; }
@@ -512,7 +593,7 @@ static void saves_enter(int k) {
   }
 }
 static void saves_erase(int k) {
-  if (!sv_used[k]) return;
+  if (is_more(k) || is_backups(k) || !sv_used[k]) return;
   if (confirm != k) { confirm = k; return; }
   static const char *const ext[] = {"", ".png", ".name"};
   for (int e = 0; e < 3; e++) {
@@ -531,9 +612,31 @@ bool dl_saves_key(int vk) {
     edit_slot = dl_sel;
     lstrcpyW(edit_buf, sv_name[dl_sel]);
     confirm = -1;
+    osk = dl_input_kind != DL_IN_KEYS; // from a controller: the keyboard on screen
+    osk_x = osk_y = 0;
+    dl_dirty = true;
     return true;
   }
   int len = lstrlenW(edit_buf);
+  if (osk) { // A types the key in hand, B erases (and leaves when there is nothing more), X keeps the name
+    switch (vk) {
+      case VK_LEFT: osk_x = osk_y < 3 ? (osk_x + 9) % 10 : (osk_x / 2 * 2 + 8) % 10; break;
+      case VK_RIGHT: osk_x = osk_y < 3 ? (osk_x + 1) % 10 : (osk_x / 2 * 2 + 2) % 10; break;
+      case VK_UP: osk_y = (osk_y + 3) % 4; break;
+      case VK_DOWN: osk_y = (osk_y + 1) % 4; break;
+      case VK_RETURN: osk_press(); break;
+      case VK_ESCAPE:
+        if (len) edit_buf[len - 1] = 0;
+        else osk = false, edit_slot = -1;
+        break;
+      case VK_DELETE: osk_caps = !osk_caps; break;
+      case VK_PRIOR: osk_page = (osk_page + OSK_PAGES - 1) % OSK_PAGES; break;
+      case VK_NEXT: osk_page = (osk_page + 1) % OSK_PAGES; break;
+      case VK_F2: vk = VK_RETURN; osk = false; break; // keep the name, as Enter does on the keyboard
+      default: break;
+    }
+    if (osk) { dl_dirty = true; return true; }
+  }
   if (vk == VK_RETURN) {
     while (len && edit_buf[len - 1] == L' ') edit_buf[--len] = 0;
     lstrcpyW(sv_name[edit_slot], edit_buf);
@@ -545,6 +648,32 @@ bool dl_saves_key(int vk) {
   return true;
 }
 
+// --ui-audit: slot 0 being named with the keyboard on screen (on: true), or not any more.
+void dl_saves_osk_sample(bool on) {
+  osk = on;
+  edit_slot = on ? 0 : -1;
+  osk_x = 3;
+  osk_y = 1;
+  osk_page = 0;
+  lstrcpyW(edit_buf, L"Abc");
+}
+
+// A on the keyboard on screen: the key in hand.
+static void osk_press(void) {
+  if (osk_y < 3) { dl_saves_char(osk_char(osk_page, osk_x, osk_y)); return; }
+  switch (osk_x / 2) {
+    case 0: osk_page = (osk_page + 1) % OSK_PAGES; break;
+    case 1: osk_caps = !osk_caps; break;
+    case 2: dl_saves_char(L' '); break;
+    case 3: {
+      int len = lstrlenW(edit_buf);
+      if (len) edit_buf[len - 1] = 0;
+      break;
+    }
+    default: osk = false; dl_saves_key(VK_RETURN); break; // OK
+  }
+}
+
 void dl_saves_char(wchar_t c) {
   int len = lstrlenW(edit_buf);
   if (edit_slot < 0 || c < 32 || c == 127 || len >= NAME_MAX) return;
@@ -554,6 +683,215 @@ void dl_saves_char(wchar_t c) {
 }
 
 const DlList dl_saves_list = {saves_open, saves_count, saves_row, saves_help, saves_enter, saves_erase, list_moved, NULL, saves_preview};
+
+// ---- backups: the versions of the saves before they were written over, in saves\backup\
+// ("<file>.1" the newest to "<file>.3", and "<file>.path" where it goes back). A new copy only when
+// the newest is BK_GAP seconds old: a burst of writings keeps the version from before it.
+#define BK_KEEP 3
+#define BK_GAP (10 * 60)
+
+static void bk_dir(char *out, bool make) {
+  char saves[MAX_PATH];
+  folder(saves, "saves", make);
+  snprintf(out, MAX_PATH, "%s" DL_SEP "backup", saves);
+  if (make) CreateDirectoryA(out, NULL);
+}
+
+static const char *leaf(const char *p) {
+  const char *s = strrchr(p, DL_SEPC);
+  return s ? s + 1 : p;
+}
+
+static void bk_path(char *out, const char *name, int k) {
+  char d[MAX_PATH];
+  bk_dir(d, false);
+  if (k) snprintf(out, MAX_PATH, "%s" DL_SEP "%s.%d", d, name, k);
+  else snprintf(out, MAX_PATH, "%s" DL_SEP "%s.path", d, name);
+}
+
+// A whole file in memory (free it), or NULL.
+static char *read_all(const char *path, size_t *n) {
+  FILE *f = fopen(path, "rb");
+  if (!f) return NULL;
+  fseek(f, 0, SEEK_END);
+  long len = ftell(f);
+  fseek(f, 0, SEEK_SET);
+  char *buf = len >= 0 ? malloc((size_t)len + 1) : NULL;
+  if (buf && fread(buf, 1, (size_t)len, f) != (size_t)len) { free(buf); buf = NULL; }
+  fclose(f);
+  if (buf) { buf[len] = 0; *n = (size_t)len; }
+  return buf;
+}
+
+static bool write_all(const char *path, const char *data, size_t n) {
+  FILE *f = fopen(path, "wb");
+  if (!f) return false;
+  bool ok = fwrite(data, 1, n, f) == n;
+  return fclose(f) == 0 && ok;
+}
+
+// Seconds since the file was last written, or -1 when it is not there.
+static long long age_of(const char *path) {
+  WIN32_FILE_ATTRIBUTE_DATA fa;
+  if (!GetFileAttributesExA(path, GetFileExInfoStandard, &fa)) return -1;
+  unsigned long long t = (unsigned long long)fa.ftLastWriteTime.dwHighDateTime << 32 | fa.ftLastWriteTime.dwLowDateTime;
+  return (long long)time(NULL) - (long long)(t / 10000000ull - 11644473600ull);
+}
+
+static void backup_make(const char *path, bool force) {
+  if (!file_exists(path)) return;
+  const char *name = leaf(path);
+  char newest[MAX_PATH], a[MAX_PATH], b[MAX_PATH], d[MAX_PATH];
+  bk_path(newest, name, 1);
+  long long age = age_of(newest);
+  if (!force && age >= 0 && age < BK_GAP) return;
+  size_t n;
+  char *data = read_all(path, &n);
+  if (!data) return;
+  bk_dir(d, true);
+  bk_path(a, name, BK_KEEP);
+  DeleteFileA(a);
+  for (int k = BK_KEEP - 1; k >= 1; k--) {
+    bk_path(a, name, k);
+    bk_path(b, name, k + 1);
+    rename(a, b);
+  }
+  write_all(newest, data, n);
+  free(data);
+  bk_path(a, name, 0);
+  write_all(a, path, strlen(path));
+}
+
+void dl_backup(const char *path) { backup_make(path, false); }
+
+#define BK_MAX 96
+typedef struct { char name[MAX_PATH], where[MAX_PATH]; int k, state; FILETIME t; } Backup; // state: the save state n it is (-1 the session), or -2 a file of the game
+static Backup bk[BK_MAX];
+// A second press confirms (Enter puts back, Delete erases) when no other key came between: the menus
+// call moved() before every key but Delete, so Enter, Enter counts one moved() between, a click none.
+static int bk_n, bk_confirm = -1, bk_erase = -1, bk_keys;
+
+// Which save state of DarkLauncher a path is: 0-9, DL_SLOTS + k, -1 the session; -2 none (a game's file).
+static int state_of(const char *where) {
+  for (int n = -1; n < states_count(); n++) {
+    char p[MAX_PATH];
+    dl_slot_path(p, n, "");
+    if (!strcmp(p, where)) return n;
+  }
+  return -2;
+}
+
+static void bk_open(void) {
+  char d[MAX_PATH], pattern[MAX_PATH];
+  bk_dir(d, false);
+  snprintf(pattern, sizeof pattern, "%s" DL_SEP "*.path", d);
+  bk_n = 0;
+  bk_confirm = bk_erase = -1;
+  WIN32_FIND_DATAA fd;
+  HANDLE h = FindFirstFileA(pattern, &fd);
+  if (h == INVALID_HANDLE_VALUE) return;
+  do {
+    char name[MAX_PATH], where[MAX_PATH] = "", p[MAX_PATH];
+    snprintf(name, sizeof name, "%s", fd.cFileName);
+    char *dot = strrchr(name, '.');
+    if (dot) *dot = 0;
+    bk_path(p, name, 0);
+    size_t n;
+    char *w = read_all(p, &n);
+    if (!w) continue;
+    snprintf(where, sizeof where, "%s", w);
+    free(w);
+    for (int k = 1; k <= BK_KEEP && bk_n < BK_MAX; k++) {
+      WIN32_FILE_ATTRIBUTE_DATA fa;
+      bk_path(p, name, k);
+      if (!GetFileAttributesExA(p, GetFileExInfoStandard, &fa)) continue;
+      Backup *b = &bk[bk_n++];
+      snprintf(b->name, sizeof b->name, "%s", name);
+      snprintf(b->where, sizeof b->where, "%s", where);
+      b->k = k;
+      b->t = fa.ftLastWriteTime;
+      b->state = state_of(where);
+    }
+  } while (FindNextFileA(h, &fd));
+  FindClose(h);
+  for (int i = 1; i < bk_n; i++) // the newest first
+    for (int j = i; j > 0 && CompareFileTime(&bk[j].t, &bk[j - 1].t) > 0; j--) {
+      Backup t = bk[j];
+      bk[j] = bk[j - 1];
+      bk[j - 1] = t;
+    }
+}
+
+static int bk_count(void) { return bk_n; }
+
+static void bk_row(int k, wchar_t *label, wchar_t *value) {
+  const Backup *b = &bk[k];
+  if (b->state == -1) lstrcpynW(label, TX(T_BK_SESSION), 64);
+  else if (b->state >= 0 && b->state < DL_SLOTS && sv_name[b->state][0]) _snwprintf(label, 63, L"%d. %ls", b->state, sv_name[b->state]);
+  else if (b->state >= 0 && b->state < DL_SLOTS) wsprintfW(label, TX(T_SLOT_N), b->state);
+  else if (b->state >= DL_SLOTS && dl_game->auto_labels) lstrcpynW(label, dl_tr(dl_game->auto_labels[b->state - DL_SLOTS]), 64);
+  else MultiByteToWideChar(CP_ACP, 0, leaf(b->where), -1, label, 64);
+  label[63] = 0;
+  row_date(&b->t, value, false);
+}
+
+static const wchar_t *bk_help(int k) {
+  static wchar_t buf[600];
+  if (bk_confirm == k && !bk_keys) return TX(T_BKH_CONFIRM);
+  if (bk_erase == k && !bk_keys) return TX(T_SVH_CONFIRM);
+  _snwprintf(buf, 599, L"%ls%ls", TX(T_BKH), bk[k].state == -2 ? TX(T_BKH_GAME) : L"");
+  buf[599] = 0;
+  return buf;
+}
+
+// Enter twice: the version goes back where it came from, the one there now kept in turn; a file of
+// the game's own is read at start, so the program starts again.
+static void bk_enter(int k) {
+  if (bk_confirm != k || bk_keys > 1) {
+    bk_confirm = k;
+    bk_erase = -1;
+    bk_keys = 0;
+    return;
+  }
+  bk_confirm = -1;
+  Backup b = bk[k];
+  char p[MAX_PATH];
+  size_t n;
+  bk_path(p, b.name, b.k);
+  char *data = read_all(p, &n);
+  if (!data) return;
+  backup_make(b.where, true);
+  make_parent(b.where);
+  bool ok = write_all(b.where, data, n);
+  free(data);
+  if (ok && b.state >= 0) { // a save state: its picture was of the version written over
+    char pic[MAX_PATH];
+    dl_slot_path(pic, b.state, ".png");
+    DeleteFileA(pic);
+  }
+  if (ok && b.state == -2) { dl_relaunch(); return; }
+  if (ok) dl_note(TX(T_BK_RESTORED));
+  bk_open();
+  saves_open();
+}
+
+static void bk_erase_row(int k) {
+  if (bk_erase != k || bk_keys > 0) {
+    bk_erase = k;
+    bk_confirm = -1;
+    bk_keys = 0;
+    return;
+  }
+  bk_erase = -1;
+  char p[MAX_PATH];
+  bk_path(p, bk[k].name, bk[k].k);
+  DeleteFileA(p);
+  bk_open();
+}
+
+static void bk_moved(void) { bk_keys++; }
+
+const DlList dl_backups_list = {bk_open, bk_count, bk_row, bk_help, bk_enter, bk_erase_row, bk_moved, dl_texts[T_BK_NONE], NULL};
 
 // screenshots: the pictures of the captures folder, newest first
 #define SHOT_MAX 1000

@@ -9,6 +9,13 @@
 #include <stdio.h>
 #include "dl.h"
 #include "project.h"
+// What the project gives for the Internet page (project.h); "" leaves the row out.
+#ifndef DISCORD_APP_ID
+#define DISCORD_APP_ID "" // its Discord application (discord.com/developers), for the player's status
+#endif
+#ifndef UPDATE_URL
+#define UPDATE_URL "" // a text file (http or https): the newest version on its first line, its page on the second
+#endif
 
 // The separator of a path's parts: Windows' own, or "/" elsewhere (the paths given to the game are the
 // system's).
@@ -32,6 +39,8 @@ typedef struct {
   int turbo, pause_menu, bg_pause; // fast forward (0 max, 2 2x, 4 4x), Esc opens the pause menu, pause behind another window
   int win_x, win_y, win_w, win_h;
   int rumble;                         // the controller vibrates when the game asks (dl_rumble)
+  int ahead;                          // run-ahead: frames the picture is ahead of the input (0-2; DlGame.run_ahead)
+  int discord, updates;               // Internet (both off at first): the status on Discord, a look for a newer version at start
   int contrast, cvd, still, big_help; // accessibility: high contrast, colour-blind filter (0 off, 1 protan, 2 deutan, 3 tritan), still sky, large help text
 } DlCfg;
 extern DlCfg dl_cfg;
@@ -131,6 +140,7 @@ bool dl_session_resume(void);      // "Continue": the session kept at the last c
 void dl_session_keep(void);        // at closing time
 int dl_latest_auto(void);          // the newest of the session and the game's automatic states (-1, DL_SLOTS + k), -2: none
 const wchar_t *dl_session_help(void);
+void dl_saves_osk_sample(bool on); // --ui-audit: the keyboard on screen, as when a slot is named with a controller
 bool dl_saves_key(int vk);         // a key on the Saves page while a slot's name is typed; true: used
 void dl_saves_char(wchar_t c);
 void dl_state_loaded(void);
@@ -146,12 +156,14 @@ void dl_toast_sample(void); // --gpu-check: the first achievement's box, without
 HBITMAP dl_picture_load(const char *path, int *w, int *h);
 
 // the program's own list pages (DlList: dl.h)
+extern const DlList dl_backups_list; // dl_saves.c: the copies kept before the saves were written over
 extern const DlList dl_saves_list, dl_shots_list;
 void dl_draw_picture(HDC dc, HBITMAP bmp, int pw, int ph, double x0, double y0, double x1, double y1); // whole, centred
 void dl_draw_pixels(HDC dc, const u32 *px, int pw, int ph, double aspect, double x0, double y0, double x1, double y1);
 
 // ---- what the setup screen shows (dl_menu.c)
 enum { M_GAME, M_SIDE, M_PAGE, M_TRY, M_PAUSE };
+bool dl_ahead_ok(void);  // the game can be run ahead (DlGame.run_ahead and its state in memory)
 extern int dl_mode;  // M_SIDE: the navigation bar is in hand; M_PAGE: a page
 extern int dl_side;  // entry of the navigation bar
 extern int dl_cur;   // page shown
@@ -181,11 +193,21 @@ extern DlSection dl_secs[DL_MAX_SECTIONS];
 extern int dl_sec_n, dl_sec_top; // entries before dl_sec_top: upper group of the bar
 
 // the kit's pages, in this order (DL_PAGE_LANGS, DL_PAGE_IMAGE, DL_PAGE_SOUND first)
-enum { PG_CTRL = DL_PAGE_SOUND + 1, PG_KEYS, PG_PAD, PG_PADFN, PG_HOT, PG_SAVES, PG_SHOTS, PG_A11Y };
+enum { PG_CTRL = DL_PAGE_SOUND + 1, PG_KEYS, PG_PAD, PG_PADFN, PG_HOT, PG_SAVES, PG_SHOTS, PG_A11Y, PG_BACKUPS, PG_NEWS, PG_WELCOME, PG_WELCOME_CTRL, PG_WELCOME_SCREEN, PG_NET };
 void dl_page_insert(int page, int at, const DlRow *row);
 void dl_menu_init(void);   // the kit's pages and the first entry, before the game's setup()
 void dl_menu_finish(void); // the kit's entries after the game's ones
 void dl_safe_page_open(void); // the safe mode page, at the start of a run after a crash
+void dl_online_start(void);      // dl_app.c: the look for a newer version, at start (if the player wants it)
+void dl_online_follow(void);     // from the main loop: Discord's status, the result of that look
+const wchar_t *dl_update_text(void); // "Version 1.4 is out." when a newer version was found, else NULL
+void dl_update_open(void);       // its page in the browser
+void dl_discord_changed(void);   // the Discord switch moved
+bool dl_news_open(void);       // the game's news, the first time its version starts; false: none to show
+void dl_welcome_open(void);    // the first start's pages (language, controls, display)
+extern int dl_news_seen;       // the version whose news were shown (a hash of DlGame.version)
+void dl_report_copy(void);      // dl_app.c: the crash report into the clipboard
+const char *dl_report_file(void); // where it was written ("" none)
 extern u32 *dl_menu_bits;                         // the setup screen as last drawn (window size)
 extern int dl_prev_x, dl_prev_y, dl_prev_w, dl_prev_h; // the live picture in it (dl_prev_w 0: none)
 void dl_draw_menu(HDC wdc);
@@ -240,6 +262,13 @@ enum {
   T_PK_ON, T_PK_OFF, T_PK_FOLDER, T_H_PK_FOLDER, T_PK_RESTART, T_H_PK_RESTART, T_H_PK, T_PK_DIR, T_PK_FILE,
   T_ACH, T_TAB_ACH, T_H_ACH, T_ACH_SECRET, T_ACH_H_SECRET, T_ACH_UNLOCKED, T_ACH_COUNT, T_ACH_LOCKED, T_ACH_DATE,
   T_SAFE_TAB, T_SAFE_KEEP, T_H_SAFE_KEEP, T_SAFE_LOAD, T_H_SAFE_LOAD, T_SAFE_RESTART, T_H_SAFE_RESTART,
+  T_AHEAD, T_H_AHEAD, T_AHEAD_1, T_AHEAD_2,
+  T_SAFE_REPORT, T_H_SAFE_REPORT, T_M_REPORT,
+  T_SVH_X, T_SVH_OSK,
+  T_NET, T_H_NET, T_TAB_NET, T_DISCORD, T_H_DISCORD, T_DS_PLAYING, T_DS_MENUS, T_UPDATES, T_H_UPDATES, T_UPD_NEW, T_UPD_NONE, T_UPD_OPEN, T_H_UPD_OPEN,
+  T_TAB_NEWS, T_H_NEWS, T_TAB_WELCOME, T_W_NEXT, T_H_W_LANG, T_H_W_CTRL, T_W_PLAY, T_H_W_PLAY,
+  T_PRESET, T_H_PRESET, T_PRE_CUSTOM, T_PRE_ORIGINAL, T_PRE_LARGE, T_PRE_CRT, T_PRE_FAST,
+  T_BACKUPS, T_H_BACKUPS, T_TAB_BACKUPS, T_BKH, T_BKH_GAME, T_BKH_CONFIRM, T_BK_NONE, T_BK_SESSION, T_BK_RESTORED,
   T_COUNT
 };
 extern const wchar_t *const dl_texts[T_COUNT][DL_LANGS];

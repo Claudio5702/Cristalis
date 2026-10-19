@@ -454,7 +454,8 @@ static int uninstall(const char *self, const char *dir, bool all) {
   int removed = 0;
   static const char *const program[] = {EXE, "avcodec-62.dll", "avutil-60.dll", "swresample-6.dll", "FFmpeg-LICENSE.txt",
                                         "LISEZMOI.txt", "README.txt", "crystal_defenders.log", "crystal_defenders.prev.log", "Jouer.bat",
-                                        "gpu_shaders.bin"}; // DarkLauncher's compiled shaders
+                                        "gpu_shaders.bin", // DarkLauncher's compiled shaders
+                                        "crystal_defenders.ini.crash.txt", "crystal_defenders.ini.running"}; // its crash report and run marker
   for (size_t k = 0; k < sizeof program / sizeof program[0]; k++) removed += delete_file(d, program[k]);
   // the game's data, its saves and achievements, screenshots, DarkLauncher's list of the achievements
   static const char *const data[] = {"game", "userdata", "captures", "saves"};

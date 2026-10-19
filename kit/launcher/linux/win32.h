@@ -186,6 +186,29 @@ HANDLE CreateWaitableTimerExW(void *attributes, LPCWSTR name, DWORD flags, DWORD
 BOOL SetWaitableTimer(HANDLE h, const LARGE_INTEGER *due, LONG period, void *routine, void *arg, BOOL resume);
 DWORD MsgWaitForMultipleObjects(DWORD n, const HANDLE *handles, BOOL all, DWORD ms, DWORD wake);
 HANDLE CreateEventW(void *attributes, BOOL manual, BOOL initial, LPCWSTR name); // auto-reset, for the sound
+// errors that end the program (signals), the module an address is in (dladdr)
+typedef struct { DWORD ExceptionCode, ExceptionFlags; void *ExceptionRecord, *ExceptionAddress; DWORD NumberParameters; ULONG_PTR ExceptionInformation[15]; } EXCEPTION_RECORD;
+typedef struct { EXCEPTION_RECORD *ExceptionRecord; void *ContextRecord; } EXCEPTION_POINTERS;
+typedef LONG (*LPTOP_LEVEL_EXCEPTION_FILTER)(EXCEPTION_POINTERS *ep);
+#define EXCEPTION_CONTINUE_SEARCH 0
+LPTOP_LEVEL_EXCEPTION_FILTER SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER f);
+#define GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT 2
+#define GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS 4
+BOOL GetModuleHandleExA(DWORD flags, const char *addr, HMODULE *out);
+// a thread (pthread), and a value changed at once for every thread
+typedef DWORD (*LPTHREAD_START_ROUTINE)(void *arg);
+HANDLE CreateThread(void *attributes, size_t stack, LPTHREAD_START_ROUTINE fn, void *arg, DWORD flags, DWORD *id);
+LONG InterlockedExchange(volatile LONG *at, LONG value);
+// the clipboard (SDL's), text only
+#define CF_UNICODETEXT 13
+#define GMEM_MOVEABLE 2
+HANDLE GlobalAlloc(UINT flags, size_t n);
+void *GlobalLock(HANDLE h);
+BOOL GlobalUnlock(HANDLE h);
+BOOL OpenClipboard(HWND w);
+BOOL EmptyClipboard(void);
+HANDLE SetClipboardData(UINT format, HANDLE h);
+BOOL CloseClipboard(void);
 DWORD GetCurrentProcessId(void);
 #define PROCESS_QUERY_LIMITED_INFORMATION 0x1000
 #define STILL_ACTIVE 259

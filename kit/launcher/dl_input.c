@@ -420,6 +420,7 @@ void dl_pad_poll(void) {
   if (pressed & ((1u << 12) | (1u << 4))) dl_key(VK_RETURN); // A or Start
   if (pressed & (1u << 13)) dl_key(VK_ESCAPE);               // B
   if (pressed & (1u << 15)) dl_key(VK_DELETE);               // Y
+  if (pressed & (1u << 14)) dl_key(VK_F2);                   // X: a slot's name (the keyboard on screen)
   if (pressed & (1u << 8)) dl_key(VK_PRIOR);                 // LB, RB: Page Up, Page Down (a pack moved)
   if (pressed & (1u << 9)) dl_key(VK_NEXT);
   if (joy) { // other controllers: the buttons of the game's A and B

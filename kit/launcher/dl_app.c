@@ -5,6 +5,24 @@
 #include <math.h>
 #include <mmsystem.h>
 #include <dwmapi.h>
+#include <time.h>
+#ifndef _WIN32
+#include <sys/utsname.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <unistd.h>
+#include <dlfcn.h>
+// libcurl's write callback (the update look on Linux): the body, as much as fits
+static size_t http_take(char *p, size_t size, size_t n, void *ctx) {
+  struct { char *out; int cap, n; } *s = ctx;
+  size_t len = size * n, room = (size_t)(s->cap - s->n);
+  memcpy(s->out + s->n, p, len < room ? len : room);
+  s->n += (int)(len < room ? len : room);
+  return len;
+}
+#endif
 
 DlCfg dl_cfg = {.ui_lang = 2, .volume = 10, .menu_sound = 1, .gpu = 1, .turbo = 0, .pause_menu = 1, .bg_pause = 1, .rumble = 1};
 HWND dl_hwnd;
@@ -41,8 +59,11 @@ static void add_setting(const char *name, int *value, int lo, int hi, int group)
 
 void dl_setting(const char *name, int *value, int lo, int hi, bool keep) { add_setting(name, value, lo, hi, keep ? 0 : 2); }
 
+static bool first_start; // no settings file yet: the first start's pages
+
 static void settings_load(void) {
   FILE *f = fopen(ini_path, "r");
+  first_start = !f;
   if (!f) return;
   char line[160], name[96];
   int v;
@@ -110,9 +131,137 @@ static bool last_run_failed(void) {
   return !(got == 1 && pid != GetCurrentProcessId() && same_program_runs((DWORD)pid)); // another copy running: no crash
 }
 
+// The marker also says, every ten seconds, where the player is (and the game's line, DlGame.report);
+// an error that ends the program adds itself to it. The next run writes the crash report from it.
+static time_t run_started;
+
+static void now_text(char *out, int n, time_t t) {
+  struct tm tm;
+#ifdef _WIN32
+  localtime_s(&tm, &t);
+#else
+  localtime_r(&t, &tm);
+#endif
+  strftime(out, (size_t)n, "%Y-%m-%d %H:%M:%S", &tm);
+}
+
 static void run_mark_write(void) {
   FILE *f = fopen(run_mark, "w");
-  if (f) { fprintf(f, "%lu\n", (unsigned long)GetCurrentProcessId()); fclose(f); }
+  if (!f) return;
+  if (!run_started) run_started = time(NULL);
+  char started[32], seen[32], game_line[200] = "";
+  now_text(started, sizeof started, run_started);
+  now_text(seen, sizeof seen, time(NULL));
+  if (dl_game->report && dl_start_done) dl_game->report(game_line, sizeof game_line - 1);
+  game_line[sizeof game_line - 1] = 0;
+  for (char *c = game_line; *c; c++)
+    if (*c == '\n' || *c == '\r') *c = ' ';
+  const char *where = dl_mode == M_GAME ? "playing" : dl_mode == M_PAUSE ? "pause menu" : dl_mode == M_PAGE ? "setup screen, a page" : "setup screen";
+  char page[24] = "";
+  if (dl_mode == M_PAGE) snprintf(page, sizeof page, " %d", dl_cur);
+  fprintf(f, "%lu\nstarted %s\nlast seen %s\nwhere %s%s%s\nplayed this run %ld s\ngame %s\n", (unsigned long)GetCurrentProcessId(), started, seen,
+          where, page, dl_started ? "" : ", game not started yet", (long)(time(NULL) - run_started), game_line);
+  fclose(f);
+}
+
+// An error that ends the program: what and where, added to the marker (then Windows does as usual).
+static LONG WINAPI crash_filter(EXCEPTION_POINTERS *ep) {
+  FILE *f = fopen(run_mark, "a");
+  if (f && ep && ep->ExceptionRecord) {
+    void *at = ep->ExceptionRecord->ExceptionAddress;
+    HMODULE m = NULL;
+    char mod[MAX_PATH] = "?";
+    if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (const char *)at, &m) && m)
+      GetModuleFileNameA(m, mod, sizeof mod);
+    const char *leaf = strrchr(mod, DL_SEPC);
+    fprintf(f, "error 0x%08lX at %s+0x%llX\n", (unsigned long)ep->ExceptionRecord->ExceptionCode, leaf ? leaf + 1 : mod,
+            (unsigned long long)((uintptr_t)at - (uintptr_t)m));
+  }
+  if (f) fclose(f);
+  return EXCEPTION_CONTINUE_SEARCH;
+}
+
+// ---- the crash report: "<settings file>.crash.txt", written at the start of the run after one that
+// did not close normally, from the marker it left
+static char report_path[MAX_PATH], *report_text;
+
+const char *dl_report_file(void) { return report_path; }
+
+static const char *error_name(unsigned long code) {
+  switch (code) {
+    case 0xC0000005: return "access violation";
+    case 0xC000001D: return "illegal instruction";
+    case 0xC0000094: return "integer division by zero";
+    case 0xC00000FD: return "stack overflow";
+    case 0xC0000409: return "stack buffer overrun";
+    case 0x40000015: return "aborted";
+    default: return "";
+  }
+}
+
+static void report_write(void) {
+  size_t cap = 65536, n = 0;
+  char *out = malloc(cap);
+  if (!out) return;
+  #define ADD(...) do { int w_ = snprintf(out + n, cap - n, __VA_ARGS__); if (w_ > 0) n += (size_t)w_ < cap - n ? (size_t)w_ : cap - n - 1; } while (0)
+  char now[32], line[512];
+  now_text(now, sizeof now, time(NULL));
+  ADD("%s (%s): crash report\nDarkLauncher " DL_VERSION "\nWritten %s\n", PROJECT_NAME, GAME_NAME, now);
+#ifdef _WIN32
+  typedef LONG(WINAPI * RtlGetVersionFn)(OSVERSIONINFOW *);
+  RtlGetVersionFn rtl = (RtlGetVersionFn)(void *)GetProcAddress(GetModuleHandleW(L"ntdll.dll"), "RtlGetVersion");
+  OSVERSIONINFOW v = {sizeof v};
+  if (rtl && !rtl(&v)) ADD("Windows %lu.%lu build %lu\n", v.dwMajorVersion, v.dwMinorVersion, v.dwBuildNumber);
+#else
+  struct utsname u;
+  if (!uname(&u)) ADD("%s %s %s\n", u.sysname, u.release, u.machine);
+#endif
+  ADD("\nThe last run:\n");
+  bool error = false;
+  FILE *f = fopen(run_mark, "r");
+  if (f) {
+    bool first = true;
+    while (fgets(line, sizeof line, f)) {
+      if (first) { first = false; continue; } // its process id
+      unsigned long code;
+      if (sscanf(line, "error 0x%lX", &code) == 1) {
+        error = true;
+        line[strcspn(line, "\r\n")] = 0;
+        ADD("  %s (%s)\n", line, error_name(code));
+      } else ADD("  %s", line);
+    }
+    fclose(f);
+  }
+  if (!error) ADD("  no error was recorded: the program was ended from outside (the system, a driver, the power, closed by force...)\n");
+  ADD("\nSettings (%s):\n", ini_path);
+  f = fopen(ini_path, "r");
+  if (f) {
+    while (fgets(line, sizeof line, f)) ADD("  %s", line);
+    fclose(f);
+  }
+  #undef ADD
+  snprintf(report_path, sizeof report_path, "%s.crash.txt", ini_path);
+  f = fopen(report_path, "wb");
+  if (f) { fwrite(out, 1, n, f); fclose(f); }
+  free(report_text);
+  report_text = out;
+}
+
+// "Copy the crash report": into the clipboard, as text.
+void dl_report_copy(void) {
+  if (!report_text) return;
+  int wn = MultiByteToWideChar(CP_UTF8, 0, report_text, -1, NULL, 0);
+  HANDLE h = wn > 0 ? GlobalAlloc(GMEM_MOVEABLE, (size_t)wn * sizeof(wchar_t)) : NULL;
+  wchar_t *w = h ? GlobalLock(h) : NULL;
+  if (!w) return;
+  MultiByteToWideChar(CP_UTF8, 0, report_text, -1, w, wn);
+  GlobalUnlock(h);
+  if (OpenClipboard(dl_hwnd)) {
+    EmptyClipboard();
+    SetClipboardData(CF_UNICODETEXT, h);
+    CloseClipboard();
+    dl_note(TX(T_M_REPORT));
+  }
 }
 
 static void run_mark_clear(void) { if (run_mark[0]) DeleteFileA(run_mark); }
@@ -619,6 +768,299 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   return DefWindowProcW(h, msg, wp, lp);
 }
 
+// ---------------------------------------------------------------- online, both off at first: the
+// player's status on Discord (its local pipe; DISCORD_APP_ID), the look for a newer version at start
+// (UPDATE_URL, through WinHTTP or libcurl, loaded when needed: nothing more to link)
+static char *json_text(char *out, size_t cap, const char *s) { // s as a JSON string's content
+  size_t n = 0;
+  for (; *s && n + 7 < cap; s++) {
+    unsigned char c = (unsigned char)*s;
+    if (c == '"' || c == '\\') { out[n++] = '\\'; out[n++] = (char)c; }
+    else if (c < 32) n += (size_t)snprintf(out + n, cap - n, "\\u%04x", c);
+    else out[n++] = (char)c;
+  }
+  out[n] = 0;
+  return out;
+}
+
+static void utf8_of(const wchar_t *w, char *out, int cap) {
+  if (WideCharToMultiByte(CP_UTF8, 0, w, -1, out, cap, NULL, NULL) <= 0) out[0] = 0;
+}
+
+#ifdef _WIN32
+static HANDLE ds_pipe = INVALID_HANDLE_VALUE;
+static bool ds_up(void) { return ds_pipe != INVALID_HANDLE_VALUE; }
+static void ds_close(void) { if (ds_up()) CloseHandle(ds_pipe); ds_pipe = INVALID_HANDLE_VALUE; }
+static bool ds_connect(void) {
+  for (int k = 0; k < 10 && !ds_up(); k++) {
+    char name[MAX_PATH];
+    const char *test = getenv("DL_DISCORD_PIPE"); // tests: another pipe than Discord's
+    if (test) snprintf(name, sizeof name, "\\\\.\\pipe\\%s", test);
+    else snprintf(name, sizeof name, "\\\\.\\pipe\\discord-ipc-%d", k);
+    ds_pipe = CreateFileA(name, GENERIC_READ | GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+    if (test) break;
+  }
+  return ds_up();
+}
+static bool ds_write(const void *p, size_t n) {
+  DWORD w = 0;
+  if (WriteFile(ds_pipe, p, (DWORD)n, &w, NULL) && w == n) return true;
+  ds_close();
+  return false;
+}
+static void ds_drain(void) { // Discord's answers, read and left
+  DWORD avail = 0;
+  while (ds_up() && PeekNamedPipe(ds_pipe, NULL, 0, NULL, &avail, NULL) && avail) {
+    char b[1024];
+    DWORD got = 0;
+    if (!ReadFile(ds_pipe, b, avail < sizeof b ? avail : sizeof b, &got, NULL)) ds_close();
+  }
+  if (ds_up() && !PeekNamedPipe(ds_pipe, NULL, 0, NULL, &avail, NULL)) ds_close(); // Discord has gone
+}
+#else
+static int ds_fd = -1;
+static bool ds_up(void) { return ds_fd >= 0; }
+static void ds_close(void) { if (ds_fd >= 0) close(ds_fd); ds_fd = -1; }
+static bool ds_connect(void) {
+  const char *dir = getenv("XDG_RUNTIME_DIR"), *test = getenv("DL_DISCORD_PIPE");
+  for (int k = 0; k < 10 && !ds_up(); k++) {
+    struct sockaddr_un a = {.sun_family = AF_UNIX};
+    if (test) snprintf(a.sun_path, sizeof a.sun_path, "%s", test);
+    else snprintf(a.sun_path, sizeof a.sun_path, "%s/discord-ipc-%d", dir ? dir : "/tmp", k);
+    int fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (fd < 0) return false;
+    if (connect(fd, (struct sockaddr *)&a, sizeof a)) { close(fd); if (test) break; continue; }
+    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+    ds_fd = fd;
+  }
+  return ds_up();
+}
+static bool ds_write(const void *p, size_t n) {
+  if (send(ds_fd, p, n, MSG_NOSIGNAL) == (ssize_t)n) return true;
+  ds_close();
+  return false;
+}
+static void ds_drain(void) {
+  char b[1024];
+  for (;;) {
+    ssize_t got = recv(ds_fd, b, sizeof b, 0);
+    if (got > 0) continue;
+    if (got == 0 || (errno != EAGAIN && errno != EWOULDBLOCK)) ds_close();
+    return;
+  }
+}
+#endif
+
+static bool ds_frame(int op, const char *json) { // Discord's frames: an opcode, a length, the JSON
+  size_t n = strlen(json);
+  char *buf = malloc(n + 8);
+  if (!buf) return false;
+  uint32_t head[2] = {(uint32_t)op, (uint32_t)n};
+  memcpy(buf, head, 8);
+  memcpy(buf + 8, json, n);
+  bool ok = ds_write(buf, n + 8);
+  free(buf);
+  return ok;
+}
+
+static time_t online_started;
+
+static void discord_follow(bool now) {
+  static DWORD last;
+  static int last_mode = -1;
+  if (!DISCORD_APP_ID[0]) return;
+  if (!dl_cfg.discord) { ds_close(); return; }
+  if (!now && GetTickCount() - last < 15000 && dl_mode == last_mode) return; // Discord takes a status every 15 s at most
+  if (!now && GetTickCount() - last < 4000) return;
+  last = GetTickCount();
+  last_mode = dl_mode;
+  if (!ds_up()) {
+    if (!ds_connect()) return;
+    char hello[160];
+    snprintf(hello, sizeof hello, "{\"v\":1,\"client_id\":\"%s\"}", DISCORD_APP_ID);
+    if (!ds_frame(0, hello)) return;
+  }
+  ds_drain();
+  if (!ds_up()) return;
+  if (!online_started) online_started = time(NULL);
+  char status[256] = "", where[96], a[600], b[256], json[1400];
+  if (dl_game->status && dl_start_done) dl_game->status(status, sizeof status - 1);
+  status[sizeof status - 1] = 0;
+  utf8_of(TX(dl_mode == M_GAME ? T_DS_PLAYING : T_DS_MENUS), where, sizeof where);
+  static unsigned nonce;
+  snprintf(json, sizeof json,
+           "{\"cmd\":\"SET_ACTIVITY\",\"args\":{\"pid\":%lu,\"activity\":{\"details\":\"%s\",\"state\":\"%s\",\"timestamps\":{\"start\":%lld}}},\"nonce\":\"%u\"}",
+           (unsigned long)GetCurrentProcessId(), json_text(a, sizeof a, status[0] ? status : where), json_text(b, sizeof b, status[0] ? where : PROJECT_NAME),
+           (long long)online_started, ++nonce);
+  ds_frame(1, json);
+}
+
+void dl_discord_changed(void) { discord_follow(true); }
+
+// ---- a newer version: UPDATE_URL read on a thread of its own, once at start
+static volatile LONG upd_state; // 0 nothing yet, 1 looking, 2 a newer version, 3 none newer (or no answer)
+static char upd_version[32], upd_page[512];
+
+static int http_get(const char *url, char *out, int cap) { // the body, or -1
+  int n = -1;
+#ifdef _WIN32
+  typedef void *HI;
+  typedef HI(WINAPI * OpenFn)(LPCWSTR, DWORD, LPCWSTR, LPCWSTR, DWORD);
+  typedef BOOL(WINAPI * CrackFn)(LPCWSTR, DWORD, DWORD, void *);
+  typedef HI(WINAPI * ConnectFn)(HI, LPCWSTR, WORD, DWORD);
+  typedef HI(WINAPI * RequestFn)(HI, LPCWSTR, LPCWSTR, LPCWSTR, LPCWSTR, LPCWSTR *, DWORD);
+  typedef BOOL(WINAPI * SendFn)(HI, LPCWSTR, DWORD, void *, DWORD, DWORD, DWORD_PTR);
+  typedef BOOL(WINAPI * ReceiveFn)(HI, void *);
+  typedef BOOL(WINAPI * ReadFn)(HI, void *, DWORD, DWORD *);
+  typedef BOOL(WINAPI * CloseFn)(HI);
+  typedef BOOL(WINAPI * TimeoutsFn)(HI, int, int, int, int);
+  HMODULE w = LoadLibraryA("winhttp.dll");
+  if (!w) return -1;
+  OpenFn h_open = (OpenFn)(void *)GetProcAddress(w, "WinHttpOpen");
+  CrackFn h_crack = (CrackFn)(void *)GetProcAddress(w, "WinHttpCrackUrl");
+  ConnectFn h_connect = (ConnectFn)(void *)GetProcAddress(w, "WinHttpConnect");
+  RequestFn h_request = (RequestFn)(void *)GetProcAddress(w, "WinHttpOpenRequest");
+  SendFn h_send = (SendFn)(void *)GetProcAddress(w, "WinHttpSendRequest");
+  ReceiveFn h_receive = (ReceiveFn)(void *)GetProcAddress(w, "WinHttpReceiveResponse");
+  ReadFn h_read = (ReadFn)(void *)GetProcAddress(w, "WinHttpReadData");
+  CloseFn h_close = (CloseFn)(void *)GetProcAddress(w, "WinHttpCloseHandle");
+  TimeoutsFn h_timeouts = (TimeoutsFn)(void *)GetProcAddress(w, "WinHttpSetTimeouts");
+  if (!h_open || !h_crack || !h_connect || !h_request || !h_send || !h_receive || !h_read || !h_close) return -1;
+  wchar_t wurl[1024], host[256], path[1024];
+  MultiByteToWideChar(CP_UTF8, 0, url, -1, wurl, 1024);
+  struct { DWORD size; LPWSTR scheme; DWORD scheme_n; int scheme_kind; LPWSTR host; DWORD host_n; WORD port; LPWSTR user; DWORD user_n; LPWSTR pass;
+           DWORD pass_n; LPWSTR path; DWORD path_n; LPWSTR extra; DWORD extra_n; } uc = {sizeof uc};
+  uc.host = host, uc.host_n = 256, uc.path = path, uc.path_n = 1024, uc.scheme_n = (DWORD)-1, uc.extra_n = (DWORD)-1;
+  if (!h_crack(wurl, 0, 0, &uc)) return -1;
+  HI s = h_open(L"" PROJECT_NAME, 0, NULL, NULL, 0), c = NULL, r = NULL;
+  if (s && h_timeouts) h_timeouts(s, 5000, 5000, 5000, 5000);
+  if (s) c = h_connect(s, host, uc.port, 0);
+  if (c) r = h_request(c, L"GET", path, NULL, NULL, NULL, uc.scheme_kind == 2 ? 0x00800000 /* WINHTTP_FLAG_SECURE */ : 0);
+  if (r && h_send(r, NULL, 0, NULL, 0, 0, 0) && h_receive(r, NULL)) {
+    n = 0;
+    DWORD got;
+    while (n < cap && h_read(r, out + n, (DWORD)(cap - n), &got) && got) n += (int)got;
+  }
+  if (r) h_close(r);
+  if (c) h_close(c);
+  if (s) h_close(s);
+#else
+  typedef void CURL;
+  void *lib = dlopen("libcurl.so.4", RTLD_NOW);
+  if (!lib) return -1;
+  CURL *(*easy_init)(void) = (CURL * (*)(void)) dlsym(lib, "curl_easy_init");
+  int (*easy_setopt)(CURL *, int, ...) = (int (*)(CURL *, int, ...))dlsym(lib, "curl_easy_setopt");
+  int (*easy_perform)(CURL *) = (int (*)(CURL *))dlsym(lib, "curl_easy_perform");
+  void (*easy_cleanup)(CURL *) = (void (*)(CURL *))dlsym(lib, "curl_easy_cleanup");
+  CURL *h = easy_init && easy_setopt && easy_perform && easy_cleanup ? easy_init() : NULL;
+  if (h) {
+    struct { char *out; int cap, n; } sink = {out, cap, 0};
+    size_t (*take)(char *, size_t, size_t, void *) = http_take;
+    easy_setopt(h, 10002 /* CURLOPT_URL */, url);
+    easy_setopt(h, 20011 /* CURLOPT_WRITEFUNCTION */, take);
+    easy_setopt(h, 10001 /* CURLOPT_WRITEDATA */, &sink);
+    easy_setopt(h, 13 /* CURLOPT_TIMEOUT */, 10L);
+    easy_setopt(h, 52 /* CURLOPT_FOLLOWLOCATION */, 1L);
+    easy_setopt(h, 99 /* CURLOPT_NOSIGNAL */, 1L);
+    if (!easy_perform(h)) n = sink.n;
+    easy_cleanup(h);
+  }
+#endif
+  return n;
+}
+
+// "1.10" > "1.9": the numbers compared one by one
+static int version_cmp(const char *a, const char *b) {
+  while (*a || *b) {
+    long x = strtol(a, (char **)&a, 10), y = strtol(b, (char **)&b, 10);
+    if (x != y) return x < y ? -1 : 1;
+    if (*a == '.') a++;
+    if (*b == '.') b++;
+    if ((*a && (*a < '0' || *a > '9')) || (*b && (*b < '0' || *b > '9'))) break;
+  }
+  return 0;
+}
+
+static DWORD WINAPI update_thread(void *arg) {
+  (void)arg;
+  char body[2048];
+  int n = http_get(UPDATE_URL, body, sizeof body - 1);
+  LONG result = 3;
+  if (n > 0) {
+    body[n] = 0;
+    char *nl = strpbrk(body, "\r\n");
+    char *page = nl ? nl + strspn(nl, "\r\n") : NULL;
+    if (nl) *nl = 0;
+    if (page) page[strcspn(page, "\r\n")] = 0;
+    snprintf(upd_version, sizeof upd_version, "%s", body);
+    snprintf(upd_page, sizeof upd_page, "%s", page && !strncmp(page, "http", 4) ? page : "");
+    if (upd_version[0] && dl_game->version && version_cmp(upd_version, dl_game->version) > 0) result = 2;
+  }
+  InterlockedExchange(&upd_state, result);
+  return 0;
+}
+
+void dl_online_start(void) {
+  if (!UPDATE_URL[0] || !dl_cfg.updates || upd_state == 1) return;
+  InterlockedExchange(&upd_state, 1);
+  HANDLE t = CreateThread(NULL, 0, update_thread, NULL, 0, NULL);
+  if (t) CloseHandle(t);
+  else upd_state = 3;
+}
+
+const wchar_t *dl_update_text(void) {
+  static wchar_t out[96];
+  if (upd_state == 2) _snwprintf(out, 95, TX(T_UPD_NEW), upd_version);
+  else if (upd_state == 3 && dl_cfg.updates) lstrcpynW(out, TX(T_UPD_NONE), 96);
+  else return NULL;
+  out[95] = 0;
+  return upd_state == 2 || dl_mode == M_PAGE ? out : NULL; // "the newest" only on the Internet page
+}
+
+void dl_update_open(void) {
+  if (upd_state == 2 && upd_page[0]) ShellExecuteA(dl_hwnd, "open", upd_page, NULL, NULL, SW_SHOWNORMAL);
+}
+
+void dl_online_follow(void) {
+  static LONG told;
+  if (upd_state == 2 && !told) { // once: a note, and "Play" says it
+    told = 1;
+    dl_note(dl_update_text());
+    dl_dirty = true;
+  }
+  discord_follow(false);
+}
+
+// ---------------------------------------------------------------- run-ahead
+// The picture one or two frames ahead of the input (DlGame.run_ahead): the frame is played for good
+// (its sound is heard), its state kept, then the frames ahead are played with the same buttons (their
+// picture is shown, their sound is not), and the state put back.
+static bool ahead_now;
+static void *ahead_state;
+static size_t ahead_cap;
+
+bool dl_running_ahead(void) { return ahead_now; }
+bool dl_ahead_ok(void) { return dl_game->run_ahead && dl_game->state_size && dl_game->state_to_mem && dl_game->state_from_mem; }
+
+static int play_frame(const DlInput *in, s16 *audio, int audio_max, int ahead) {
+  int n = dl_game->frame(in, dl_pic, audio, audio_max);
+  if (ahead <= 0 || !dl_ahead_ok()) return n;
+  size_t size = dl_game->state_size();
+  if (size > ahead_cap) {
+    void *more = realloc(ahead_state, size);
+    if (!more) return n;
+    ahead_state = more;
+    ahead_cap = size;
+  }
+  static s16 silent[8192];
+  dl_game->state_to_mem(ahead_state);
+  ahead_now = true;
+  for (int k = 0; k < ahead; k++) dl_game->frame(in, dl_pic, silent, audio_max < 4096 ? audio_max : 4096);
+  ahead_now = false;
+  dl_game->state_from_mem(ahead_state);
+  return n;
+}
+
 // ---------------------------------------------------------------- using the computer lightly
 #ifndef CREATE_WAITABLE_TIMER_HIGH_RESOLUTION
 #define CREATE_WAITABLE_TIMER_HIGH_RESOLUTION 0x00000002
@@ -759,11 +1201,15 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   add_setting("pause_menu", &dl_cfg.pause_menu, 0, 1, 2);
   add_setting("bg_pause", &dl_cfg.bg_pause, 0, 1, 2);
   if (game->rumble) add_setting("rumble", &dl_cfg.rumble, 0, 1, 2);
+  if (dl_ahead_ok()) add_setting("run_ahead", &dl_cfg.ahead, 0, 2, 2);
+  if (DISCORD_APP_ID[0]) add_setting("discord", &dl_cfg.discord, 0, 1, 0); // kept by "Defaults": the player's choice
+  if (UPDATE_URL[0]) add_setting("update_check", &dl_cfg.updates, 0, 1, 0);
   add_setting("state_slot", &dl_slot, 0, DL_SLOTS - 1, 0);
   add_setting("a11y_contrast", &dl_cfg.contrast, 0, 1, 0); // kept by "Defaults": a player who needs them keeps them
   add_setting("a11y_cvd", &dl_cfg.cvd, 0, 3, 0);
   add_setting("a11y_still", &dl_cfg.still, 0, 1, 0);
   add_setting("a11y_big_help", &dl_cfg.big_help, 0, 1, 0);
+  add_setting("news_seen", &dl_news_seen, 0, 0x7FFFFFFF, 0);
   add_setting("win_x", &dl_cfg.win_x, -32000, 32000, 0);
   add_setting("win_y", &dl_cfg.win_y, -32000, 32000, 0);
   add_setting("win_w", &dl_cfg.win_w, 0, 32000, 0);
@@ -776,7 +1222,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   if (!dl_lang_ok(dl_cfg.ui_lang)) dl_cfg.ui_lang = dl_lang_default(); // a language this game's texts do not have
   for (int k = 0; k < setting_n; k++) saved[k] = *settings[k].value; // as read: nothing to write yet
   bool crashed = !dl_audit_dir && !gpu_check_dir && !bench_secs && last_run_failed();
-  if (crashed) safe_start();
+  if (crashed) { report_write(); safe_start(); }
 
   // window: where it was last time, otherwise 1280 x 800 in the middle of the screen
   WNDCLASSW wc = {0};
@@ -810,7 +1256,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     dl_start_done = true;
     return gpu_check();
   }
-  if (!bench_secs) run_mark_write(); // removed when the program closes normally
+  if (!bench_secs) { run_mark_write(); SetUnhandledExceptionFilter(crash_filter); } // the marker is removed when the program closes normally
   if (dl_cfg.gpu) dl_gpu_prepare(); // the shaders, on a second thread; GDI shows the first pictures
   ShowWindow(dl_hwnd, SW_SHOW);
   bool want_full = dl_cfg.fullscreen;
@@ -831,7 +1277,10 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   int audio_max = game->audio_rate > 0 ? (int)(game->audio_rate / (game->fps > 0 ? game->fps : 60.0)) * 2 + 64 : 0;
   s16 *audio = audio_max ? malloc((size_t)audio_max * 4) : NULL;
   u32 bench_frames = 0, bench_gaps = 0;
+  if (!bench_secs) dl_online_start();
   if (crashed) dl_safe_page_open();
+  else if (first_start && !bench_secs && !play_now) dl_welcome_open();
+  else if (!bench_secs && !play_now) dl_news_open();
   else if (bench_secs || play_now) dl_play();
   LARGE_INTEGER bench_t0, menu_next = {0}; // menu_next: when the sky behind the setup screen moves next
   QueryPerformanceCounter(&bench_t0);
@@ -852,6 +1301,16 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (!dl_running) break;
     dl_pad_poll();
     dl_gpu_follow(false);
+    if (!bench_secs) dl_online_follow();
+    { // where the player is, for a crash report (the marker), every ten seconds
+      static DWORD marked;
+      static int marked_mode = -1;
+      if (!bench_secs && (GetTickCount() - marked > 10000 || dl_mode != marked_mode)) { // and at once when the player goes elsewhere
+        marked = GetTickCount();
+        marked_mode = dl_mode;
+        run_mark_write();
+      }
+    }
     if (!bench_secs) settings_follow();
     { // a note that has just ended goes away
       static bool noted;
@@ -899,7 +1358,8 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (run && (steps > 1 || (pace ? queued < 3 : now.QuadPart >= next.QuadPart))) {
       DlInput in = {dl_mode == M_GAME ? dl_game_buttons() : 0};
       for (int k = 0; k < speed; k++) {
-        int n = game->frame(&in, dl_pic, audio, audio_max);
+        // run-ahead only in play, at the normal speed
+        int n = play_frame(&in, audio, audio_max, dl_mode == M_GAME && dl_started && speed == 1 ? dl_cfg.ahead : 0);
         if (n > 0 && audio && !turbo) audio_add(audio, n);
         if (dl_mode == M_GAME && dl_started) dl_rewind_snap();
         fps_frames++;

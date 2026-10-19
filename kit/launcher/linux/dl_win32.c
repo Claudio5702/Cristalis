@@ -3,6 +3,7 @@
 // drew into it, shown through an SDL texture when the DC is given back), the sound (waveOut and
 // PlaySound as SDL audio streams), the keyboard (Windows' virtual-key codes, laid out as the system's
 // keyboard), files and folders, the trash, dates, the process, and the pictures GDI+ reads (PNG, BMP).
+#define _GNU_SOURCE // dladdr, and the registers of a signal's context
 #include "win32.h"
 #include <SDL3/SDL.h>
 #include <ctype.h>
@@ -14,6 +15,9 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#include <dlfcn.h>
+#include <pthread.h>
+#include <ucontext.h>
 
 #include <locale.h>
 
@@ -219,11 +223,99 @@ BOOL QueryFullProcessImageNameW(HANDLE h, DWORD flags, wchar_t *out, DWORD *n) {
   return TRUE;
 }
 
+// The module an address is in (GetModuleHandleExA): its base, and its file for GetModuleFileNameA.
+static void *module_base;
+static char module_file[MAX_PATH];
+
+BOOL GetModuleHandleExA(DWORD flags, const char *addr, HMODULE *out) {
+  Dl_info info;
+  *out = NULL;
+  if (!(flags & GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS) || !dladdr(addr, &info) || !info.dli_fbase) return FALSE;
+  module_base = info.dli_fbase;
+  snprintf(module_file, sizeof module_file, "%s", info.dli_fname ? info.dli_fname : "?");
+  *out = (HMODULE)info.dli_fbase;
+  return TRUE;
+}
+
 DWORD GetModuleFileNameA(HMODULE m, char *out, DWORD n) {
-  (void)m;
+  if (m && m == module_base) { snprintf(out, n, "%s", module_file); return (DWORD)strlen(out); }
   if (!exe_of(getpid(), out, n)) { out[0] = 0; return 0; }
   return (DWORD)strlen(out);
 }
+
+// Errors that end the program: the signals, as Windows' exceptions, to the filter; then the signal
+// does what it does by default.
+static LPTOP_LEVEL_EXCEPTION_FILTER crash_filter_fn;
+
+static void on_fatal_signal(int sig, siginfo_t *si, void *ctx) {
+  EXCEPTION_RECORD r = {0};
+  EXCEPTION_POINTERS ep = {&r, ctx};
+  r.ExceptionCode = sig == SIGSEGV || sig == SIGBUS ? 0xC0000005 : sig == SIGILL ? 0xC000001D : sig == SIGFPE ? 0xC0000094 : 0x40000015;
+#if defined(__x86_64__)
+  r.ExceptionAddress = (void *)((ucontext_t *)ctx)->uc_mcontext.gregs[REG_RIP];
+#elif defined(__aarch64__)
+  r.ExceptionAddress = (void *)((ucontext_t *)ctx)->uc_mcontext.pc;
+#else
+  r.ExceptionAddress = si->si_addr;
+#endif
+  (void)si;
+  if (crash_filter_fn) crash_filter_fn(&ep);
+  signal(sig, SIG_DFL);
+  raise(sig);
+}
+
+LPTOP_LEVEL_EXCEPTION_FILTER SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_FILTER f) {
+  LPTOP_LEVEL_EXCEPTION_FILTER old = crash_filter_fn;
+  crash_filter_fn = f;
+  struct sigaction sa;
+  memset(&sa, 0, sizeof sa);
+  sa.sa_sigaction = on_fatal_signal;
+  sa.sa_flags = SA_SIGINFO | SA_RESETHAND;
+  sigemptyset(&sa.sa_mask);
+  static const int sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT};
+  for (size_t k = 0; k < sizeof sigs / sizeof sigs[0]; k++) sigaction(sigs[k], &sa, NULL);
+  return old;
+}
+
+// A thread: pthread's, left to end by itself (CloseHandle only lets the handle go).
+typedef struct { LPTHREAD_START_ROUTINE fn; void *arg; } ThreadStart;
+static void *thread_main(void *p) {
+  ThreadStart t = *(ThreadStart *)p;
+  free(p);
+  t.fn(t.arg);
+  return NULL;
+}
+HANDLE CreateThread(void *attributes, size_t stack, LPTHREAD_START_ROUTINE fn, void *arg, DWORD flags, DWORD *id) {
+  (void)attributes, (void)stack, (void)flags;
+  ThreadStart *t = malloc(sizeof *t);
+  Handle *h = calloc(1, sizeof *h);
+  pthread_t th;
+  if (!t || !h) { free(t); free(h); return NULL; }
+  t->fn = fn;
+  t->arg = arg;
+  if (pthread_create(&th, NULL, thread_main, t)) { free(t); free(h); return NULL; }
+  pthread_detach(th);
+  h->kind = H_PROC; // only for CloseHandle
+  if (id) *id = 0;
+  return h;
+}
+LONG InterlockedExchange(volatile LONG *at, LONG value) { return __atomic_exchange_n(at, value, __ATOMIC_SEQ_CST); }
+
+// The clipboard: SDL's, for text (CF_UNICODETEXT from a GlobalAlloc'd buffer).
+HANDLE GlobalAlloc(UINT flags, size_t n) { (void)flags; return calloc(1, n ? n : 1); }
+void *GlobalLock(HANDLE h) { return h; }
+BOOL GlobalUnlock(HANDLE h) { (void)h; return TRUE; }
+BOOL OpenClipboard(HWND w) { (void)w; return sdl_up(); }
+BOOL EmptyClipboard(void) { return TRUE; }
+HANDLE SetClipboardData(UINT format, HANDLE h) {
+  if (format != CF_UNICODETEXT || !h) return NULL;
+  int n = wide_to_utf8(h, -1, NULL, 0);
+  char *u = n > 0 ? malloc((size_t)n) : NULL;
+  if (u) { wide_to_utf8(h, -1, u, n); SDL_SetClipboardText(u); free(u); }
+  free(h);
+  return h;
+}
+BOOL CloseClipboard(void) { return TRUE; }
 
 DWORD GetModuleFileNameW(HMODULE m, wchar_t *out, DWORD n) {
   char p[MAX_PATH];

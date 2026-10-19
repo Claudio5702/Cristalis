@@ -10,7 +10,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "1.19"
+#define DL_VERSION "1.3"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -106,6 +106,15 @@ typedef struct DlGame {
   // is called then (before start()) to turn off the game's own risky options by changing their values;
   // the settings file keeps the player's values unless the player changes them in that run. May be NULL.
   void (*safe_mode)(void);
+  // A line for the crash report (the game's version, where the player is: "chapter 3, battle"...), at
+  // most n characters: asked every ten seconds while the game runs, kept in case the program does not
+  // close normally, and written then in "<settings file>.crash.txt" (the safe mode page copies it).
+  // Quick, and in plain ASCII or UTF-8. May be NULL.
+  void (*report)(char *out, int n);
+  // What the player is doing, for the status Discord shows (the Internet page of the Controls, with
+  // DISCORD_APP_ID in project.h): "Chapter 3, a battle"..., at most n characters of UTF-8. Asked every
+  // fifteen seconds. NULL: "Playing" or "In the menus".
+  void (*status)(char *out, int n);
   // true: fast forward now, without the key (the game knows a dull moment: the enemy's turn...). May be NULL.
   bool (*turbo)(void);
 
@@ -120,6 +129,14 @@ typedef struct DlGame {
   void (*state_to_mem)(void *out);
   void (*state_from_mem)(const void *in);
   void (*state_loaded)(void);      // after a state was loaded or the game rewound (may be NULL)
+  // true: DarkLauncher may run the game's frames ahead and take them back ("run-ahead": the
+  // Responsiveness row of the Controls page shows the picture one or two frames ahead of the input, so
+  // that the game answers sooner). Needs state_size, state_to_mem and state_from_mem. The frames ahead
+  // are shown but not heard, and taken back with state_from_mem (state_loaded is not called for them).
+  // While one runs, dl_running_ahead() is true: the game leaves out there what must happen once only
+  // (recording a replay, marking a cartridge save to write...); DarkLauncher leaves out its notes and
+  // achievements.
+  bool run_ahead;
   // Where the states are (MAX_PATH characters): n 0-9 the player's slots, 10 + k the game's automatic
   // states, -1 the session. NULL: saves\<FILE_STEM>.state<n>, .auto<k>, .session.
   void (*state_path)(int n, char *out);
@@ -167,6 +184,12 @@ typedef struct DlGame {
   int pad_layout;       // DL_PAD_*: the controller's first assignment (0: Super Nintendo places)
   int pad_menu;         // DL_MENU_*: what opens the pause menu on a controller (0: View)
   bool rumble;          // the game makes the controller vibrate (dl_rumble): a Vibration switch on the Controls page
+
+  // The game's own version ("1.2"), and a DlText of what is new in it: shown on a page the first time
+  // this version starts (the settings file keeps which one was seen). One line (\n between them) for
+  // each news: a short title (a row of the page), then | and what it is (its help). May be NULL.
+  const char *version;
+  const wchar_t *const *news;
 
   // The languages of the game's own texts (its DlTexts, and the tables it reads with dl_lang()): bits
   // 1 << DL_LANG_*, or DL_LANGS_ALL. 0: the first six (jp to de), the languages before Italian. The
@@ -224,6 +247,15 @@ int dl_list_page(const wchar_t *const *tab, const DlList *list);
 void dl_add_rows(int page, const DlRow *rows, int count);
 // An entry of the navigation bar opening a page (icon: a character of the Segoe MDL2 Assets font).
 void dl_section(int page, unsigned icon, const wchar_t *const *label, const wchar_t *const *help);
+// A row at the end of the Saves page (before "Back") opening one of the game's pages: its own saves, for
+// instance (a cartridge's), next to the save states rather than in an entry of the bar of their own.
+// Esc on that page comes back to this row. One such row; a second call replaces it.
+void dl_saves_more(int page, const wchar_t *const *label, const wchar_t *const *help);
+// Before the game writes over one of its own saves (a cartridge's...): DarkLauncher keeps the version
+// there now in saves\backup\ (3 versions of each file at most, a new one when the last is 10 minutes
+// old), and the "Backups" row of the Saves page puts one back (the program then starts again, so that
+// the game reads it). The save states and the session are kept that way by DarkLauncher itself.
+void dl_backup(const char *path);
 // A value kept in the settings file; its value now is its default ("Defaults" puts it back unless keep).
 void dl_setting(const char *name, int *value, int lo, int hi, bool keep);
 // A function of the game (going back to the start of a turn, a panel...): run by a keyboard key and a
@@ -278,6 +310,7 @@ void dl_restart(void);                          // the game from the beginning (
 // same command line: for a change the game can only take at start (another language of its data...).
 void dl_relaunch(void);
 bool dl_in_game(void);                          // the game is being played (not the setup screen, not the preview before it)
+bool dl_running_ahead(void);                    // from frame(): this frame is one run ahead, to be taken back (DlGame.run_ahead)
 bool dl_gpu_on(void);                           // the picture goes through the graphics card now
 void dl_open_page(int page);                    // shows a page of the setup screen (from a list, the pause menu...)
 // The game is not started any more (another game was loaded: another language...): it runs behind the

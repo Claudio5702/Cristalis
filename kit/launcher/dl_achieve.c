@@ -69,6 +69,7 @@ void dl_toast_sample(void) { // --gpu-check: the first achievement's, without un
 }
 
 void dl_unlock(const char *id) {
+  if (dl_running_ahead()) return; // it comes again in the frame taken for good
   int k = ach_find(id);
   if (k < 0 || ach_time[k]) return;
   ach_time[k] = (long long)time(NULL);
