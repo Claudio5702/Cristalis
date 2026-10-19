@@ -14,7 +14,7 @@ escrito solo para este juego. Hay una versión experimental para Linux.
 **No se incluye ningún recurso del juego**, ni en este repositorio ni en las releases: las imágenes,
 los sonidos, la música y los textos se leen de tu propia copia del juego. El repositorio tampoco
 contiene código del juego: el código traducido se genera a partir de un `default.xex` al compilar el
-programa, y los programas de la [página de releases](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) se compilan así. **Versión 1.02, una
+programa, y los programas de la [página de releases](https://github.com/Claudio5702/Cristalis/releases/latest) se compilan así. **Versión 1.02, una
 beta**: jugada por pocas personas hasta ahora.
 
 **Necesitas tu propia copia de Crystal Defenders (Xbox 360).** Crystal Defenders pertenece a Square
@@ -28,13 +28,13 @@ Enix; este proyecto no está afiliado a Square Enix ni cuenta con su aprobación
 
 ## Jugar
 
-Descarga la última versión de la [página de releases](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest), y solo de ahí:
-`CrystalDefendersRecomp-Setup.exe` para Windows, `CrystalDefendersRecomp-linux-x86_64.tar.gz` para Linux.
+Descarga la última versión de la [página de releases](https://github.com/Claudio5702/Cristalis/releases/latest), y solo de ahí:
+`Cristalis-Setup.exe` para Windows, `Cristalis-linux-x86_64.tar.gz` para Linux.
 
 1. Copia el juego desde tu consola: la carpeta `CRYSTAL DEFENDERS` (o la carpeta con el
    identificador del título, `58410989`) tal como está en el almacenamiento de la consola, por
    ejemplo en una memoria USB.
-2. Con el instalador: pon esa carpeta junto a `CrystalDefendersRecomp-Setup.exe` y ejecútalo. El juego
+2. Con el instalador: pon esa carpeta junto a `Cristalis-Setup.exe` y ejecútalo. El juego
    se instala desde ella, con accesos directos y una entrada en la lista de aplicaciones de Windows.
    Sin la carpeta, la última ventana del instalador pregunta dónde está.
 3. Sin el instalador: ejecuta `crystal_defenders.exe`. En el primer arranque pide esa carpeta (o una

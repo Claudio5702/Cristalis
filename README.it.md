@@ -14,7 +14,7 @@ per questo gioco. Una versione per Linux è sperimentale.
 **Non è inclusa alcuna risorsa del gioco**, né in questo repository né nelle release: immagini,
 suoni, musica e testi vengono letti dalla tua copia del gioco. Il repository non contiene nemmeno
 codice del gioco: il codice tradotto viene generato da un `default.xex` quando si compila il
-programma, e i programmi della [pagina delle release](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) sono compilati così. **Versione 1.02,
+programma, e i programmi della [pagina delle release](https://github.com/Claudio5702/Cristalis/releases/latest) sono compilati così. **Versione 1.02,
 una beta**: finora giocata da poche persone.
 
 **Ti serve la tua copia di Crystal Defenders (Xbox 360).** Crystal Defenders appartiene a Square
@@ -28,13 +28,13 @@ Enix; questo progetto non è affiliato a Square Enix né approvato da essa.
 
 ## Giocare
 
-Scarica l'ultima versione dalla [pagina delle release](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest), e solo da lì:
-`CrystalDefendersRecomp-Setup.exe` per Windows, `CrystalDefendersRecomp-linux-x86_64.tar.gz` per Linux.
+Scarica l'ultima versione dalla [pagina delle release](https://github.com/Claudio5702/Cristalis/releases/latest), e solo da lì:
+`Cristalis-Setup.exe` per Windows, `Cristalis-linux-x86_64.tar.gz` per Linux.
 
 1. Copia il gioco dalla tua console: la cartella `CRYSTAL DEFENDERS` (o la cartella con
    l'identificativo del titolo, `58410989`) così come si trova nella memoria della console, per
    esempio su una chiavetta USB.
-2. Con il programma di installazione: metti quella cartella accanto a `CrystalDefendersRecomp-Setup.exe`
+2. Con il programma di installazione: metti quella cartella accanto a `Cristalis-Setup.exe`
    e avvialo. Il gioco viene installato da essa, con collegamenti e una voce nell'elenco delle app di
    Windows. Senza la cartella, l'ultima finestra del programma di installazione chiede dove si trova.
 3. Senza il programma di installazione: avvia `crystal_defenders.exe`. Al primo avvio chiede quella

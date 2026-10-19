@@ -53,7 +53,7 @@ public static class CdPack {
 }
 '@
 
-$out = Join-Path $Output 'Crystal Defenders - Setup.exe'
+$out = Join-Path $Output 'Cristalis-Setup.exe'
 Copy-Item -LiteralPath $stub -Destination $out -Force
 $fs = [IO.File]::Open($out, 'Append', 'Write')
 try {

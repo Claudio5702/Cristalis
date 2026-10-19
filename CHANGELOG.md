@@ -12,6 +12,10 @@ on DarkLauncher's "What's new" page.
   Recomp": the setup screen, the window title, the READMEs, the installer and the crash report say so.
   The program's files keep their names (`crystal_defenders.exe`, `.ini`, saves), and an installed copy
   is found again by the installer.
+- A new icon, as Kahna's carries its "K": the initial C of Cristalis in the gold of the setup screen's
+  title, with the crystal in its opening (program, installer, window, Linux).
+- The repository is now `Claudio5702/Cristalis` (the old address leads there), and the published files
+  are `Cristalis-Setup.exe` and `Cristalis-linux-x86_64.tar.gz`.
 
 ## 1.02
 
@@ -21,7 +25,7 @@ does (no game asset in them; the player's own copy is still needed).
 - **DarkLauncher 1.33**: a sturdier crash report (the error line is written without the C library's
   heap, a lock that blocks it no longer hangs the program, a stack overflow is reported). Nothing
   changes for the player; the report still names the error on Windows (checked with a forced crash).
-- The READMEs say where to download it (`CrystalDefendersRecomp-Setup.exe` for Windows, the Linux
+- The READMEs say where to download it (`Cristalis-Setup.exe` for Windows, the Linux
   archive), and what the releases hold and do not hold.
 
 ## 1.01

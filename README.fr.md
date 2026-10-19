@@ -14,7 +14,7 @@ natif : le code PowerPC du jeu est traduit à l'avance en C++ avec
 **Aucune ressource du jeu n'est fournie**, ni dans ce dépôt ni dans les releases : les images, les
 sons, la musique et les textes sont lus dans votre propre copie du jeu. Le dépôt ne contient pas non
 plus de code du jeu : le code traduit est produit à partir d'un `default.xex` au moment de compiler le
-programme, et les programmes de la [page des releases](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) sont compilés ainsi. **Version 1.02,
+programme, et les programmes de la [page des releases](https://github.com/Claudio5702/Cristalis/releases/latest) sont compilés ainsi. **Version 1.02,
 une bêta** : jouée par peu de personnes jusqu'ici.
 
 **Vous devez fournir votre propre copie de Crystal Defenders (Xbox 360).** Crystal Defenders
@@ -28,13 +28,13 @@ appartient à Square Enix ; ce projet n'est ni affilié à Square Enix ni approu
 
 ## Jouer
 
-Téléchargez la dernière version sur la [page des releases](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest), et uniquement là :
-`CrystalDefendersRecomp-Setup.exe` pour Windows, `CrystalDefendersRecomp-linux-x86_64.tar.gz` pour Linux.
+Téléchargez la dernière version sur la [page des releases](https://github.com/Claudio5702/Cristalis/releases/latest), et uniquement là :
+`Cristalis-Setup.exe` pour Windows, `Cristalis-linux-x86_64.tar.gz` pour Linux.
 
 1. Copiez le jeu depuis votre console : le dossier `CRYSTAL DEFENDERS` (ou le dossier qui porte
    l'identifiant du titre, `58410989`) tel qu'il se trouve sur le stockage de la console, par
    exemple sur une clé USB.
-2. Avec l'installeur : placez ce dossier à côté de `CrystalDefendersRecomp-Setup.exe` et lancez-le.
+2. Avec l'installeur : placez ce dossier à côté de `Cristalis-Setup.exe` et lancez-le.
    Le jeu est installé à partir de ce dossier, avec des raccourcis et une entrée dans la liste des
    applications de Windows. Sans le dossier, la dernière fenêtre de l'installeur demande où il se
    trouve.

@@ -1,5 +1,6 @@
-﻿# Draws the program's icon: an original crystal in the blue of the game's
-# panels (no artwork from the game is used), and writes
+﻿# Draws the program's icon: the initial C of Cristalis in the gold of the setup screen's
+# title, with an original crystal, on the blue of the game's panels (no artwork from
+# the game is used), and writes
 # resources\crystal_defenders.ico with PNG entries from 16 to 256 pixels.
 # Usage: make_icon.ps1 [-Preview <png>]
 param([string]$Preview = '')
@@ -27,33 +28,51 @@ $g.DrawPath($rim, $path)
 $edge = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(10, 30, 48)), 6
 $g.DrawPath($edge, $path)
 
-# Soft glow behind the crystal.
+# The initial "C" of Cristalis, lettered like the setup screen's title (Constantia capitals, in the gold
+# of its logo), as Kahna's icon carries its "K".
+$family = New-Object System.Drawing.FontFamily 'Constantia'
+$fmt = [System.Drawing.StringFormat]::GenericTypographic
+$letter = New-Object System.Drawing.Drawing2D.GraphicsPath
+$letter.AddString('C', $family, [int][System.Drawing.FontStyle]::Bold, 400, (P 0 0), $fmt)
+$lb = $letter.GetBounds()
+$scale = 372 / $lb.Height
+$fit = New-Object System.Drawing.Drawing2D.Matrix
+$fit.Translate(250 - ($lb.X + $lb.Width / 2) * $scale, 256 - ($lb.Y + $lb.Height / 2) * $scale)
+$fit.Scale($scale, $scale)
+$letter.Transform($fit)
+$shadow = $letter.Clone(); $sm = New-Object System.Drawing.Drawing2D.Matrix; $sm.Translate(6, 9); $shadow.Transform($sm)
+$shade = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(110, 4, 16, 30))
+$g.FillPath($shade, $shadow)
+$letterEdge = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(40, 30, 10)), 12
+$letterEdge.LineJoin = 'Round'
+$g.DrawPath($letterEdge, $letter)
+$lb = $letter.GetBounds()
+$gold = New-Object System.Drawing.Drawing2D.LinearGradientBrush (P 0 $lb.Top), (P 0 $lb.Bottom), ([System.Drawing.Color]::FromArgb(250, 238, 186)), ([System.Drawing.Color]::FromArgb(196, 160, 82))
+$g.FillPath($gold, $letter)
+
+# The crystal, smaller, in the opening of the C, with its glow.
+$cx = 318; $cy = 256; $k = 0.42
+function Q([double]$x, [double]$y) { P ($cx + ($x - 256) * $k) ($cy + ($y - 256) * $k) }
 $glowPath = New-Object System.Drawing.Drawing2D.GraphicsPath
-$glowPath.AddEllipse(86, 70, 340, 372)
+$glowPath.AddEllipse($cx - 92, $cy - 100, 184, 200)
 $glow = New-Object System.Drawing.Drawing2D.PathGradientBrush $glowPath
 $glow.CenterColor = [System.Drawing.Color]::FromArgb(150, 170, 240, 255)
 $glow.SurroundColors = @([System.Drawing.Color]::FromArgb(0, 170, 240, 255))
 $g.FillPath($glow, $glowPath)
-
-# The crystal: a tall six-sided gem, lit from the upper left.
-$top = P 256 62; $bottom = P 256 450
-$ul = P 150 178; $ur = P 362 178; $ll = P 150 318; $lr = P 362 318
-$cu = P 256 214; $cl = P 256 296
-Fill $g @(214, 248, 255) @($top, $ul, $cu)          # upper left facet
-Fill $g @(120, 208, 244) @($top, $cu, $ur)          # upper right facet
-Fill $g @(150, 226, 250) @($ul, $ll, $cl, $cu)      # left side
-Fill $g @(58, 150, 214)  @($cu, $cl, $lr, $ur)      # right side
-Fill $g @(70, 168, 224)  @($ll, $bottom, $cl)       # lower left facet
-Fill $g @(28, 96, 170)   @($cl, $bottom, $lr)       # lower right facet
-$outline = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(14, 52, 96)), 9
+$top = Q 256 62; $bottom = Q 256 450
+$ul = Q 150 178; $ur = Q 362 178; $ll = Q 150 318; $lr = Q 362 318
+$cu = Q 256 214; $cl = Q 256 296
+Fill $g @(214, 248, 255) @($top, $ul, $cu)
+Fill $g @(120, 208, 244) @($top, $cu, $ur)
+Fill $g @(150, 226, 250) @($ul, $ll, $cl, $cu)
+Fill $g @(58, 150, 214)  @($cu, $cl, $lr, $ur)
+Fill $g @(70, 168, 224)  @($ll, $bottom, $cl)
+Fill $g @(28, 96, 170)   @($cl, $bottom, $lr)
+$outline = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(14, 52, 96)), 6
 $outline.LineJoin = 'Round'
 $g.DrawPolygon($outline, [System.Drawing.PointF[]]@($top, $ur, $lr, $bottom, $ll, $ul))
-$inner = New-Object System.Drawing.Pen ([System.Drawing.Color]::FromArgb(120, 236, 252, 255)), 4
-foreach ($pair in @($top, $cu), @($ul, $cu), @($ur, $cu), @($cu, $cl), @($ll, $cl), @($lr, $cl), @($cl, $bottom)) { $g.DrawLine($inner, $pair[0], $pair[1]) }
-
-# A four-pointed sparkle on the upper left facet.
 $white = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(245, 255, 255, 255))
-$g.FillPolygon($white, [System.Drawing.PointF[]]@((P 206 118), (P 214 148), (P 244 156), (P 214 164), (P 206 194), (P 198 164), (P 168 156), (P 198 148)))
+$g.FillPolygon($white, [System.Drawing.PointF[]]@((Q 206 118), (Q 214 148), (Q 244 156), (Q 214 164), (Q 206 194), (Q 198 164), (Q 168 156), (Q 198 148)))
 $g.Dispose()
 
 if ($Preview) { $art.Save($Preview) }

@@ -38,4 +38,4 @@ UNINSTALLING
   Saves and game data are kept unless you tick the box.
 
 Audio decoding uses FFmpeg (https://ffmpeg.org), LGPL, see FFmpeg-LICENSE.txt.
-Source code: https://github.com/Claudio5702/CrystalDefendersRecomp
+Source code: https://github.com/Claudio5702/Cristalis

@@ -38,4 +38,4 @@ DESINSTALLER
   Les sauvegardes et les donnees du jeu sont gardees, sauf si vous cochez la case.
 
 Le decodage audio utilise FFmpeg (https://ffmpeg.org), LGPL, voir FFmpeg-LICENSE.txt.
-Code source : https://github.com/Claudio5702/CrystalDefendersRecomp
+Code source : https://github.com/Claudio5702/Cristalis

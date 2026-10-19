@@ -9,7 +9,7 @@ build=${1:?build directory}
 out=${2:?output directory}
 ffmpeg_src=${3:-}
 here=$(cd "$(dirname "$0")" && pwd)
-name=CrystalDefendersRecomp-linux-x86_64
+name=Cristalis-linux-x86_64
 dest="$out/$name"
 
 rm -rf "$dest"
@@ -90,7 +90,7 @@ crystal_defenders.ini. Log: crystal_defenders.log.
 Audio decoding uses FFmpeg (https://ffmpeg.org), LGPL 2.1 or later, built in
 with only the XMA decoders. SDL3 (https://libsdl.org) is under the zlib license.
 The program's source code, which allows rebuilding it against another FFmpeg,
-is at https://github.com/Claudio5702/CrystalDefendersRecomp
+is at https://github.com/Claudio5702/Cristalis
 EOF
 
 tar -C "$out" -czf "$out/$name.tar.gz" "$name"

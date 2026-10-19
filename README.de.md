@@ -15,7 +15,7 @@ experimentell.
 **Es sind keine Ressourcen des Spiels enthalten**, weder in diesem Repository noch in den Releases:
 Bilder, Töne, Musik und Texte werden aus Ihrer eigenen Kopie des Spiels gelesen. Das Repository
 enthält auch keinen Code des Spiels: Der übersetzte Code wird beim Bauen des Programms aus einer
-`default.xex` erzeugt, und die Programme auf der [Release-Seite](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) werden so gebaut.
+`default.xex` erzeugt, und die Programme auf der [Release-Seite](https://github.com/Claudio5702/Cristalis/releases/latest) werden so gebaut.
 **Version 1.02, eine Beta**: bisher von wenigen gespielt.
 
 **Sie brauchen Ihre eigene Kopie von Crystal Defenders (Xbox 360).** Crystal Defenders gehört Square
@@ -30,13 +30,13 @@ unterstützt.
 
 ## Spielen
 
-Laden Sie die neueste Version von der [Release-Seite](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) herunter, und nur von dort:
-`CrystalDefendersRecomp-Setup.exe` für Windows, `CrystalDefendersRecomp-linux-x86_64.tar.gz` für Linux.
+Laden Sie die neueste Version von der [Release-Seite](https://github.com/Claudio5702/Cristalis/releases/latest) herunter, und nur von dort:
+`Cristalis-Setup.exe` für Windows, `Cristalis-linux-x86_64.tar.gz` für Linux.
 
 1. Kopieren Sie das Spiel von Ihrer Konsole: den Ordner `CRYSTAL DEFENDERS` (oder den Ordner mit der
    Titel-ID, `58410989`), so wie er auf dem Speicher der Konsole liegt, zum Beispiel auf einem
    USB-Stick.
-2. Mit dem Installationsprogramm: Legen Sie diesen Ordner neben `CrystalDefendersRecomp-Setup.exe` und
+2. Mit dem Installationsprogramm: Legen Sie diesen Ordner neben `Cristalis-Setup.exe` und
    starten Sie es. Das Spiel wird aus diesem Ordner installiert, mit Verknüpfungen und einem Eintrag
    in der Windows-Liste der Apps. Ohne den Ordner fragt das letzte Fenster des Installationsprogramms,
    wo er liegt.

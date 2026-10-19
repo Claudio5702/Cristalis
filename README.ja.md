@@ -13,7 +13,7 @@
 
 このリポジトリにもリリースにも、**ゲームの素材は一切含まれていません**。画像・音声・音楽・テキストは
 お手持ちのゲームから読み込まれます。リポジトリにはゲームのコードも含まれていません。変換されたコードは
-プログラムのビルド時に `default.xex` から生成され、[リリースページ](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest)のプログラムもそうして
+プログラムのビルド時に `default.xex` から生成され、[リリースページ](https://github.com/Claudio5702/Cristalis/releases/latest)のプログラムもそうして
 ビルドされています。**バージョン 1.02（ベータ版）**：まだ遊んだ人はごく少数です。
 
 **クリスタルディフェンダーズ（Xbox 360）をご自身でお持ちである必要があります。** クリスタル
@@ -27,12 +27,12 @@
 
 ## 遊び方
 
-最新版は[リリースページ](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest)から、そこからだけダウンロードしてください：
-Windows 用は `CrystalDefendersRecomp-Setup.exe`、Linux 用は `CrystalDefendersRecomp-linux-x86_64.tar.gz` です。
+最新版は[リリースページ](https://github.com/Claudio5702/Cristalis/releases/latest)から、そこからだけダウンロードしてください：
+Windows 用は `Cristalis-Setup.exe`、Linux 用は `Cristalis-linux-x86_64.tar.gz` です。
 
 1. 本体からゲームをコピーします。本体のストレージにある `CRYSTAL DEFENDERS` フォルダー（または
    タイトル ID の `58410989` という名前のフォルダー）を、たとえば USB メモリーにコピーします。
-2. インストーラーを使う場合：そのフォルダーを `CrystalDefendersRecomp-Setup.exe` と同じ場所に置いて
+2. インストーラーを使う場合：そのフォルダーを `Cristalis-Setup.exe` と同じ場所に置いて
    実行します。ゲームはそのフォルダーからインストールされ、ショートカットと Windows のアプリ一覧
    への登録も作られます。フォルダーがない場合は、インストーラーの最後の画面で場所を尋ねられます。
 3. インストーラーを使わない場合：`crystal_defenders.exe` を実行します。初回起動時にそのフォルダー
