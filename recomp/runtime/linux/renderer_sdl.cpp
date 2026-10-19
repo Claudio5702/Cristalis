@@ -409,6 +409,28 @@ static GLenum BlendOperation(uint32_t operation)
     }
 }
 
+// The vertices of a draw go one after another into one large buffer, given a fresh one only when
+// full: a new buffer for each of the few hundred draws of a picture costs much on some drivers (Mesa's
+// for Direct3D 12 under WSL slowed to 85 ms a picture, or locked up in its own thread). Returns the
+// index of the first vertex in the buffer, -1 for more than it holds.
+static GLint StreamVertices(const HostVertex* vertices, size_t count)
+{
+    constexpr GLsizeiptr kStreamBytes = GLsizeiptr(sizeof(HostVertex)) * 65536 * 4;
+    static GLsizeiptr streamAt = kStreamBytes;
+    const GLsizeiptr bytes = GLsizeiptr(count * sizeof(HostVertex));
+    if (bytes > kStreamBytes)
+        return -1;
+    if (streamAt + bytes > kStreamBytes)
+    {
+        glBufferData(GL_ARRAY_BUFFER, kStreamBytes, nullptr, GL_STREAM_DRAW);
+        streamAt = 0;
+    }
+    glBufferSubData(GL_ARRAY_BUFFER, streamAt, bytes, vertices);
+    GLint first = GLint(streamAt / GLsizeiptr(sizeof(HostVertex)));
+    streamAt += bytes;
+    return first;
+}
+
 void RendererDraw(const HostDraw& draw)
 {
     if (g_gl == nullptr || draw.vertices.empty())
@@ -465,8 +487,9 @@ void RendererDraw(const HostDraw& draw)
     int left = scaled(draw.scissor[0]), right = scaled(draw.scissor[2]);
     int bottom = scaled(int(kHostHeight) - draw.scissor[3]), top = scaled(int(kHostHeight) - draw.scissor[1]);
     glScissor(left, bottom, right - left, top - bottom);
-    glBufferData(GL_ARRAY_BUFFER, GLsizeiptr(draw.vertices.size() * sizeof(HostVertex)), draw.vertices.data(), GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, GLsizei(draw.vertices.size()));
+    GLint first = StreamVertices(draw.vertices.data(), draw.vertices.size());
+    if (first >= 0)
+        glDrawArrays(GL_TRIANGLES, first, GLsizei(draw.vertices.size()));
 }
 
 #ifndef CD_DARKLAUNCHER // the SDL2 window, its input, menus and presenting
@@ -805,8 +828,8 @@ static void DrawOverlayQuad(GLuint texture, float left, float top, float right, 
         { x1, y0, 0.5f, 1, 1, 0, r, g, b, a }, { x1, y1, 0.5f, 1, 1, 1, r, g, b, a }, { x0, y1, 0.5f, 1, 0, 1, r, g, b, a },
     };
     glBindTexture(GL_TEXTURE_2D, texture);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STREAM_DRAW);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    GLint first = StreamVertices(vertices, 6);
+    glDrawArrays(GL_TRIANGLES, first, 6);
 }
 
 struct OverlayTexture
@@ -1521,23 +1544,64 @@ void RendererRumble(uint16_t left, uint16_t right)
 // achievements.cpp's notice: DarkLauncher announces achievements itself.
 void LinuxToast(const std::wstring&, const std::wstring&) {}
 
-// The picture just drawn goes to DarkLauncher, which waits for it; the game is held there until
-// DarkLauncher asks for the next one.
+// The picture just drawn is read back without waiting for the graphics card: it is copied into one of
+// two pixel buffers while the game goes on with the next picture, and the one read the time before,
+// ready by now, goes to DarkLauncher (one picture later, 16 ms: what lets a slower machine, the Steam
+// Deck, keep the card and the processor busy at once). DarkLauncher waits for it; the game is held
+// there until DarkLauncher asks for the next one.
+static GLuint g_readBuffers[2];
+static GLsync g_readFences[2];
+static uint32_t g_readWidth[2], g_readHeight[2];
+static int g_readPending = -1; // the buffer read the time before, shown this time
+
+// The picture read into buffer k, turned the right way up (OpenGL gives the bottom row first), to
+// DarkLauncher.
+static void PresentReadBuffer(int k)
+{
+    static std::vector<uint32_t> picture;
+    const uint32_t width = g_readWidth[k], height = g_readHeight[k];
+    if (g_readFences[k] != nullptr)
+    {
+        glClientWaitSync(g_readFences[k], GL_SYNC_FLUSH_COMMANDS_BIT, ~GLuint64(0));
+        glDeleteSync(g_readFences[k]);
+        g_readFences[k] = nullptr;
+    }
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, g_readBuffers[k]);
+    const auto* rows = static_cast<const uint32_t*>(glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, GLsizeiptr(width) * height * 4, GL_MAP_READ_BIT));
+    if (rows != nullptr)
+    {
+        picture.resize(size_t(width) * height);
+        for (uint32_t y = 0; y < height; y++)
+            memcpy(&picture[size_t(y) * width], &rows[size_t(height - 1 - y) * width], width * 4);
+        glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
+    }
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    if (rows != nullptr)
+        DlBridgePresent(picture.data(), width, height, width * 4);
+}
+
 void RendererPresent()
 {
     if (g_gl == nullptr)
         return;
     g_frameNumber++;
     const uint32_t width = FrameWidth(), height = FrameHeight();
-    static std::vector<uint32_t> rows, picture;
-    rows.resize(size_t(width) * height);
-    picture.resize(rows.size());
+    if (g_readBuffers[0] == 0)
+        glGenBuffers(2, g_readBuffers);
+    const int k = g_readPending == 0 ? 1 : 0; // not the one still to be shown
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, g_readBuffers[k]);
+    if (g_readWidth[k] != width || g_readHeight[k] != height)
+        glBufferData(GL_PIXEL_PACK_BUFFER, GLsizeiptr(width) * height * 4, nullptr, GL_STREAM_READ);
+    g_readWidth[k] = width;
+    g_readHeight[k] = height;
     glBindFramebuffer(GL_READ_FRAMEBUFFER, g_frameBuffer);
-    glReadPixels(0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, rows.data());
-    // OpenGL gives the bottom row first
-    for (uint32_t y = 0; y < height; y++)
-        memcpy(&picture[size_t(y) * width], &rows[size_t(height - 1 - y) * width], width * 4);
-    DlBridgePresent(picture.data(), width, height, width * 4);
+    glReadPixels(0, 0, width, height, GL_BGRA, GL_UNSIGNED_BYTE, nullptr);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    g_readFences[k] = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+    glFlush();
+    // the picture before; the very first time, this one, waited for (and shown twice)
+    PresentReadBuffer(g_readPending >= 0 ? g_readPending : k);
+    g_readPending = k;
 
     uint32_t wanted = DlBridgeHalves();
     if (wanted != g_halves && CreateFrameTargets(wanted))

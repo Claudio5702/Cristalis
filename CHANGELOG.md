@@ -8,6 +8,16 @@ on DarkLauncher's "What's new" page.
 
 ## Next version (not numbered yet)
 
+- **Linux: the game no longer stops at its title screen.** Each draw gave the vertex buffer a new
+  store (`glBufferData`, a few hundred times a picture); under WSL, Mesa's driver for Direct3D 12 locked
+  up in its own thread at the title screen, and the "40 pictures a second" measured were DarkLauncher
+  showing the last picture again. The vertices now go one after another into one large buffer: the
+  game runs at 60 pictures a second under WSL (0.9 ms of drawing a picture). It may well never have
+  happened with a real Linux PC's driver, but nothing proved it.
+- Linux: the picture is read back for DarkLauncher without waiting for the graphics card (two pixel
+  buffers, shown one picture later), so that a slower machine such as the Steam Deck keeps the card and
+  the processor busy at once.
+
 - The project is now called **Cristalis**, "Crystal Defenders Recomp", as Kahna is "Bahamut Lagoon
   Recomp": the setup screen, the window title, the READMEs, the installer and the crash report say so.
   The program's files keep their names (`crystal_defenders.exe`, `.ini`, saves), and an installed copy
