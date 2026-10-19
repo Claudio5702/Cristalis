@@ -6,6 +6,12 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## Next version (not numbered yet)
+
+- **DarkLauncher 2.02**: the game says when it gives the last picture again (`dl_picture_same`), so
+  that `--bench` and `--gpu-check` count the new pictures apart; a game that stops making them, as on
+  Linux before 1.03, now shows at once ("new pictures 1187" of 1194 under WSL).
+
 ## 1.03
 
 - **DarkLauncher 2.01**, open source under the MIT license ("DarkLauncher contributors"): its source

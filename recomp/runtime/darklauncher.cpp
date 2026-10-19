@@ -407,7 +407,9 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
         uint64_t seen = g_pictures;
         g_asked++;
         g_signal.notify_all();
-        g_signal.wait_for(lock, std::chrono::milliseconds(25), [&] { return g_pictures != seen; });
+        bool fresh = g_signal.wait_for(lock, std::chrono::milliseconds(25), [&] { return g_pictures != seen; });
+        if (!fresh)
+            dl_picture_same(); // the last picture again: --bench counts the new ones apart
         if (!g_picture.empty())
         {
             memcpy(pixels, g_picture.data(), g_picture.size() * 4);

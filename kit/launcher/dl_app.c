@@ -1067,7 +1067,13 @@ static size_t ahead_cap;
 bool dl_running_ahead(void) { return ahead_now; }
 bool dl_ahead_ok(void) { return dl_game->run_ahead && dl_game->state_size && dl_game->state_to_mem && dl_game->state_from_mem; }
 
+// dl_picture_same: the frame taken for good gave the picture of last time again (the frames run ahead
+// do not count)
+static bool pic_same;
+void dl_picture_same(void) { if (!ahead_now) pic_same = true; }
+
 static int play_frame(const DlInput *in, s16 *audio, int audio_max, int ahead) {
+  pic_same = false;
   int n = dl_game->frame(in, dl_pic, audio, audio_max);
   if (ahead <= 0 || !dl_ahead_ok()) return n;
   size_t size = dl_game->state_size();
@@ -1140,7 +1146,13 @@ static int gpu_check(void) {
     Sleep(20);
   }
   if (!dl_gpu_ready()) { printf("gpu check: the graphics card cannot be used\n"); return 3; }
-  for (int k = 0; k < 90; k++) dl_game->frame(&(DlInput){k > 30 ? DL_LEFT | DL_UP : 0}, dl_pic, tmp, 4096);
+  int fresh = 0;
+  for (int k = 0; k < 90; k++) {
+    pic_same = false;
+    dl_game->frame(&(DlInput){k > 30 ? DL_LEFT | DL_UP : 0}, dl_pic, tmp, 4096);
+    if (!pic_same) fresh++;
+  }
+  printf("gpu check: the game gave 90 pictures, %d new%s\n", fresh, fresh ? "" : " (it makes none: the pictures below show its last one)");
   dl_toast_sample(); // over the game's pictures, when it has achievements
   static const struct { const char *name; int mode, page, smooth, scan, crt, fps; } shots[] = {
       {"menu", M_SIDE, -1, 0, 0, 0, 0},     {"image_page", M_PAGE, DL_PAGE_IMAGE, 0, 0, 0, 0}, {"game_sharp", M_GAME, -1, 0, 0, 0, 1},
@@ -1302,7 +1314,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   double period = fq.QuadPart / (game->fps > 0 ? game->fps : 60.0);
   int audio_max = game->audio_rate > 0 ? (int)(game->audio_rate / (game->fps > 0 ? game->fps : 60.0)) * 2 + 64 : 0;
   s16 *audio = audio_max ? malloc((size_t)audio_max * 4) : NULL;
-  u32 bench_frames = 0, bench_gaps = 0;
+  u32 bench_frames = 0, bench_gaps = 0, bench_new = 0; // bench_new: the pictures that were not the last one again (dl_picture_same)
   if (!bench_secs) dl_online_start();
   if (crashed) dl_safe_page_open();
   else if (first_start && !bench_secs && !play_now) dl_welcome_open();
@@ -1315,7 +1327,8 @@ int dl_run(const DlGame *game, int argc, char **argv) {
       QueryPerformanceCounter(&now);
       double t = (double)(now.QuadPart - bench_t0.QuadPart) / (double)fq.QuadPart;
       if (t >= bench_secs) {
-        printf("bench: %u pictures in %.1f s (%.2f per second), sound gaps %u\n", bench_frames, t, bench_frames / t, bench_gaps);
+        printf("bench: %u pictures in %.1f s (%.2f per second), sound gaps %u, new pictures %u (%.2f per second)\n", bench_frames, t,
+               bench_frames / t, bench_gaps, bench_new, bench_new / t);
         break;
       }
     }
@@ -1390,6 +1403,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
         if (dl_mode == M_GAME && dl_started) dl_rewind_snap();
         fps_frames++;
         bench_frames++;
+        if (!pic_same) bench_new++;
       }
       next.QuadPart += (LONGLONG)period;
       if (now.QuadPart - next.QuadPart > (LONGLONG)(period * 4)) next = now; // far behind: no catching up

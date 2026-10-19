@@ -1,7 +1,7 @@
-DarkLauncher 2.01 (commit 629e8f8), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h 4CFAB94111455241
+DarkLauncher 2.02 (commit 48bc9c7), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h A6EFEFECD8C7805F
 file dl_achieve.c 34CF06C12DBD8312
-file dl_app.c 36D6FD961301AD7F
+file dl_app.c A92336DCEAB79CA6
 file dl_draw.c 2387B68EBDFEF8AB
 file dl_gpu.c B0C74AE61AB65583
 file dl_input.c 19EDC10485F9795D

@@ -10,7 +10,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "2.01"
+#define DL_VERSION "2.02"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -340,6 +340,10 @@ void dl_picture_size(int w, int h, double aspect);
 // From frame(): the picture is s times the console's own resolution (enlarged graphics); the
 // scanlines and the CRT filter follow the console's lines. 1 until it is called.
 void dl_picture_scale(int s);
+// From frame(): the picture is the one given last time, unchanged (the game had no new one in time: it
+// waits for another thread, it is paused...). Optional: --bench and --gpu-check then count the new
+// pictures apart, so that a game that stops making them shows at once.
+void dl_picture_same(void);
 
 // Runs the program: window, setup screen, game. Returns the exit code.
 int dl_run(const DlGame *game, int argc, char **argv);
