@@ -375,10 +375,18 @@ BOOL CreateProcessW(const wchar_t *exe, const wchar_t *cmd, void *pa, void *ta, 
   int argc = 0;
   for (size_t k = 0; k < n && argc < 127; k += strlen(buf + k) + 1) argv[argc++] = buf + k;
   argv[argc] = NULL;
+  // the program's file by its path, not /proc/self/exe: once an update has put a new file there, that
+  // link still names the old one (" (deleted)"), and the process would be called "exe"
+  static char path[PATH_MAX];
+  ssize_t len = readlink("/proc/self/exe", path, sizeof path - 1);
+  path[len > 0 ? len : 0] = 0;
+  size_t pn = strlen(path);
+  if (pn > 10 && !strcmp(path + pn - 10, " (deleted)")) path[pn - 10] = 0;
   pid_t pid = fork();
   if (pid < 0) return FALSE;
   if (!pid) {
     setsid();
+    if (path[0]) execv(path, argv);
     execv("/proc/self/exe", argv);
     _exit(127);
   }

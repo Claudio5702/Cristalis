@@ -14,7 +14,7 @@ on DarkLauncher's "What's new" page.
   them); `userdata` goes once empty.
 - The `saves` and `captures` folders are made at the first start, so that they can be seen before the
   first save or screenshot.
-- **Updates (DarkLauncher 2.1)**: once the player turns on the look for new versions (Settings,
+- **Updates (DarkLauncher 2.11)**: once the player turns on the look for new versions (Settings,
   Internet; off at first), DarkLauncher reads the newest release of this repository at each start,
   says when one is out, and its "Update" downloads the release's file, checks its size and SHA-256
   against GitHub's, and installs it: the installer on Windows (it now accepts `/WAIT=<pid>` and
