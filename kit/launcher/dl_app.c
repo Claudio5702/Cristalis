@@ -385,14 +385,17 @@ void dl_fit(int cw, int ch, bool integer, int *w, int *h) {
   *h = sh;
 }
 
+int dl_crt(void) { return dl_game && (dl_game->hide & DL_HIDE_CRT) ? 0 : dl_cfg.crt; }
+int dl_scanlines(void) { return dl_game && (dl_game->hide & DL_HIDE_SCANLINES) ? 0 : dl_cfg.scanlines; }
+
 // The game's picture into a rectangle, with the filter and the scanlines; the frame rate on top.
 void dl_blit(HDC dc, int x, int y, int w, int h) {
   if (w <= 0 || h <= 0 || !dl_pic) return;
   int gw = dl_pic_w, gh = dl_pic_h, sh = gh;
   const u32 *src = dl_pic;
-  if (dl_cfg.scanlines) {
+  if (dl_scanlines()) {
     // each line three times, the third one darker
-    u32 keep = (u32)(256 - dl_cfg.scanlines * 48);
+    u32 keep = (u32)(256 - dl_scanlines() * 48);
     for (int yy = 0; yy < gh; yy++) {
       const u32 *row = &dl_pic[(size_t)yy * gw];
       u32 *o = &scan_buf[(size_t)yy * 3 * gw];

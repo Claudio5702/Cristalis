@@ -528,6 +528,8 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.pad_layout = DL_PAD_XBOX;
     game.pad_menu = DL_MENU_HOLD;
     game.rumble = true; // DarkLauncher's Vibration switch, and dl_rumble to every kind of controller
+    // a 2009 HD game made for flat screens: the tube's look is not offered (the setting is kept)
+    game.hide = DL_HIDE_CRT | DL_HIDE_SCANLINES;
     // --no-theme: DarkLauncher's own look (to compare)
     bool themed = true;
     for (int i = 1; i < argc; i++)

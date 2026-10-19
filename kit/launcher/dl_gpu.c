@@ -511,7 +511,7 @@ static void gpu_quad(int x, int y, int w, int h, ID3D11PixelShader *ps, int whic
 // its own constants and textures first (step of steps: smooth motion).
 static void gpu_game_quad(int x, int y, int w, int h, int step, int steps) {
   GpuConsts c = {{(float)dl_pic_w, (float)dl_pic_h}, {(float)w, (float)h}, {(float)x, (float)y},
-                 (float)dl_cfg.smooth, dl_cfg.crt ? 0.0f : (float)dl_cfg.scanlines, (float)dl_cfg.crt, hdr_chain ? hdr_white : 0,
+                 (float)dl_cfg.smooth, dl_crt() ? 0.0f : (float)dl_scanlines(), (float)dl_crt(), hdr_chain ? hdr_white : 0,
                  {(float)dl_pic_w / dl_pic_scale, (float)dl_pic_h / dl_pic_scale}};
   c.cvd = (float)dl_cfg.cvd;
   if (dl_game->gpu_frame) dl_game->gpu_frame(c.game, step, steps);

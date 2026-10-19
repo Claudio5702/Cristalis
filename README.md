@@ -65,7 +65,7 @@ is not.
 - **Six languages of the game** (French, English, German, Spanish, Italian, Japanese), chosen in the
   settings; the game restarts in the new one.
 - **Display through the graphics card**: the game drawn at 1280×720, 1920×1080, 2560×1440 or 3840×2160, then sharp,
-  smooth or smooth-edged at any window size; scanlines, a flat or curved CRT look, HDR (Windows).
+  smooth or smooth-edged at any window size; HDR (Windows).
 - **Achievements stored on the computer**, with a notice over the game and a list in the settings.
 - **The console's own offline behaviour on request**: the "Not connected to Xbox LIVE" notice and
   the choice of the storage device are off by default, and can be turned on.
@@ -93,7 +93,7 @@ back.
   - **Languages**: the game's language (the game restarts in it) and the menu's.
   - **Picture**: the internal resolution (1280×720, 1920×1080, 2560×1440 or 3840×2160), a preset,
     full screen, integer scaling, display through the graphics card or in software, filter,
-    scanlines, CRT, HDR, vertical sync, the frame rate shown, "Try it full size", and accessibility
+    HDR, vertical sync, the frame rate shown, "Try it full size", and accessibility
     (high contrast, colour-blind filter, less motion, large help text).
   - **Sound**: the volume and the sounds of the menu.
   - **Controls**: the keyboard keys and controller buttons of the game, vibration, and the shortcuts.

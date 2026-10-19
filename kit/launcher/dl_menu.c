@@ -110,12 +110,15 @@ static const DlRow langs_rows[] = {
 typedef struct { int integer_scale, smooth, scanlines, crt; } Preset; // smooth: 0 sharp, 1 smooth, 2 smooth edges
 static const Preset presets[4] = {{1, 0, 0, 0}, {0, 2, 0, 0}, {0, 1, 2, 2}, {0, 0, 0, 0}}; // original, large, CRT, performance
 static const int preset_texts[4] = {T_PRE_ORIGINAL, T_PRE_LARGE, T_PRE_CRT, T_PRE_FAST};
+// the presets offered, in order (without "CRT" when the game hides the CRT filter); preset_pick is one of them
+static int preset_ids[4] = {0, 1, 2, 3}, preset_n = 4;
 static int preset_pick; // the last preset chosen (< > go on from it)
 static int preset_match(void) { // -1: none
-  for (int k = 0; k < 4; k++) {
-    const Preset *p = &presets[k];
-    if (dl_cfg.integer_scale == p->integer_scale && dl_cfg.smooth == p->smooth && dl_cfg.scanlines == p->scanlines && dl_cfg.crt == p->crt &&
-        (k != 3 || !dl_cfg.ahead)) // Performance: no run-ahead either
+  bool no_crt = dl_game->hide & DL_HIDE_CRT, no_scan = dl_game->hide & DL_HIDE_SCANLINES; // a hidden row is left aside
+  for (int k = 0; k < preset_n; k++) {
+    const Preset *p = &presets[preset_ids[k]];
+    if (dl_cfg.integer_scale == p->integer_scale && dl_cfg.smooth == p->smooth && (no_scan || dl_cfg.scanlines == p->scanlines) &&
+        (no_crt || dl_cfg.crt == p->crt) && (preset_ids[k] != 3 || !dl_cfg.ahead)) // Performance: no run-ahead either
       return k;
   }
   return -1;
@@ -125,18 +128,19 @@ static const wchar_t *preset_show(int v) {
   int m = preset_match();
   if (m < 0) return TX(T_PRE_CUSTOM);
   preset_pick = m;
-  return TX(preset_texts[m]);
+  return TX(preset_texts[preset_ids[m]]);
 }
 static void preset_changed(void) {
-  const Preset *p = &presets[preset_pick];
+  int id = preset_ids[preset_pick < 0 || preset_pick >= preset_n ? 0 : preset_pick];
+  const Preset *p = &presets[id];
   dl_cfg.integer_scale = p->integer_scale;
   dl_cfg.smooth = p->smooth;
-  dl_cfg.scanlines = p->scanlines;
-  dl_cfg.crt = p->crt;
-  if (preset_pick == 3) dl_cfg.ahead = 0;
+  if (!(dl_game->hide & DL_HIDE_SCANLINES)) dl_cfg.scanlines = p->scanlines;
+  if (!(dl_game->hide & DL_HIDE_CRT)) dl_cfg.crt = p->crt;
+  if (id == 3) dl_cfg.ahead = 0;
   dl_dirty = true;
 }
-static const DlRow image_rows[] = {
+static DlRow image_rows[] = { // not const: the presets' count is set at start (DlGame.hide)
     {DL_CHOICE, dl_texts[T_PRESET], dl_texts[T_H_PRESET], &preset_pick, 3, NULL, preset_show, preset_changed},
     {DL_SWITCH, dl_texts[T_FULL], dl_texts[T_H_FULL], &dl_cfg.fullscreen, 1, NULL, NULL, full_changed},
     {DL_SWITCH, dl_texts[T_INT], dl_texts[T_H_INT], &dl_cfg.integer_scale, 1},
@@ -274,7 +278,7 @@ static const DlRow welcome_ctrl_rows[] = {
     {.kind = DL_PAGE, .label = dl_texts[T_PAD], .help = dl_texts[T_H_PAD], .page = PG_PAD},
     {DL_ACTION, dl_texts[T_W_NEXT], dl_texts[T_H_W_CTRL], NULL, 0, NULL, NULL, welcome_screen},
 };
-static const DlRow welcome_screen_rows[] = {
+static DlRow welcome_screen_rows[] = { // not const, as image_rows
     {DL_SWITCH, dl_texts[T_FULL], dl_texts[T_H_FULL], &dl_cfg.fullscreen, 1, NULL, NULL, full_changed},
     {DL_CHOICE, dl_texts[T_PRESET], dl_texts[T_H_PRESET], &preset_pick, 3, NULL, preset_show, preset_changed},
     {DL_ACTION, dl_texts[T_W_PLAY], dl_texts[T_H_W_PLAY], NULL, 0, NULL, NULL, dl_play},
@@ -316,7 +320,23 @@ void dl_menu_init(void) {
   if (dl_game->pad_layout || dl_game->pad_menu) pad_rows[sizeof pad_rows / sizeof pad_rows[0] - 1].help = dl_texts[T_PH_DEFAULTS_GAME];
   if (dl_game->pad_menu == DL_MENU_HOLD) padfn_rows[4].help = dl_texts[T_PH_MENU_HOLD]; // FN_MENU's row
   dl_page(dl_texts[T_TAB_LANGS], langs_rows, 1);
+  // the rows the game does not offer (DlGame.hide), and the "CRT" preset with the CRT filter
+  if (dl_game->hide & DL_HIDE_CRT) {
+    preset_n = 0;
+    for (int k = 0; k < 4; k++)
+      if (k != 2) preset_ids[preset_n++] = k;
+  }
+  image_rows[0].max = welcome_screen_rows[1].max = preset_n - 1;
+  if (dl_game->hide & DL_HIDE_CRT) image_rows[0].help = welcome_screen_rows[1].help = dl_texts[T_H_PRESET_NOCRT];
   dl_page(dl_texts[T_TAB_IMAGE], image_rows, sizeof image_rows / sizeof image_rows[0]);
+  for (int k = dl_pages[DL_PAGE_IMAGE].n - 1; k >= 0; k--) {
+    const int *v = dl_pages[DL_PAGE_IMAGE].rows[k]->value;
+    if ((v == &dl_cfg.crt && (dl_game->hide & DL_HIDE_CRT)) || (v == &dl_cfg.scanlines && (dl_game->hide & DL_HIDE_SCANLINES))) {
+      DlPage *p = &dl_pages[DL_PAGE_IMAGE];
+      memmove(&p->rows[k], &p->rows[k + 1], sizeof p->rows[0] * (size_t)(p->n - k - 1));
+      p->n--;
+    }
+  }
   dl_page(dl_texts[T_TAB_SOUND], sound_rows, sizeof sound_rows / sizeof sound_rows[0]);
   dl_page(dl_texts[T_TAB_CTRL], ctrl_rows, sizeof ctrl_rows / sizeof ctrl_rows[0]);
   if (dl_game->rumble) dl_page_insert(PG_CTRL, 3, &rumble_row); // after the three pages of assignments

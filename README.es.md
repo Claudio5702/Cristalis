@@ -66,8 +66,7 @@ es.
 - **Los seis idiomas del juego** (francés, inglés, alemán, español, italiano, japonés), elegidos en
   los ajustes; el juego se reinicia en el nuevo idioma.
 - **Imagen a través de la tarjeta gráfica**: el juego dibujado a 1280×720, 1920×1080, 2560×1440 o
-  3840×2160, y luego nítido, suavizado o con bordes suavizados en cualquier tamaño de ventana;
-  scanlines, un filtro CRT plano o curvo, HDR (Windows).
+  3840×2160, y luego nítido, suavizado o con bordes suavizados en cualquier tamaño de ventana; HDR (Windows).
 - **Logros guardados en el ordenador**, con un aviso sobre el juego y una lista en los ajustes.
 - **El comportamiento sin conexión de la consola, si se desea**: el aviso «No conectado a Xbox LIVE»
   y la elección del dispositivo de almacenamiento están desactivados por defecto y se pueden activar.
@@ -97,7 +96,7 @@ página de la entrada seleccionada se muestra a su lado. Intro o Derecha entra e
   - **Idiomas**: el idioma del juego (el juego se reinicia en él) y el del menú.
   - **Imagen**: la resolución interna (1280×720, 1920×1080, 2560×1440 o 3840×2160), un preajuste,
     pantalla completa, escala entera, imagen por la tarjeta gráfica o por software, filtro,
-    scanlines, filtro CRT, HDR, sincronización vertical, mostrar los fotogramas por segundo,
+    HDR, sincronización vertical, mostrar los fotogramas por segundo,
     «Probar en grande» y accesibilidad (alto contraste, filtro para daltónicos, menos movimiento,
     ayuda en grande).
   - **Sonido**: el volumen y los sonidos del menú.

@@ -416,8 +416,8 @@ static void game_quad(int x, int y, int w, int h, int step, int steps) {
   set2(gl.ps, "origin", (float)x, (float)y);
   set2(gl.ps, "srcSize", (float)dl_pic_w / dl_pic_scale, (float)dl_pic_h / dl_pic_scale);
   set1(gl.ps, "filt", (float)dl_cfg.smooth);
-  set1(gl.ps, "scan", dl_cfg.crt ? 0.0f : (float)dl_cfg.scanlines);
-  set1(gl.ps, "crt", (float)dl_cfg.crt);
+  set1(gl.ps, "scan", dl_crt() ? 0.0f : (float)dl_scanlines());
+  set1(gl.ps, "crt", (float)dl_crt());
   set1(gl.ps, "hdr", 0);
   set1(gl.ps, "cvd", (float)dl_cfg.cvd);
   GLint at = glGetUniformLocation(gl.ps, "game");

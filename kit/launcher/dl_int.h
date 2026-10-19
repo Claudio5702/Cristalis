@@ -268,7 +268,7 @@ enum {
   T_H_SETTINGS, T_TAB_SETTINGS,
   T_NET, T_H_NET, T_TAB_NET, T_DISCORD, T_H_DISCORD, T_DS_PLAYING, T_DS_MENUS, T_UPDATES, T_H_UPDATES, T_UPD_NEW, T_UPD_NONE, T_UPD_OPEN, T_H_UPD_OPEN,
   T_TAB_NEWS, T_H_NEWS, T_TAB_WELCOME, T_W_NEXT, T_H_W_LANG, T_H_W_CTRL, T_W_PLAY, T_H_W_PLAY,
-  T_PRESET, T_H_PRESET, T_PRE_CUSTOM, T_PRE_ORIGINAL, T_PRE_LARGE, T_PRE_CRT, T_PRE_FAST,
+  T_PRESET, T_H_PRESET, T_H_PRESET_NOCRT, T_PRE_CUSTOM, T_PRE_ORIGINAL, T_PRE_LARGE, T_PRE_CRT, T_PRE_FAST,
   T_BACKUPS, T_H_BACKUPS, T_TAB_BACKUPS, T_BKH, T_BKH_GAME, T_BKH_CONFIRM, T_BK_NONE, T_BK_SESSION, T_BK_RESTORED,
   T_COUNT
 };
@@ -333,5 +333,9 @@ const void *ui_theme_sound(int kind, int volume);
 #define SIDE_X0 13.0
 #define SIDE_X1 153.0
 #define PANEL_BOTTOM 372.0
+
+// The CRT filter and the scanlines as they are applied: 0 when the game hides their row (DlGame.hide).
+int dl_crt(void);
+int dl_scanlines(void);
 
 #endif

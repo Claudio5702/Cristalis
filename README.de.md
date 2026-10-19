@@ -70,8 +70,7 @@ wenn nicht.
 - **Die sechs Sprachen des Spiels** (Französisch, Englisch, Deutsch, Spanisch, Italienisch,
   Japanisch), in den Einstellungen gewählt; das Spiel startet in der neuen Sprache neu.
 - **Anzeige über die Grafikkarte**: das Spiel in 1280×720, 1920×1080, 2560×1440 oder 3840×2160
-  gezeichnet, dann scharf, geglättet oder mit weichen Kanten in jeder Fenstergröße; Scanlines, ein
-  flacher oder gewölbter Röhren-Filter, HDR (Windows).
+  gezeichnet, dann scharf, geglättet oder mit weichen Kanten in jeder Fenstergröße; HDR (Windows).
 - **Erfolge auf dem Computer gespeichert**, mit einer Meldung über dem Spiel und einer Liste in den
   Einstellungen.
 - **Das Offline-Verhalten der Konsole auf Wunsch**: der Hinweis „Nicht mit Xbox LIVE verbunden" und
@@ -101,8 +100,7 @@ die Seite des gewählten Eintrags erscheint daneben. Enter oder Rechts öffnet s
 - **Einstellungen**: eine Seite, die zum Rest führt.
   - **Sprachen**: die Sprache des Spiels (das Spiel startet in ihr neu) und die des Menüs.
   - **Bild**: die interne Auflösung (1280×720, 1920×1080, 2560×1440 oder 3840×2160), eine Voreinstellung,
-    Vollbild, Ganzzahl-Skalierung, Anzeige über die Grafikkarte oder in Software, Filter, Scanlines,
-    Röhren-Filter, HDR, vertikale Synchronisation, die Anzeige der Bildrate, „Groß ausprobieren" und
+    Vollbild, Ganzzahl-Skalierung, Anzeige über die Grafikkarte oder in Software, Filter, HDR, vertikale Synchronisation, die Anzeige der Bildrate, „Groß ausprobieren" und
     Barrierefreiheit (hoher Kontrast, Farbenblind-Filter, weniger Bewegung, große Hilfetexte).
   - **Ton**: die Lautstärke und die Töne des Menüs.
   - **Steuerung**: die Tastatur-Tasten und Controller-Knöpfe des Spiels, die Vibration und die

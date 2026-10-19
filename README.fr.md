@@ -68,8 +68,7 @@ n'est pas le cas.
 - **Les six langues du jeu** (français, anglais, allemand, espagnol, italien, japonais), choisies
   dans les réglages ; le jeu redémarre dans la nouvelle langue.
 - **Affichage par la carte graphique** : le jeu dessiné en 1280×720, 1920×1080, 2560×1440 ou
-  3840×2160, puis net, lissé ou aux bords adoucis à toutes les tailles de fenêtre ; scanlines,
-  filtre CRT plat ou bombé, HDR (Windows).
+  3840×2160, puis net, lissé ou aux bords adoucis à toutes les tailles de fenêtre ; HDR (Windows).
 - **Succès enregistrés sur l'ordinateur**, avec une notification par-dessus le jeu et une liste dans
   les réglages.
 - **Le comportement hors ligne de la console, sur demande** : l'avis « Non connecté à Xbox LIVE »
@@ -100,7 +99,7 @@ page de l'entrée sélectionnée s'affiche à côté. Entrée ou Droite y entre,
   - **Langues** : la langue du jeu (le jeu redémarre dans celle-ci) et celle du menu.
   - **Image** : la résolution interne (1280×720, 1920×1080, 2560×1440 ou 3840×2160), un préréglage,
     le plein écran, l'échelle entière, l'affichage par la carte graphique ou par le processeur, le
-    filtre, les scanlines, le filtre CRT, le HDR, la synchro verticale, l'affichage des images par
+    filtre, le HDR, la synchro verticale, l'affichage des images par
     seconde, « Essayer en grand » et l'accessibilité (contraste élevé, filtre pour daltoniens,
     moins de mouvement, aide en grand).
   - **Son** : le volume et les sons du menu.

@@ -10,7 +10,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "2.02"
+#define DL_VERSION "2.03"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -43,6 +43,9 @@ enum { DL_PAD_SNES, DL_PAD_XBOX };
 // Select; View held for a moment (a short press stays the game's Select); no button (Esc on the
 // keyboard; the player may still choose one on the Controls page).
 enum { DL_MENU_VIEW, DL_MENU_HOLD, DL_MENU_NONE };
+// Rows of the Picture page a game does not offer (DlGame.hide): the CRT filter, the scanlines (an HD
+// game made for flat screens...).
+enum { DL_HIDE_CRT = 1 << 0, DL_HIDE_SCANLINES = 1 << 1 };
 
 // A picture laid over the game's (high-resolution text, a panel...): w x h pixels 0xAARRGGBB, colours
 // already multiplied by their opacity, at x,y in the window.
@@ -199,6 +202,11 @@ typedef struct DlGame {
   // 1 << DL_LANG_*, or DL_LANGS_ALL. 0: the first six (jp to de), the languages before Italian. The
   // Languages page offers only these, and dl_lang() never returns another.
   unsigned langs;
+
+  // DL_HIDE_*: rows of the Picture page left out (0: all shown). What they set is not applied then (the
+  // picture is drawn without it), and the presets leave it aside ("CRT" goes with the CRT filter); the
+  // settings file keeps the player's value.
+  unsigned hide;
 } DlGame;
 
 // ---- pages: lists of rows, drawn and handled by DarkLauncher
