@@ -13,7 +13,7 @@ New-Item -ItemType Directory -Force $Output | Out-Null
 
 $stub = Join-Path $Output 'setup_stub.exe'
 $res = Join-Path $Output 'setup_res.o'
-& windres (Join-Path $recomp 'resources\crystal_defenders.rc') -O coff -o $res --include-dir (Join-Path $recomp 'resources')
+& windres (Join-Path $PSScriptRoot 'setup\setup.rc') -O coff -o $res --include-dir (Join-Path $recomp 'resources')
 if ($LASTEXITCODE -ne 0) { throw "resource build failed" }
 # -mwindows: no console window; the program attaches to a terminal itself when started from one
 & clang -std=c11 -O2 -Wall (Join-Path $PSScriptRoot 'setup\setup.c') $res -o $stub -mwindows -static -lole32 -luuid -lshell32 -luser32 -lgdi32 -ladvapi32

@@ -1,0 +1,4 @@
+// The installer's icons, drawn by tools/make_icon.ps1: 1, the game's (the installer's own); 2, the
+// grey one that the copy left as Uninstall.exe takes (setup.c, give_uninstall_icon).
+1 ICON "crystal_defenders.ico"
+2 ICON "crystal_defenders_uninstall.ico"

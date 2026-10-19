@@ -14,6 +14,8 @@ on DarkLauncher's "What's new" page.
   is found again by the installer.
 - A new icon, as Kahna's carries its "K": the initial C of Cristalis in the gold of the setup screen's
   title, with the crystal in its opening (program, installer, window, Linux).
+- The uninstaller has the same icon in shades of grey, so that `Uninstall.exe` is not mistaken for the
+  game next to it.
 - The repository is now `Claudio5702/Cristalis` (the old address leads there), and the published files
   are `Cristalis-Setup.exe` and `Cristalis-linux-x86_64.tar.gz`.
 

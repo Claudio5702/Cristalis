@@ -385,6 +385,27 @@ static bool install_game_data(const char *dest, const char *copy) {
   return code == 0 && game_ready(dest);
 }
 
+// Uninstall.exe takes the grey icon (setup.rc): its first icon group, the one Explorer shows, gets the
+// data of the second, which points at the grey pictures that this program carries too.
+static BOOL CALLBACK first_language(HMODULE module, LPCSTR type, LPCSTR name, WORD language, LONG_PTR out) {
+  (void)module, (void)type, (void)name;
+  *(WORD *)out = language;
+  return FALSE;
+}
+
+static void give_uninstall_icon(const char *path) {
+  HRSRC grey = FindResourceA(NULL, MAKEINTRESOURCEA(2), (LPCSTR)RT_GROUP_ICON);
+  HGLOBAL loaded = grey ? LoadResource(NULL, grey) : NULL;
+  void *data = loaded ? LockResource(loaded) : NULL;
+  if (!data) return;
+  WORD language = 0;
+  EnumResourceLanguagesA(NULL, (LPCSTR)RT_GROUP_ICON, MAKEINTRESOURCEA(1), first_language, (LONG_PTR)&language);
+  HANDLE update = BeginUpdateResourceA(path, FALSE);
+  if (!update) return;
+  bool ok = UpdateResourceA(update, (LPCSTR)RT_GROUP_ICON, MAKEINTRESOURCEA(1), language, data, SizeofResource(NULL, grey));
+  EndUpdateResourceA(update, !ok);
+}
+
 #define UNINST_KEY "Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\CrystalDefendersRecomp"
 
 // Everything inside a folder, sub-folders included; the folders themselves are removed too (but not 'dir').
@@ -608,6 +629,7 @@ int main(int argc, char **argv) {
         left -= n;
       }
       fclose(o);
+      give_uninstall_icon(path);
     }
   }
   fclose(f);

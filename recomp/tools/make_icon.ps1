@@ -1,7 +1,8 @@
 ﻿# Draws the program's icon: the initial C of Cristalis in the gold of the setup screen's
 # title, with an original crystal, on the blue of the game's panels (no artwork from
 # the game is used), and writes
-# resources\crystal_defenders.ico with PNG entries from 16 to 256 pixels.
+# resources\crystal_defenders.ico with PNG entries from 16 to 256 pixels, and a grey
+# crystal_defenders_uninstall.ico for the uninstaller.
 # Usage: make_icon.ps1 [-Preview <png>]
 param([string]$Preview = '')
 $ErrorActionPreference = 'Stop'
@@ -77,32 +78,53 @@ $g.Dispose()
 
 if ($Preview) { $art.Save($Preview) }
 
-$images = foreach ($s in 16, 24, 32, 48, 64, 256) {
-    $bitmap = New-Object System.Drawing.Bitmap $s, $s
-    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-    $graphics.InterpolationMode = 'HighQualityBicubic'; $graphics.PixelOffsetMode = 'HighQuality'
-    $graphics.DrawImage($art, 0, 0, $s, $s)
-    $graphics.Dispose()
-    $stream = New-Object System.IO.MemoryStream
-    $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
-    $bitmap.Dispose()
-    , @($s, $stream.ToArray())
+# An .ico of PNG entries from 16 to 256 pixels, from a 512 x 512 drawing.
+function Write-Ico($art, [string]$name) {
+    $images = foreach ($s in 16, 24, 32, 48, 64, 256) {
+        $bitmap = New-Object System.Drawing.Bitmap $s, $s
+        $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+        $graphics.InterpolationMode = 'HighQualityBicubic'; $graphics.PixelOffsetMode = 'HighQuality'
+        $graphics.DrawImage($art, 0, 0, $s, $s)
+        $graphics.Dispose()
+        $stream = New-Object System.IO.MemoryStream
+        $bitmap.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
+        $bitmap.Dispose()
+        , @($s, $stream.ToArray())
+    }
+    $out = New-Object System.IO.MemoryStream
+    $writer = New-Object System.IO.BinaryWriter $out
+    $writer.Write([uint16]0); $writer.Write([uint16]1); $writer.Write([uint16]$images.Count)
+    $offset = 6 + 16 * $images.Count
+    foreach ($image in $images) {
+        $dimension = if ($image[0] -ge 256) { 0 } else { $image[0] }
+        $writer.Write([byte]$dimension); $writer.Write([byte]$dimension); $writer.Write([byte]0); $writer.Write([byte]0)
+        $writer.Write([uint16]1); $writer.Write([uint16]32)
+        $writer.Write([uint32]$image[1].Length); $writer.Write([uint32]$offset)
+        $offset += $image[1].Length
+    }
+    foreach ($image in $images) { $writer.Write($image[1]) }
+    $target = Join-Path $root 'recomp\resources'
+    New-Item -ItemType Directory -Force $target | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $target $name), $out.ToArray())
+    '{0}: {1} bytes' -f $name, $out.Length
 }
-$art.Dispose()
 
-$out = New-Object System.IO.MemoryStream
-$writer = New-Object System.IO.BinaryWriter $out
-$writer.Write([uint16]0); $writer.Write([uint16]1); $writer.Write([uint16]$images.Count)
-$offset = 6 + 16 * $images.Count
-foreach ($image in $images) {
-    $dimension = if ($image[0] -ge 256) { 0 } else { $image[0] }
-    $writer.Write([byte]$dimension); $writer.Write([byte]$dimension); $writer.Write([byte]0); $writer.Write([byte]0)
-    $writer.Write([uint16]1); $writer.Write([uint16]32)
-    $writer.Write([uint32]$image[1].Length); $writer.Write([uint32]$offset)
-    $offset += $image[1].Length
-}
-foreach ($image in $images) { $writer.Write($image[1]) }
-$target = Join-Path $root 'recomp\resources'
-New-Item -ItemType Directory -Force $target | Out-Null
-[IO.File]::WriteAllBytes((Join-Path $target 'crystal_defenders.ico'), $out.ToArray())
-'{0} bytes' -f $out.Length
+Write-Ico $art 'crystal_defenders.ico'
+
+# The uninstaller's icon: the same drawing in shades of grey (relief and shadows kept), so that
+# Uninstall.exe is not mistaken for the game next to it.
+$grey = New-Object System.Drawing.Bitmap $size, $size
+$gg = [System.Drawing.Graphics]::FromImage($grey)
+$m = New-Object System.Drawing.Imaging.ColorMatrix
+$m.Matrix00 = 0.30; $m.Matrix01 = 0.30; $m.Matrix02 = 0.30
+$m.Matrix10 = 0.59; $m.Matrix11 = 0.59; $m.Matrix12 = 0.59
+$m.Matrix20 = 0.11; $m.Matrix21 = 0.11; $m.Matrix22 = 0.11
+$m.Matrix33 = 1; $m.Matrix44 = 1
+$attributes = New-Object System.Drawing.Imaging.ImageAttributes
+$attributes.SetColorMatrix($m)
+$gg.DrawImage($art, (New-Object System.Drawing.Rectangle 0, 0, $size, $size), 0, 0, $size, $size, 'Pixel', $attributes)
+$gg.Dispose()
+if ($Preview) { $grey.Save([IO.Path]::ChangeExtension($Preview, '.uninstall.png')) }
+Write-Ico $grey 'crystal_defenders_uninstall.ico'
+$grey.Dispose()
+$art.Dispose()
