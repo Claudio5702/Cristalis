@@ -48,7 +48,7 @@ cp "$here/../../LICENSE" "$dest/LICENSE.txt"
 for f in /usr/share/licenses/sdl3/LICENSE /usr/share/licenses/sdl3/LICENSE.txt /usr/share/doc/libsdl3*/copyright; do [ -f "$f" ] && cp "$f" "$dest/SDL3-LICENSE.txt" && break; done
 
 cat > "$dest/README.txt" <<'EOF'
-CrystalDefendersRecomp - unofficial native Linux build (experimental)
+Cristalis (Crystal Defenders Recomp) - unofficial native Linux build (experimental)
 
 This folder does NOT contain the game, only the program that runs it. You need
 your own copy of Crystal Defenders (Xbox 360, Xbox Live Arcade): the

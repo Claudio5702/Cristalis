@@ -1,6 +1,6 @@
-# CrystalDefendersRecomp
+# Cristalis
 
-**Crystal Defenders (Xbox 360) — adaptación nativa no oficial por recompilación estática**
+**Crystal Defenders Recomp — adaptación nativa por recompilación estática**
 
 *[English](README.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · **Español** · [Italiano](README.it.md) · [日本語](README.ja.md)*
 

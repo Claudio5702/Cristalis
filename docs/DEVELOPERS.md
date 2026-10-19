@@ -1,4 +1,4 @@
-# CrystalDefendersRecomp — for developers
+# Cristalis (Crystal Defenders Recomp) — for developers
 
 How the project works, how to build it, check it and make the installer. The repository never holds
 the game's data or its translated code: both come from your own copy of the game.

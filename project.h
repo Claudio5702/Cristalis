@@ -1,4 +1,4 @@
-// What makes an installed program this project (CrystalDefendersRecomp), for DarkLauncher
+// What makes an installed program this project (Cristalis), for DarkLauncher
 // (kit\launcher) and the installer. Started from DarkLauncher's project.h; every name is this
 // project's own.
 //
@@ -8,16 +8,16 @@
 #define PROJECT_H
 
 // ---- names
-#define PROJECT_NAME "CrystalDefendersRecomp"     // name of the project: window titles, installer file
-#define PROJECT_SUBTITLE "Recomp"                 // what it is, beside the name
+#define PROJECT_NAME "Cristalis"                  // name of the project: window titles, crash report
+#define PROJECT_SUBTITLE "Crystal Defenders Recomp" // what it is, beside the name
 #define PROJECT_LOGO_FIRST "C"                    // the setup screen's title: a large initial (also on the icon),
-#define PROJECT_LOGO_REST "RYSTAL DEFENDERS"      // then the rest in smaller capitals
+#define PROJECT_LOGO_REST "RISTALIS"              // then the rest in smaller capitals
 #define GAME_VERSION "1.02"                    // this port's version (CHANGELOG.md): 1.01, 1.02... as DarkLauncher's
 #define GAME_NAME "Crystal Defenders"             // the program as the user sees it: install folder, shortcuts, Windows list of programs
 #define FILE_STEM "crystal_defenders"             // crystal_defenders.exe, crystal_defenders.ini...
-#define WINDOW_CLASS "CrystalDefendersRecomp"     // window class of the program
+#define WINDOW_CLASS "CrystalDefendersRecomp"     // window class of the program (the name before Cristalis: kept)
 #define SETUP_CLASS "CrystalDefendersRecompSetup" // window class of the installer
-#define UNINSTALL_ID "CrystalDefendersRecomp"     // key of the entry in the Windows list of programs (unique per project)
+#define UNINSTALL_ID "CrystalDefendersRecomp"     // key of the entry in the Windows list of programs (kept: an installed copy is found again)
 #define SETUP_MAGIC "CDRECOMP"                    // exactly 8 characters ending the installer's payload
 
 // ---- game file
@@ -40,6 +40,6 @@
 #define SETUP_PERSONAL_FILES FILE_STEM ".ini", "launcher_bg.*"
 #define SETUP_PERSONAL_FOLDERS "userdata", "captures", "saves", "game"
 
-#define PROJECT_TITLE GAME_NAME " - " PROJECT_NAME
+#define PROJECT_TITLE PROJECT_NAME " - " PROJECT_SUBTITLE
 
 #endif

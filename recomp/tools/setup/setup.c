@@ -629,7 +629,7 @@ int main(int argc, char **argv) {
     if (RegCreateKeyExA(HKEY_CURRENT_USER, UNINST_KEY, 0, NULL, 0, KEY_WRITE, NULL, &key, NULL) == ERROR_SUCCESS) {
       char un[MAX_PATH + 2];
       DWORD one = 1;
-      static const char name[] = "Crystal Defenders (CrystalDefendersRecomp)", publisher[] = "CrystalDefendersRecomp (unofficial)";
+      static const char name[] = "Cristalis (Crystal Defenders)", publisher[] = "Cristalis (unofficial)";
       snprintf(un, sizeof un, "\"%s\\Uninstall.exe\"", dest);
       RegSetValueExA(key, "DisplayName", 0, REG_SZ, (const BYTE *)name, sizeof name);
       RegSetValueExA(key, "Publisher", 0, REG_SZ, (const BYTE *)publisher, sizeof publisher);

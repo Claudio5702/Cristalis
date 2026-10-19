@@ -25,7 +25,7 @@ static const wchar_t *const texts[6][T_COUNT] = {
     // ------------------------------------------------------------------ Français
     {
         [T_TITLE_INSTALL] = L"Installation de Crystal Defenders", [T_TITLE_UNINSTALL] = L"Désinstallation de Crystal Defenders",
-        [T_INTRO] = L"Ce programme installe CrystalDefendersRecomp (portage natif non officiel de Crystal Defenders pour Windows) sur cet ordinateur.",
+        [T_INTRO] = L"Ce programme installe Cristalis (portage natif non officiel de Crystal Defenders pour Windows) sur cet ordinateur.",
         [T_DIR_LABEL] = L"Dossier d'installation :", [T_BROWSE_BTN] = L"Parcourir…",
         [T_BROWSE] = L"Dossier où installer Crystal Defenders (un sous-dossier « Crystal Defenders » y sera créé)",
         [T_CHK_DESKTOP] = L"Créer un raccourci sur le Bureau", [T_CHK_MENU] = L"Créer un raccourci dans le menu Démarrer",
@@ -53,7 +53,7 @@ static const wchar_t *const texts[6][T_COUNT] = {
     // ------------------------------------------------------------------ English
     {
         [T_TITLE_INSTALL] = L"Crystal Defenders Setup", [T_TITLE_UNINSTALL] = L"Uninstall Crystal Defenders",
-        [T_INTRO] = L"This program installs CrystalDefendersRecomp (an unofficial native port of Crystal Defenders for Windows) on this computer.",
+        [T_INTRO] = L"This program installs Cristalis (an unofficial native port of Crystal Defenders for Windows) on this computer.",
         [T_DIR_LABEL] = L"Installation folder:", [T_BROWSE_BTN] = L"Browse…",
         [T_BROWSE] = L"Folder to install Crystal Defenders in (a \"Crystal Defenders\" folder is created inside it)",
         [T_CHK_DESKTOP] = L"Create a shortcut on the desktop", [T_CHK_MENU] = L"Create a shortcut in the Start menu",
@@ -81,7 +81,7 @@ static const wchar_t *const texts[6][T_COUNT] = {
     // ------------------------------------------------------------------ Deutsch
     {
         [T_TITLE_INSTALL] = L"Installation von Crystal Defenders", [T_TITLE_UNINSTALL] = L"Deinstallation von Crystal Defenders",
-        [T_INTRO] = L"Dieses Programm installiert CrystalDefendersRecomp (eine inoffizielle native Portierung von Crystal Defenders für Windows) auf diesem Computer.",
+        [T_INTRO] = L"Dieses Programm installiert Cristalis (eine inoffizielle native Portierung von Crystal Defenders für Windows) auf diesem Computer.",
         [T_DIR_LABEL] = L"Installationsordner:", [T_BROWSE_BTN] = L"Durchsuchen…",
         [T_BROWSE] = L"Ordner für Crystal Defenders (darin wird ein Ordner „Crystal Defenders“ angelegt)",
         [T_CHK_DESKTOP] = L"Verknüpfung auf dem Desktop erstellen", [T_CHK_MENU] = L"Verknüpfung im Startmenü erstellen",
@@ -109,7 +109,7 @@ static const wchar_t *const texts[6][T_COUNT] = {
     // ------------------------------------------------------------------ Español
     {
         [T_TITLE_INSTALL] = L"Instalación de Crystal Defenders", [T_TITLE_UNINSTALL] = L"Desinstalación de Crystal Defenders",
-        [T_INTRO] = L"Este programa instala CrystalDefendersRecomp (una adaptación nativa no oficial de Crystal Defenders para Windows) en este ordenador.",
+        [T_INTRO] = L"Este programa instala Cristalis (una adaptación nativa no oficial de Crystal Defenders para Windows) en este ordenador.",
         [T_DIR_LABEL] = L"Carpeta de instalación:", [T_BROWSE_BTN] = L"Examinar…",
         [T_BROWSE] = L"Carpeta donde instalar Crystal Defenders (se creará dentro una carpeta «Crystal Defenders»)",
         [T_CHK_DESKTOP] = L"Crear un acceso directo en el escritorio", [T_CHK_MENU] = L"Crear un acceso directo en el menú Inicio",
@@ -137,7 +137,7 @@ static const wchar_t *const texts[6][T_COUNT] = {
     // ------------------------------------------------------------------ Italiano
     {
         [T_TITLE_INSTALL] = L"Installazione di Crystal Defenders", [T_TITLE_UNINSTALL] = L"Disinstallazione di Crystal Defenders",
-        [T_INTRO] = L"Questo programma installa CrystalDefendersRecomp (una conversione nativa non ufficiale di Crystal Defenders per Windows) su questo computer.",
+        [T_INTRO] = L"Questo programma installa Cristalis (una conversione nativa non ufficiale di Crystal Defenders per Windows) su questo computer.",
         [T_DIR_LABEL] = L"Cartella di installazione:", [T_BROWSE_BTN] = L"Sfoglia…",
         [T_BROWSE] = L"Cartella in cui installare Crystal Defenders (al suo interno verrà creata una cartella «Crystal Defenders»)",
         [T_CHK_DESKTOP] = L"Crea un collegamento sul desktop", [T_CHK_MENU] = L"Crea un collegamento nel menu Start",
@@ -165,7 +165,7 @@ static const wchar_t *const texts[6][T_COUNT] = {
     // ------------------------------------------------------------------ 日本語
     {
         [T_TITLE_INSTALL] = L"Crystal Defenders のインストール", [T_TITLE_UNINSTALL] = L"Crystal Defenders のアンインストール",
-        [T_INTRO] = L"CrystalDefendersRecomp（クリスタルディフェンダーズの Windows 向け非公式ネイティブ移植版）をこのパソコンにインストールします。",
+        [T_INTRO] = L"Cristalis（クリスタルディフェンダーズの Windows 向け非公式ネイティブ移植版）をこのパソコンにインストールします。",
         [T_DIR_LABEL] = L"インストール先のフォルダー：", [T_BROWSE_BTN] = L"参照…",
         [T_BROWSE] = L"Crystal Defenders のインストール先（中に「Crystal Defenders」フォルダーが作られます）",
         [T_CHK_DESKTOP] = L"デスクトップにショートカットを作る", [T_CHK_MENU] = L"スタートメニューにショートカットを作る",

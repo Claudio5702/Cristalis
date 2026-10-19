@@ -1,10 +1,17 @@
-# Versions of CrystalDefendersRecomp
+# Versions of Cristalis
 
 The number is `GAME_VERSION` in `project.h`, numbered as [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)
 does: small improvements move the second figure (1.01, 1.02...); a large novelty goes to the next ten
 (1.1, that is 1.10, then 1.11...); the first figure changes (2.0) for a change of the whole. Each
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
+
+## Next version (not numbered yet)
+
+- The project is now called **Cristalis**, "Crystal Defenders Recomp", as Kahna is "Bahamut Lagoon
+  Recomp": the setup screen, the window title, the READMEs, the installer and the crash report say so.
+  The program's files keep their names (`crystal_defenders.exe`, `.ini`, saves), and an installed copy
+  is found again by the installer.
 
 ## 1.02
 

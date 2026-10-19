@@ -1,6 +1,6 @@
-# CrystalDefendersRecomp
+# Cristalis
 
-**Crystal Defenders（Xbox 360）— 静的リコンパイルによる非公式ネイティブ移植**
+**Crystal Defenders Recomp — 静的リコンパイルによるネイティブ移植**
 
 *[English](README.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Español](README.es.md) · [Italiano](README.it.md) · **日本語***
 

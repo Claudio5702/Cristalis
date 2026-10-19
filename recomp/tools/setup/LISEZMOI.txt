@@ -1,4 +1,4 @@
-Crystal Defenders - CrystalDefendersRecomp
+Cristalis - Crystal Defenders Recomp
 Portage natif non officiel pour Windows. Ecrit par une IA (Claude Code, Claude Opus 5.5).
 Sans lien avec Square Enix. Les donnees du jeu ne sont pas fournies : il faut
 votre propre copie du jeu (Xbox 360, Xbox Live Arcade).

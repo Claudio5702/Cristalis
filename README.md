@@ -1,6 +1,6 @@
-# CrystalDefendersRecomp
+# Cristalis
 
-**Crystal Defenders (Xbox 360) — unofficial native port by static recompilation**
+**Crystal Defenders Recomp — native port by static recompilation**
 
 ***English** · [Français](README.fr.md) · [Deutsch](README.de.md) · [Español](README.es.md) · [Italiano](README.it.md) · [日本語](README.ja.md)*
 
