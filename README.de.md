@@ -94,7 +94,7 @@ die Seite des gewählten Eintrags erscheint daneben. Enter oder Rechts öffnet s
 - **Erfolge**: die zwölf Erfolge des Spiels, mit dem Datum jedes Erfolgs und was er verlangt.
 - **Einstellungen**: eine Seite, die zum Rest führt.
   - **Sprachen**: die Sprache des Spiels (das Spiel startet in ihr neu) und die des Menüs.
-  - **Bild**: die interne Auflösung (1280×720, 1920×1080, 2560×1440 oder 3840×2160), eine Vorgabe,
+  - **Bild**: die interne Auflösung (1280×720, 1920×1080, 2560×1440 oder 3840×2160), eine Voreinstellung,
     Vollbild, Ganzzahl-Skalierung, Anzeige über die Grafikkarte oder in Software, Filter, Scanlines,
     Röhren-Filter, HDR, vertikale Synchronisation, die Anzeige der Bildrate, „Groß ausprobieren" und
     Barrierefreiheit (hoher Kontrast, Farbenblind-Filter, weniger Bewegung, große Hilfetexte).
@@ -176,6 +176,8 @@ zu erzwingen. Die Windows-Version läuft auch über Proton.
 
 Wie das Projekt funktioniert, wie man es baut, den Code des Spiels neu übersetzt, prüft und das
 Installationsprogramm erstellt: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (auf Englisch).
+
+Was sich in jeder Version geändert hat (jetzt 1.01): [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
 
 ## Häufige Fragen
 

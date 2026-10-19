@@ -176,6 +176,8 @@ compatibilité. La version Windows tourne aussi avec Proton.
 Le fonctionnement du projet, comment le compiler, traduire à nouveau le code du jeu, le vérifier et
 faire l'installeur : [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (en anglais).
 
+Ce qui a changé à chaque version (actuellement 1.01) : [CHANGELOG.md](CHANGELOG.md) (en anglais).
+
 ## Questions fréquentes
 
 **Est-ce un émulateur ?** Non. Le programme du jeu lui-même est traduit à l'avance en code natif

@@ -17,6 +17,7 @@
 extern "C"
 {
 #include "dl.h"
+#include "project.h" // GAME_VERSION
 }
 
 #include <windows.h>
@@ -334,37 +335,30 @@ void Status(char* out, int n)
 
 // ---- What is new ----
 
-constexpr const char* kVersion = "1.0";
-// One line per news: its title, then | and what it is.
+// What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
+// it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"Linux|Windows と同じ設定画面、ポーズメニュー、コントローラーで Linux でも動きます。\n"
-    L"内部解像度|ゲームを 3840×2160 まで描けます。「画面」ページで選べます。\n"
-    L"PlayStation のコントローラー|PS4 と PS5 のコントローラーがそのまま使え、振動もします。\n"
-    L"クラッシュレポート|クラッシュの後、どのステージのどのウェーブだったかを記録します。",
-    L"Linux|Le jeu tourne aussi sous Linux, avec le même écran de réglages, le menu de pause et les manettes.\n"
-    L"Résolution interne|Le jeu peut être dessiné jusqu'en 3840 × 2160 : page Image.\n"
-    L"Manettes PlayStation|Les manettes PS4 et PS5 marchent telles quelles, avec la vibration.\n"
-    L"Rapport de plantage|Après un plantage, le rapport dit où en était la partie : stage et wave.",
-    L"Linux|The game also runs on Linux, with the same settings screen, pause menu and controllers.\n"
-    L"Internal resolution|The game can be drawn at up to 3840 × 2160: Picture page.\n"
-    L"PlayStation controllers|PS4 and PS5 controllers work as they are, with vibration.\n"
-    L"Crash report|After a crash, the report says where the game was: stage and wave.",
-    L"Linux|El juego también funciona en Linux, con la misma pantalla de ajustes, el menú de pausa y los mandos.\n"
-    L"Resolución interna|El juego puede dibujarse hasta 3840 × 2160: página Imagen.\n"
-    L"Mandos de PlayStation|Los mandos de PS4 y PS5 funcionan tal cual, con vibración.\n"
-    L"Informe de fallo|Tras un fallo, el informe dice dónde estaba la partida: stage y wave.",
-    L"Linux|O jogo também roda no Linux, com a mesma tela de ajustes, o menu de pausa e os controles.\n"
-    L"Resolução interna|O jogo pode ser desenhado em até 3840 × 2160: página Imagem.\n"
-    L"Controles de PlayStation|Os controles de PS4 e PS5 funcionam como estão, com vibração.\n"
-    L"Relatório de falha|Depois de uma falha, o relatório diz onde estava a partida: stage e wave.",
-    L"Linux|Das Spiel läuft auch unter Linux, mit demselben Einstellungsbildschirm, Pausenmenü und Controllern.\n"
-    L"Interne Auflösung|Das Spiel kann bis 3840 × 2160 gezeichnet werden: Seite Bild.\n"
-    L"PlayStation-Controller|PS4- und PS5-Controller funktionieren direkt, mit Vibration.\n"
-    L"Absturzbericht|Nach einem Absturz sagt der Bericht, wo das Spiel war: Stage und Wave.",
-    L"Linux|Il gioco gira anche su Linux, con la stessa schermata delle impostazioni, il menu di pausa e i controller.\n"
-    L"Risoluzione interna|Il gioco può essere disegnato fino a 3840 × 2160: pagina Immagine.\n"
-    L"Controller PlayStation|I controller PS4 e PS5 funzionano così come sono, con vibrazione.\n"
-    L"Rapporto di crash|Dopo un crash, il rapporto dice dov'era la partita: stage e wave." };
+    L"すっきりしたメニュー|左のバーは「プレイ」「キャプチャ」「ゲーム」「実績」「設定」だけになりました。言語、画面、サウンド、操作は「設定」の中です。\n"
+    L"アクセシビリティ|「画面」にプリセットと、ハイコントラスト、色覚フィルター、動きを減らす、大きなヘルプの設定が加わりました。\n"
+    L"より詳しいクラッシュレポート|Windows では、レポートにエラーの種類も記録されます。",
+    L"Menu allégé|La barre de gauche ne garde que Jouer, Captures, Jeu, Succès et Paramètres ; Langues, Image, Son et Commandes sont dans Paramètres.\n"
+    L"Accessibilité|La page Image gagne un préréglage et une page Accessibilité : contraste élevé, filtre pour daltoniens, moins de mouvement, aide en grand.\n"
+    L"Rapport de plantage plus précis|Sous Windows, le rapport nomme aussi l'erreur.",
+    L"Lighter menu|The bar on the left keeps only Play, Screenshots, Game, Achievements and Settings; Languages, Picture, Sound and Controls are in Settings.\n"
+    L"Accessibility|The Picture page gains a preset and an Accessibility page: high contrast, colour-blind filter, less motion, large help text.\n"
+    L"More precise crash report|On Windows, the report also names the error.",
+    L"Menú más ligero|La barra de la izquierda solo tiene Jugar, Capturas, Juego, Logros y Ajustes; Idiomas, Imagen, Sonido y Controles están en Ajustes.\n"
+    L"Accesibilidad|La página Imagen gana un preajuste y una página Accesibilidad: alto contraste, filtro para daltónicos, menos movimiento, ayuda en grande.\n"
+    L"Informe de fallo más preciso|En Windows, el informe también nombra el error.",
+    L"Menu mais leve|A barra da esquerda tem só Jogar, Capturas, Jogo, Conquistas e Configurações; Idiomas, Imagem, Som e Controles estão em Configurações.\n"
+    L"Acessibilidade|A página Imagem ganha uma predefinição e uma página Acessibilidade: alto contraste, filtro para daltônicos, menos movimento, ajuda grande.\n"
+    L"Relatório de falha mais preciso|No Windows, o relatório também diz qual foi o erro.",
+    L"Schlankeres Menü|Die Leiste links enthält nur noch Spielen, Screenshots, Spiel, Erfolge und Einstellungen; Sprachen, Bild, Ton und Steuerung sind unter Einstellungen.\n"
+    L"Barrierefreiheit|Die Seite Bild bekommt eine Voreinstellung und eine Seite Barrierefreiheit: hoher Kontrast, Farbenblind-Filter, weniger Bewegung, große Hilfetexte.\n"
+    L"Genauerer Absturzbericht|Unter Windows nennt der Bericht auch den Fehler.",
+    L"Menu più leggero|La barra a sinistra tiene solo Gioca, Screenshot, Opzioni, Obiettivi e Impostazioni; Lingue, Immagine, Audio e Comandi sono in Impostazioni.\n"
+    L"Accessibilità|La pagina Immagine guadagna una preimpostazione e una pagina Accessibilità: contrasto elevato, filtro per daltonici, meno movimento, aiuto in grande.\n"
+    L"Rapporto di crash più preciso|Su Windows, il rapporto indica anche l'errore." };
 
 // ---- The game ----
 
@@ -522,7 +516,7 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.safe_mode = SafeMode;
     game.report = Report;
     game.status = Status;
-    game.version = kVersion;
+    game.version = GAME_VERSION;
     game.news = t_news;
     // An Xbox game: its buttons in the Xbox places at first, and View held (not pressed) opens the
     // pause menu, so a short press stays the game's Back.

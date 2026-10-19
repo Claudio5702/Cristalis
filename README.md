@@ -160,6 +160,8 @@ Proton.
 How the project works, how to build it, translate the game's code again, check it and make the
 installer: [docs/DEVELOPERS.md](docs/DEVELOPERS.md).
 
+What changed in each version (now 1.01): [CHANGELOG.md](CHANGELOG.md).
+
 ## FAQ
 
 **Is it an emulator?** No. The game's own program is translated ahead of time into native code for

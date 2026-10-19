@@ -5,6 +5,7 @@
 !/.gitignore
 !/README.md
 !/README.*.md
+!/CHANGELOG.md
 !/LICENSE
 !/build.ps1
 !/recompile.ps1

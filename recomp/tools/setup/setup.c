@@ -48,6 +48,7 @@ static bool unpack(const char *in, size_t in_size, char *out, size_t out_size) {
 static bool silent, no_system; // no_system: leave shortcuts and the Windows entry alone
 
 #include "setup_text.h"
+#include "../../../project.h" // GAME_VERSION
 
 // A line in the terminal the installer was started from: written as text of the console itself, so
 // that accents and other scripts come out right whatever its code page; UTF-8 when redirected.
@@ -632,6 +633,7 @@ int main(int argc, char **argv) {
       snprintf(un, sizeof un, "\"%s\\Uninstall.exe\"", dest);
       RegSetValueExA(key, "DisplayName", 0, REG_SZ, (const BYTE *)name, sizeof name);
       RegSetValueExA(key, "Publisher", 0, REG_SZ, (const BYTE *)publisher, sizeof publisher);
+      RegSetValueExA(key, "DisplayVersion", 0, REG_SZ, (const BYTE *)GAME_VERSION, sizeof GAME_VERSION);
       RegSetValueExA(key, "UninstallString", 0, REG_SZ, (const BYTE *)un, (DWORD)strlen(un) + 1);
       RegSetValueExA(key, "InstallLocation", 0, REG_SZ, (const BYTE *)dest, (DWORD)strlen(dest) + 1);
       RegSetValueExA(key, "DisplayIcon", 0, REG_SZ, (const BYTE *)exe, (DWORD)strlen(exe) + 1);
