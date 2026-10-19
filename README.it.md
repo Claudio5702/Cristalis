@@ -159,8 +159,8 @@ fontconfig dal sistema; SDL3 è incluso, in `lib/`, e FFmpeg è integrato.
 2. Copiaci dentro la tua cartella `CRYSTAL DEFENDERS` (o `58410989`).
 3. Avvia `crystal_defenders.sh`. Il gioco viene installato al primo avvio.
 
-Finora è stata eseguita solo sotto WSL (su una vera scheda grafica attraverso di esso, ma senza
-controller); nessuno l'ha ancora provata su un vero desktop Linux né su uno Steam Deck. Su uno Steam
+Finora è stata eseguita solo sotto WSL, un Linux dentro Windows (su una vera scheda grafica attraverso di esso, ma senza
+controller); nessuno l'ha ancora provata su un vero desktop Linux né su uno Steam Deck. La parte Linux di DarkLauncher (finestra, menu, audio, controller) è altrettanto nuova ed è stata provata solo allo stesso modo. Su uno Steam
 Deck, aggiungi `crystal_defenders.sh` a Steam come gioco non Steam, senza forzare uno strumento di
 compatibilità. La versione per Windows gira anche con Proton.
 

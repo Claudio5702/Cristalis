@@ -150,8 +150,8 @@ Windows の設定のインストール済みアプリ一覧から「Cristalis (C
 2. その中に `CRYSTAL DEFENDERS`（または `58410989`）フォルダーをコピーします。
 3. `crystal_defenders.sh` を実行します。初回起動時にゲームがインストールされます。
 
-これまで WSL 上でしか動かしていません（WSL 経由で実際のグラフィックカードを使用、コントローラーは
-未使用）。実際の Linux デスクトップや Steam Deck ではまだ誰も試していません。Steam Deck では、
+これまで WSL（Windows の中で動く Linux）上でしか動かしていません（WSL 経由で実際のグラフィックカードを使用、コントローラーは
+未使用）。実際の Linux デスクトップや Steam Deck ではまだ誰も試していません。DarkLauncher の Linux 版（ウィンドウ、メニュー、サウンド、コントローラー）も同じく新しく、同じ方法でしか試していません。Steam Deck では、
 互換性ツールを強制せずに、`crystal_defenders.sh` を「Steam 以外のゲーム」として Steam に追加して
 ください。Windows 版も Proton で動きます。
 

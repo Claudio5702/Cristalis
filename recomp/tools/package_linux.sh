@@ -52,6 +52,10 @@ for f in /usr/share/licenses/sdl3/LICENSE /usr/share/licenses/sdl3/LICENSE.txt /
 cat > "$dest/README.txt" <<'EOF'
 Cristalis (Crystal Defenders Recomp) - unofficial native Linux build (experimental)
 
+EXPERIMENTAL: this build, and DarkLauncher's Linux side (window, menus, sound,
+controllers), have only been run under WSL (Linux running inside Windows) so
+far: never yet on a real Linux PC or a Steam Deck. Reports are welcome.
+
 This folder does NOT contain the game, only the program that runs it. You need
 your own copy of Crystal Defenders (Xbox 360, Xbox Live Arcade): the
 "CRYSTAL DEFENDERS" (or "58410989") folder as found on the console's storage.
