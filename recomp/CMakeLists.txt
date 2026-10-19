@@ -51,9 +51,7 @@ set(RUNTIME_SOURCES
     runtime/imports.gen.cpp)
 
 # DarkLauncher (kit/launcher, copied from the DarkLauncher kit): the window, the settings screen, the
-# controls and the sound output of the game; the game's side is runtime/darklauncher.cpp. Since 2.0 the
-# kit gives dl.h and the built library only (DarkLauncher.dll on Windows, linux/libdarklauncher.so),
-# under its own license (kit/launcher/LICENSE.txt).
+# controls and the sound output of the game; the game's side is runtime/darklauncher.cpp.
 option(CD_DARKLAUNCHER "Run the game inside DarkLauncher (OFF: its own window and start screen)" ON)
 set(KIT ${CMAKE_CURRENT_SOURCE_DIR}/../kit/launcher)
 
@@ -61,17 +59,16 @@ if(WIN32)
     enable_language(RC)
     set(PLATFORM_SOURCES runtime/renderer.cpp resources/crystal_defenders.rc)
     if(CD_DARKLAUNCHER)
-        list(APPEND PLATFORM_SOURCES runtime/darklauncher.cpp)
+        file(GLOB DARKLAUNCHER_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../kit/launcher/*.c)
+        set_source_files_properties(${DARKLAUNCHER_SOURCES} PROPERTIES COMPILE_OPTIONS "-std=c11;-Wno-missing-braces")
+        list(APPEND PLATFORM_SOURCES runtime/darklauncher.cpp ${DARKLAUNCHER_SOURCES})
     endif()
     add_executable(crystal_defenders ${RUNTIME_SOURCES} ${PLATFORM_SOURCES})
     if(CD_DARKLAUNCHER)
         target_compile_definitions(crystal_defenders PRIVATE CD_DARKLAUNCHER)
         # dl.h, and the project's project.h at the root of the repository
-        target_include_directories(crystal_defenders PRIVATE ${KIT} ${CMAKE_CURRENT_SOURCE_DIR}/..)
-        target_link_libraries(crystal_defenders PRIVATE ${KIT}/libdarklauncher.dll.a gdi32 user32 shell32)
-        # DarkLauncher.dll next to the program
-        add_custom_command(TARGET crystal_defenders POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${KIT}/DarkLauncher.dll $<TARGET_FILE_DIR:crystal_defenders>)
+        target_include_directories(crystal_defenders PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../kit/launcher ${CMAKE_CURRENT_SOURCE_DIR}/..)
+        target_link_libraries(crystal_defenders PRIVATE dwmapi gdi32 user32 shell32)
     endif()
 
     # FFmpeg (LGPL, shared build) decodes the game's XMA audio.
@@ -117,10 +114,15 @@ else()
 
     set(PLATFORM_SOURCES runtime/linux/win32.cpp runtime/linux/overlay.cpp runtime/linux/renderer_sdl.cpp)
     if(CD_DARKLAUNCHER)
-        # DarkLauncher's built library; it needs SDL3, FreeType, fontconfig and OpenGL itself.
-        add_library(darklauncher SHARED IMPORTED)
-        set_target_properties(darklauncher PROPERTIES IMPORTED_LOCATION ${KIT}/linux/libdarklauncher.so)
-        target_link_libraries(darklauncher INTERFACE PkgConfig::SDL PkgConfig::TEXT OpenGL::GL m)
+        # DarkLauncher's shared code (but its Direct3D and HID parts) on what kit/launcher/linux gives
+        # it of Windows. A library of its own: it has its own windows.h, not the runtime's.
+        add_library(darklauncher STATIC
+            ${KIT}/dl_app.c ${KIT}/dl_menu.c ${KIT}/dl_draw.c ${KIT}/dl_text.c ${KIT}/dl_saves.c ${KIT}/dl_achieve.c
+            ${KIT}/dl_packs.c ${KIT}/dl_input.c ${KIT}/linux/dl_gdi.c ${KIT}/linux/dl_icons.c ${KIT}/linux/dl_win32.c
+            ${KIT}/linux/dl_pads.c ${KIT}/linux/dl_gl.c)
+        target_include_directories(darklauncher PRIVATE ${KIT}/linux/include ${KIT} ${CMAKE_CURRENT_SOURCE_DIR}/..)
+        target_compile_options(darklauncher PRIVATE -std=gnu11 -Wno-missing-braces -Wno-unused-parameter)
+        target_link_libraries(darklauncher PUBLIC PkgConfig::SDL PkgConfig::TEXT OpenGL::GL m)
         list(APPEND PLATFORM_SOURCES runtime/darklauncher.cpp)
     endif()
     add_executable(crystal_defenders ${RUNTIME_SOURCES} ${PLATFORM_SOURCES})
@@ -131,14 +133,8 @@ else()
         # dl.h, and the project's project.h at the root of the repository
         target_include_directories(crystal_defenders PRIVATE ${KIT} ${CMAKE_CURRENT_SOURCE_DIR}/..)
         target_link_libraries(crystal_defenders PRIVATE darklauncher OpenGL::EGL)
-        # DarkLauncher's library and SDL3, which few systems have yet, are looked for in the program's
-        # lib folder first; the library is put there at each build
+        # SDL3, which few systems have yet, is looked for in the program's lib folder first
         target_link_options(crystal_defenders PRIVATE "-Wl,-rpath,$ORIGIN/lib")
-        # and nowhere else: not the folder of this computer CMake would add for the imported library
-        set_target_properties(crystal_defenders PROPERTIES SKIP_BUILD_RPATH TRUE)
-        add_custom_command(TARGET crystal_defenders POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:crystal_defenders>/lib
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different ${KIT}/linux/libdarklauncher.so $<TARGET_FILE_DIR:crystal_defenders>/lib)
     endif()
     # The C++ library is built in, so the program only needs the system's C library, SDL and OpenGL.
     target_link_options(crystal_defenders PRIVATE -static-libstdc++ -static-libgcc)

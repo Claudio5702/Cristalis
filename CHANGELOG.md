@@ -8,11 +8,6 @@ on DarkLauncher's "What's new" page.
 
 ## Next version (not numbered yet)
 
-- **DarkLauncher 2.0**: given as built files only (`dl.h`, `DarkLauncher.dll`, `libdarklauncher.so`),
-  under its own license (`kit/launcher/LICENSE.txt`), no longer as source. The build links the library
-  and puts it next to the program (Windows) or in its `lib` folder (Linux); the installer and the Linux
-  archive carry it with its license. Nothing changes on screen.
-
 - **Linux: the game no longer stops at its title screen.** Each draw gave the vertex buffer a new
   store (`glBufferData`, a few hundred times a picture); under WSL, Mesa's driver for Direct3D 12 locked
   up in its own thread at the title screen, and the "40 pictures a second" measured were DarkLauncher
