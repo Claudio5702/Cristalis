@@ -338,20 +338,27 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"最初の公開版|リリースページから、インストーラー付きでそのまま入手できるようになりました。\n"
-    L"より丈夫なクラッシュレポート|レポートがプログラムを止めることはなくなり、スタックの使い切りも記録されます。",
-    L"Première version publique|Le jeu est proposé tout prêt sur la page des releases, avec son installeur.\n"
-    L"Rapport de plantage plus solide|Il ne bloque plus jamais le programme, et signale aussi une pile épuisée.",
-    L"First public version|The game comes ready to use on the Releases page, with its installer.\n"
-    L"Sturdier crash report|It never blocks the program any more, and also reports a stack overflow.",
-    L"Primera versión pública|El juego se ofrece listo en la página de releases, con su instalador.\n"
-    L"Informe de fallo más sólido|Ya no bloquea nunca el programa y también indica una pila agotada.",
-    L"Primeira versão pública|O jogo é oferecido pronto na página de releases, com seu instalador.\n"
-    L"Relatório de falha mais sólido|Nunca mais trava o programa e também informa uma pilha esgotada.",
-    L"Erste öffentliche Version|Das Spiel gibt es fertig auf der Release-Seite, mit Installationsprogramm.\n"
-    L"Robusterer Absturzbericht|Er blockiert das Programm nie mehr und meldet auch einen Stapelüberlauf.",
-    L"Prima versione pubblica|Il gioco è disponibile già pronto nella pagina delle release, con il suo programma di installazione.\n"
-    L"Rapporto di crash più solido|Non blocca più il programma e segnala anche uno stack esaurito." };
+    L"新しい名前：Cristalis|この移植版は Cristalis という名前になり、アイコンも新しくなりました。設定とセーブデータはそのままです。\n"
+    L"Linux の修正|Linux で、ゲームがタイトル画面で止まらなくなりました。\n"
+    L"DarkLauncher 2.01|設定画面はオープンソース（MIT ライセンス）になりました。",
+    L"Nouveau nom : Cristalis|Ce portage s'appelle maintenant Cristalis, avec une nouvelle icône. Vos réglages et vos sauvegardes restent.\n"
+    L"Linux corrigé|Sous Linux, le jeu ne se fige plus sur l'écran titre.\n"
+    L"DarkLauncher 2.01|L'écran de réglages est maintenant open source (licence MIT).",
+    L"New name: Cristalis|This port is now called Cristalis, with a new icon. Your settings and saves stay.\n"
+    L"Linux fixed|On Linux, the game no longer freezes at its title screen.\n"
+    L"DarkLauncher 2.01|The settings screen is now open source (MIT license).",
+    L"Nuevo nombre: Cristalis|Esta adaptación se llama ahora Cristalis, con un icono nuevo. Tus ajustes y partidas se conservan.\n"
+    L"Linux corregido|En Linux, el juego ya no se congela en la pantalla de título.\n"
+    L"DarkLauncher 2.01|La pantalla de ajustes es ahora de código abierto (licencia MIT).",
+    L"Novo nome: Cristalis|Esta versão agora se chama Cristalis, com um ícone novo. Seus ajustes e saves continuam.\n"
+    L"Linux corrigido|No Linux, o jogo não trava mais na tela de título.\n"
+    L"DarkLauncher 2.01|A tela de ajustes agora é de código aberto (licença MIT).",
+    L"Neuer Name: Cristalis|Diese Portierung heißt jetzt Cristalis, mit einem neuen Symbol. Einstellungen und Spielstände bleiben.\n"
+    L"Linux behoben|Unter Linux bleibt das Spiel nicht mehr am Titelbildschirm stehen.\n"
+    L"DarkLauncher 2.01|Der Einstellungsbildschirm ist jetzt quelloffen (MIT-Lizenz).",
+    L"Nuovo nome: Cristalis|Questa conversione ora si chiama Cristalis, con una nuova icona. Impostazioni e salvataggi restano.\n"
+    L"Linux corretto|Su Linux, il gioco non si blocca più alla schermata del titolo.\n"
+    L"DarkLauncher 2.01|La schermata delle impostazioni è ora open source (licenza MIT)." };
 
 // ---- The game ----
 

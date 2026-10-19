@@ -6,7 +6,11 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
-## Next version (not numbered yet)
+## 1.03
+
+- **DarkLauncher 2.01**, open source under the MIT license ("DarkLauncher contributors"): its source
+  is in `kit/launcher` as before, with its license (`kit/launcher/LICENSE`), which the installer and
+  the Linux archive now carry as `DarkLauncher-LICENSE.txt`.
 
 - **Linux: the game no longer stops at its title screen.** Each draw gave the vertex buffer a new
   store (`glBufferData`, a few hundred times a picture); under WSL, Mesa's driver for Direct3D 12 locked

@@ -253,7 +253,9 @@ static void report_write(void) {
     }
     fclose(f);
   }
-  if (!error) ADD("  no error was recorded: the program was ended from outside (the system, a driver, the power, closed by force...)\n");
+  if (!error)
+    ADD("  no error was recorded: the program was ended from outside (the system, a driver, the power, closed by force...),\n"
+        "  or by the game's own error handler, which did not hand the error on to DarkLauncher\n");
   ADD("\nSettings (%s):\n", ini_path);
   f = fopen(ini_path, "r");
   if (f) {

@@ -10,11 +10,14 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "1.33"
+#define DL_VERSION "2.01"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <wchar.h>
+#ifdef __cplusplus
+extern "C" { // a game written in C++ includes it as it is
+#endif
 
 // Languages of the setup screen, in the order of every table of texts: jp, fr, en, es, br, de, it.
 enum { DL_LANG_JP, DL_LANG_FR, DL_LANG_EN, DL_LANG_ES, DL_LANG_BR, DL_LANG_DE, DL_LANG_IT };
@@ -341,4 +344,7 @@ void dl_picture_scale(int s);
 // Runs the program: window, setup screen, game. Returns the exit code.
 int dl_run(const DlGame *game, int argc, char **argv);
 
+#ifdef __cplusplus
+}
+#endif
 #endif

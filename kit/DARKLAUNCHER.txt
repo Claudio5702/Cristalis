@@ -1,16 +1,16 @@
-DarkLauncher 1.33 (commit 7e5a4b5), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h 245ECF736438AAE1
-file dl_achieve.c 7717926FD2027AF9
-file dl_app.c DAC373763D221294
-file dl_draw.c 5D10309DEC48C32D
+DarkLauncher 2.01 (commit 629e8f8), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h 4CFAB94111455241
+file dl_achieve.c 34CF06C12DBD8312
+file dl_app.c 36D6FD961301AD7F
+file dl_draw.c 2387B68EBDFEF8AB
 file dl_gpu.c B0C74AE61AB65583
 file dl_input.c 19EDC10485F9795D
-file dl_int.h DBF1ECDC9BB817C5
-file dl_menu.c 09A6A3220FFC9AC8
+file dl_int.h 8650F6792380D85D
+file dl_menu.c B5D9F62E46082266
 file dl_packs.c 10AE1C0391C7EF4F
-file dl_saves.c 5D9784EA85DE7AA1
+file dl_saves.c 59E4098A14674210
 file dl_sony.c AD231D89B5ECF6E7
-file dl_text.c D5F0E76B6D43BC97
+file dl_text.c A4EB8C180256FF80
 file linux/dl_gdi.c 51ED378B11D7CDF3
 file linux/dl_gl.c D5B70332FD72697A
 file linux/dl_icons.c E4F2AC1F462F8241
@@ -25,3 +25,4 @@ file linux/include/shellapi.h 2F5DDD6DA7026E0C
 file linux/include/windows.h 2F5DDD6DA7026E0C
 file linux/include/xinput.h 2F5DDD6DA7026E0C
 file linux/win32.h C9C25E63CBC12917
+file LICENSE F440F3176A720F9F
