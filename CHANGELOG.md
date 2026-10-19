@@ -1,6 +1,6 @@
 # Versions of Cristalis
 
-The number is `GAME_VERSION` in `project.h`, numbered as [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)
+The number is `GAME_VERSION` in `project.h`, numbered as [DarkLauncher](kit/launcher)
 does: small improvements move the second figure (1.01, 1.02...); a large novelty goes to the next ten
 (1.1, that is 1.10, then 1.11...); the first figure changes (2.0) for a change of the whole. Each
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,

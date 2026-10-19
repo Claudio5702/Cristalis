@@ -59,7 +59,7 @@ segnala se non lo è.
 
 ## Funzioni
 
-- **Il gioco in [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)**, il launcher creato
+- **Il gioco in [DarkLauncher](kit/launcher)**, il launcher creato
   per Kahna (Bahamut Lagoon Recomp): una schermata delle impostazioni prima del gioco e un menu di
   pausa durante la partita, in sette lingue, con tastiera, controller o mouse. Il suo aspetto segue
   la direzione artistica del gioco: il blu delle sue finestre, l'oro dei suoi cristalli, una notte
@@ -212,7 +212,7 @@ documentazione sono stati scritti da esso, secondo le richieste e le prove dell'
 
 - [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) di hedge-dev: il ricompilatore che traduce
   il codice del gioco.
-- [DarkLauncher](https://github.com/Claudio5702/DarkLauncher): la schermata delle impostazioni, il
+- [DarkLauncher](kit/launcher): la schermata delle impostazioni, il
   menu di pausa e i filtri dell'immagine, creati per Kahna.
 - [FFmpeg](https://ffmpeg.org) (LGPL): la decodifica XMA.
 - [Xenia](https://xenia.jp): la sua documentazione della Xbox 360, usata come riferimento.

@@ -60,7 +60,7 @@ n'est pas le cas.
 
 ## Fonctions
 
-- **Le jeu dans [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)**, le lanceur créé pour
+- **Le jeu dans [DarkLauncher](kit/launcher)**, le lanceur créé pour
   Kahna (Bahamut Lagoon Recomp) : un écran de réglages avant le jeu et un menu de pause en jeu, en
   sept langues, au clavier, à la manette ou à la souris. Son apparence suit la direction artistique
   du jeu : le bleu de ses fenêtres, l'or de ses cristaux, une nuit étoilée. DarkLauncher dessine
@@ -217,7 +217,7 @@ Ce projet a été réalisé à 100 % avec [Claude Code](https://claude.com/claud
 
 - [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) de hedge-dev : le recompilateur qui
   traduit le code du jeu.
-- [DarkLauncher](https://github.com/Claudio5702/DarkLauncher) : l'écran de réglages, le menu de
+- [DarkLauncher](kit/launcher) : l'écran de réglages, le menu de
   pause et les filtres d'image, créés pour Kahna.
 - [FFmpeg](https://ffmpeg.org) (LGPL) : le décodage XMA.
 - [Xenia](https://xenia.jp) : sa documentation de la Xbox 360, utilisée comme référence.

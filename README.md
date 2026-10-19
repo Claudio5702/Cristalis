@@ -57,7 +57,7 @@ is not.
 
 ## Features
 
-- **The game in [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)**, the launcher made
+- **The game in [DarkLauncher](kit/launcher)**, the launcher made
   for Kahna (Bahamut Lagoon Recomp): a settings screen before the game and a pause menu in game, in
   seven languages, with the keyboard, a controller or the mouse. Its look follows the game's art
   direction: the blue of its windows, the gold of its crystals, a starry night. DarkLauncher draws
@@ -200,7 +200,7 @@ it, following the requests and the tests of the project's author.
 
 - [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) by hedge-dev: the recompiler that translates
   the game's code.
-- [DarkLauncher](https://github.com/Claudio5702/DarkLauncher): the settings screen, the pause menu
+- [DarkLauncher](kit/launcher): the settings screen, the pause menu
   and the picture filters, made for Kahna.
 - [FFmpeg](https://ffmpeg.org) (LGPL): XMA decoding.
 - [Xenia](https://xenia.jp): its documentation of the Xbox 360, used as reference.

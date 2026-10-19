@@ -56,7 +56,7 @@ Windows 10 または 11（64 ビット）、Direct3D 11 対応のグラフィッ
 
 ## 機能
 
-- **[DarkLauncher](https://github.com/Claudio5702/DarkLauncher) の中で動くゲーム**：Kahna（Bahamut
+- **[DarkLauncher](kit/launcher) の中で動くゲーム**：Kahna（Bahamut
   Lagoon Recomp）のために作られたランチャーです。ゲームの前の設定画面と、プレイ中のポーズメニューを
   備え、7 か国語に対応し、キーボード・コントローラー・マウスで操作できます。見た目はゲームの
   アートディレクションに合わせています：ウィンドウの青、クリスタルの金色、星空。すべて DarkLauncher
@@ -205,7 +205,7 @@ XMA 音声、システムの機能）は Windows 用に書き直しています�
 
 - hedge-dev の [XenonRecomp](https://github.com/hedge-dev/XenonRecomp)：ゲームのコードを変換する
   リコンパイラー。
-- [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)：Kahna のために作られた設定画面、
+- [DarkLauncher](kit/launcher)：Kahna のために作られた設定画面、
   ポーズメニュー、画像フィルター。
 - [FFmpeg](https://ffmpeg.org)（LGPL）：XMA のデコード。
 - [Xenia](https://xenia.jp)：参考にした Xbox 360 のドキュメント。

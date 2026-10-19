@@ -62,7 +62,7 @@ wenn nicht.
 
 ## Funktionen
 
-- **Das Spiel in [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)**, dem für Kahna
+- **Das Spiel in [DarkLauncher](kit/launcher)**, dem für Kahna
   (Bahamut Lagoon Recomp) entwickelten Launcher: ein Einstellungsbildschirm vor dem Spiel und ein
   Pausenmenü im Spiel, in sieben Sprachen, mit Tastatur, Controller oder Maus. Sein Aussehen folgt
   der künstlerischen Gestaltung des Spiels: das Blau seiner Fenster, das Gold seiner Kristalle, ein
@@ -219,7 +219,7 @@ Dokumentation wurden von ihm geschrieben, nach den Wünschen und Tests des Autor
 
 - [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) von hedge-dev: der Rekompilierer, der den
   Code des Spiels übersetzt.
-- [DarkLauncher](https://github.com/Claudio5702/DarkLauncher): der Einstellungsbildschirm, das
+- [DarkLauncher](kit/launcher): der Einstellungsbildschirm, das
   Pausenmenü und die Bildfilter, entwickelt für Kahna.
 - [FFmpeg](https://ffmpeg.org) (LGPL): XMA-Dekodierung.
 - [Xenia](https://xenia.jp): seine Dokumentation der Xbox 360, als Referenz genutzt.
