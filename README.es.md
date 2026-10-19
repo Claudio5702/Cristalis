@@ -14,7 +14,7 @@ escrito solo para este juego. Hay una versión experimental para Linux.
 **No se incluye ningún recurso del juego**, ni en este repositorio ni en las releases: las imágenes,
 los sonidos, la música y los textos se leen de tu propia copia del juego. El repositorio tampoco
 contiene código del juego: el código traducido se genera a partir de un `default.xex` al compilar el
-programa, y los programas de la [página de releases](https://github.com/Claudio5702/Cristalis/releases/latest) se compilan así. **Versión 1.05, una
+programa, y los programas de la [página de releases](https://github.com/Claudio5702/Cristalis/releases/latest) se compilan así. **Versión 1.06, una
 beta**: jugada por pocas personas hasta ahora.
 
 **Necesitas tu propia copia de Crystal Defenders (Xbox 360).** Crystal Defenders pertenece a Square
@@ -119,8 +119,7 @@ cambiar en la página Controles.
 | LB / RB | Q / W | LB / RB (L1 / R1) |
 | Start / Back | Intro / Mayús derecha | Start / Back (Options / Share); mantenido, Back abre el menú de pausa |
 
-`Esc`: menú de pausa — `F11` o `Alt+Intro`: pantalla completa — `F12`: captura en `captures\` —
-`Tab` (mantenido): avance rápido.
+`Esc`: menú de pausa — `F11` o `Alt+Intro`: pantalla completa — `F12`: captura en `captures\`.
 
 ## Archivos
 
@@ -175,7 +174,7 @@ compatibilidad. La versión de Windows también funciona con Proton.
 Cómo funciona el proyecto, cómo compilarlo, volver a traducir el código del juego, comprobarlo y
 crear el instalador: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (en inglés).
 
-Lo que cambió en cada versión (ahora 1.05): [CHANGELOG.md](CHANGELOG.md) (en inglés).
+Lo que cambió en cada versión (ahora 1.06): [CHANGELOG.md](CHANGELOG.md) (en inglés).
 
 ## Preguntas frecuentes
 

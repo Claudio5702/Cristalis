@@ -345,13 +345,13 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"終了時のクラッシュを修正|ゲームを終了するときにクラッシュしなくなりました。次の起動がセーフモードで始まることもありません。",
-    L"Fermeture corrigée|Le jeu ne plante plus en se fermant : le lancement suivant ne s'ouvre plus en mode sans échec.",
-    L"Closing fixed|The game no longer crashes when it closes: the next start no longer opens in safe mode.",
-    L"Cierre corregido|El juego ya no falla al cerrarse: el siguiente arranque ya no se abre en modo seguro.",
-    L"Fechamento corrigido|O jogo não trava mais ao fechar: a próxima abertura não começa mais no modo de segurança.",
-    L"Beenden behoben|Das Spiel stürzt beim Beenden nicht mehr ab: Der nächste Start öffnet nicht mehr im abgesicherten Modus.",
-    L"Chiusura corretta|Il gioco non va più in crash alla chiusura: l'avvio successivo non si apre più in modalità provvisoria." };
+    L"早送りを整理|DarkLauncher の早送りはなくなりました（このゲームでは正しく動きませんでした）。ゲーム自体の早送りはそのまま使えます。",
+    L"Avance rapide simplifiée|L'avance rapide de DarkLauncher n'est plus proposée : elle marchait mal avec ce jeu. Celle du jeu lui-même reste.",
+    L"Simpler fast forward|DarkLauncher's fast forward is no longer offered: it worked badly with this game. The game's own stays.",
+    L"Avance rápido simplificado|El avance rápido de DarkLauncher ya no se ofrece: funcionaba mal con este juego. El del propio juego sigue.",
+    L"Avanço rápido simplificado|O avanço rápido do DarkLauncher não é mais oferecido: funcionava mal com este jogo. O do próprio jogo continua.",
+    L"Schnellvorlauf vereinfacht|Der Schnellvorlauf von DarkLauncher wird nicht mehr angeboten: Er lief mit diesem Spiel schlecht. Der des Spiels bleibt.",
+    L"Avanti veloce semplificato|L'avanti veloce di DarkLauncher non è più proposto: funzionava male con questo gioco. Quello del gioco resta." };
 
 // ---- The game ----
 
@@ -521,8 +521,9 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.pad_layout = DL_PAD_XBOX;
     game.pad_menu = DL_MENU_HOLD;
     game.rumble = true; // DarkLauncher's Vibration switch, and dl_rumble to every kind of controller
-    // a 2009 HD game made for flat screens: the tube's look is not offered (the setting is kept)
-    game.hide = DL_HIDE_CRT | DL_HIDE_SCANLINES;
+    // a 2009 HD game made for flat screens: the tube's look is not offered; nor DarkLauncher's fast
+    // forward, which cannot speed up a game that makes each picture when asked (it has its own)
+    game.hide = DL_HIDE_CRT | DL_HIDE_SCANLINES | DL_HIDE_TURBO;
     // --no-theme: DarkLauncher's own look (to compare)
     bool themed = true;
     for (int i = 1; i < argc; i++)

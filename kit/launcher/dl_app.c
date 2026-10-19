@@ -1383,7 +1383,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     bool hidden = IsIconic(dl_hwnd);
     if (hidden && bg_pause) run = false;
     // fast forward: several pictures of the game for one, without their sound
-    bool turbo = dl_mode == M_GAME && (dl_turbo_held() || (dl_started && game->turbo && game->turbo()));
+    bool turbo = dl_mode == M_GAME && !(game->hide & DL_HIDE_TURBO) && (dl_turbo_held() || (dl_started && game->turbo && game->turbo()));
     int speed = !turbo ? 1 : dl_cfg.turbo == 2 ? 2 : dl_cfg.turbo == 4 ? 4 : 12;
     // the wait for the screen refresh is skipped whenever the sound is running short: sound first
     int queued = wave_out ? audio_queued() : 0;

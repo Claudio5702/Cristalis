@@ -177,7 +177,7 @@ static const wchar_t *ps_more(void) { // PlayStation pads, under the help of "Co
 static const DlRow rumble_row = {DL_SWITCH, dl_texts[T_RUMBLE], dl_texts[T_H_RUMBLE], &dl_cfg.rumble, 1};
 static const wchar_t *const *const ahead_names[] = {dl_texts[T_NO], dl_texts[T_AHEAD_1], dl_texts[T_AHEAD_2]};
 static const DlRow ahead_row = {DL_CHOICE, dl_texts[T_AHEAD], dl_texts[T_H_AHEAD], &dl_cfg.ahead, 2, ahead_names};
-static const DlRow ctrl_rows[] = {
+static DlRow ctrl_rows[] = { // not const, as the rows below: their help leaves out fast forward when the game hides it
     {.kind = DL_PAGE, .label = dl_texts[T_KEYS], .help = dl_texts[T_H_KEYS], .page = PG_KEYS},
     {.kind = DL_PAGE, .label = dl_texts[T_PAD], .help = dl_texts[T_H_PAD], .page = PG_PAD, .more = ps_more},
     {.kind = DL_PAGE, .label = dl_texts[T_HOT], .help = dl_texts[T_H_HOT], .page = PG_HOT},
@@ -186,7 +186,7 @@ static const DlRow ctrl_rows[] = {
     {.kind = DL_SWITCH, .label = dl_texts[T_BGPAUSE], .help = dl_texts[T_H_BGPAUSE], .value = &dl_cfg.bg_pause, .max = 1},
 };
 #define KEY_ROW(k) {.kind = DL_KEY, .label = dl_texts[T_BTN_UP + (k)], .help = dl_texts[T_KH_BTN], .value = &dl_key_vk[k]}
-static const DlRow keys_rows[] = {
+static DlRow keys_rows[] = {
     KEY_ROW(0), KEY_ROW(1), KEY_ROW(2), KEY_ROW(3), KEY_ROW(4), KEY_ROW(5), KEY_ROW(6), KEY_ROW(7), KEY_ROW(8), KEY_ROW(9), KEY_ROW(10), KEY_ROW(11),
     {.kind = DL_KEY, .label = dl_texts[T_BTN_TURBO], .help = dl_texts[T_KH_TURBO], .value = &dl_key_vk[DL_BTNS]},
     {.kind = DL_ACTION, .label = dl_texts[T_GFXDEF], .help = dl_texts[T_KH_DEFAULTS], .run = dl_keys_default},
@@ -273,7 +273,7 @@ static const DlRow welcome_rows[] = {
     {DL_CHOICE, dl_texts[T_UILANG], dl_texts[T_H_UILANG], &dl_cfg.ui_lang, DL_LANGS - 1, NULL, show_lang, lang_changed},
     {DL_ACTION, dl_texts[T_W_NEXT], dl_texts[T_H_W_LANG], NULL, 0, NULL, NULL, welcome_ctrl},
 };
-static const DlRow welcome_ctrl_rows[] = {
+static DlRow welcome_ctrl_rows[] = {
     {.kind = DL_PAGE, .label = dl_texts[T_KEYS], .help = dl_texts[T_H_KEYS], .page = PG_KEYS},
     {.kind = DL_PAGE, .label = dl_texts[T_PAD], .help = dl_texts[T_H_PAD], .page = PG_PAD},
     {DL_ACTION, dl_texts[T_W_NEXT], dl_texts[T_H_W_CTRL], NULL, 0, NULL, NULL, welcome_screen},
@@ -305,7 +305,7 @@ static const DlRow net_row = {.kind = DL_PAGE, .label = dl_texts[T_NET], .help =
 // ---- Settings: one entry of the bar for the kit's pages and its rarer actions
 static void settings_folder(void) { ShellExecuteA(NULL, "open", dl_base_dir, NULL, NULL, SW_SHOWNORMAL); }
 static void settings_defaults(void) { dl_defaults(false); }
-static const DlRow settings_rows[] = {
+static DlRow settings_rows[] = {
     {.kind = DL_PAGE, .label = dl_texts[T_LANGS], .help = dl_texts[T_H_LANGS], .page = DL_PAGE_LANGS},
     {.kind = DL_PAGE, .label = dl_texts[T_IMAGE], .help = dl_texts[T_H_IMAGE], .page = DL_PAGE_IMAGE},
     {.kind = DL_PAGE, .label = dl_texts[T_SOUND], .help = dl_texts[T_H_SOUND], .page = DL_PAGE_SOUND},
@@ -315,11 +315,29 @@ static const DlRow settings_rows[] = {
 };
 static const DlRow settings_reset_row = {DL_ACTION, dl_texts[T_RESET], dl_texts[T_H_RESET], NULL, 0, NULL, NULL, dl_restart};
 
+// Takes out of a page the row that sets this value (a row the game does not offer: DlGame.hide).
+static void page_drop(int page, const int *value) {
+  if (page < 0 || page >= dl_page_n) return;
+  DlPage *p = &dl_pages[page];
+  for (int k = p->n - 1; k >= 0; k--)
+    if (p->rows[k]->value == value) {
+      memmove(&p->rows[k], &p->rows[k + 1], sizeof p->rows[0] * (size_t)(p->n - k - 1));
+      p->n--;
+    }
+}
+
 void dl_menu_init(void) {
   bool saves = dl_game->save_state && dl_game->load_state;
   if (dl_game->pad_layout || dl_game->pad_menu) pad_rows[sizeof pad_rows / sizeof pad_rows[0] - 1].help = dl_texts[T_PH_DEFAULTS_GAME];
   if (dl_game->pad_menu == DL_MENU_HOLD) padfn_rows[4].help = dl_texts[T_PH_MENU_HOLD]; // FN_MENU's row
   dl_page(dl_texts[T_TAB_LANGS], langs_rows, 1);
+  // DarkLauncher's fast forward hidden (DlGame.hide): the helps that name it say the rest only
+  if (dl_game->hide & DL_HIDE_TURBO) {
+    ctrl_rows[0].help = welcome_ctrl_rows[0].help = dl_texts[T_H_KEYS_NT];
+    keys_rows[sizeof keys_rows / sizeof keys_rows[0] - 1].help = dl_texts[T_KH_DEFAULTS_NT];
+    pad_rows[sizeof pad_rows / sizeof pad_rows[0] - 2].help = dl_texts[T_PH_FN_NT];
+    settings_rows[3].help = dl_texts[T_H_CTRL_NT];
+  }
   // the rows the game does not offer (DlGame.hide), and the "CRT" preset with the CRT filter
   if (dl_game->hide & DL_HIDE_CRT) {
     preset_n = 0;
@@ -329,14 +347,8 @@ void dl_menu_init(void) {
   image_rows[0].max = welcome_screen_rows[1].max = preset_n - 1;
   if (dl_game->hide & DL_HIDE_CRT) image_rows[0].help = welcome_screen_rows[1].help = dl_texts[T_H_PRESET_NOCRT];
   dl_page(dl_texts[T_TAB_IMAGE], image_rows, sizeof image_rows / sizeof image_rows[0]);
-  for (int k = dl_pages[DL_PAGE_IMAGE].n - 1; k >= 0; k--) {
-    const int *v = dl_pages[DL_PAGE_IMAGE].rows[k]->value;
-    if ((v == &dl_cfg.crt && (dl_game->hide & DL_HIDE_CRT)) || (v == &dl_cfg.scanlines && (dl_game->hide & DL_HIDE_SCANLINES))) {
-      DlPage *p = &dl_pages[DL_PAGE_IMAGE];
-      memmove(&p->rows[k], &p->rows[k + 1], sizeof p->rows[0] * (size_t)(p->n - k - 1));
-      p->n--;
-    }
-  }
+  if (dl_game->hide & DL_HIDE_CRT) page_drop(DL_PAGE_IMAGE, &dl_cfg.crt);
+  if (dl_game->hide & DL_HIDE_SCANLINES) page_drop(DL_PAGE_IMAGE, &dl_cfg.scanlines);
   dl_page(dl_texts[T_TAB_SOUND], sound_rows, sizeof sound_rows / sizeof sound_rows[0]);
   dl_page(dl_texts[T_TAB_CTRL], ctrl_rows, sizeof ctrl_rows / sizeof ctrl_rows[0]);
   if (dl_game->rumble) dl_page_insert(PG_CTRL, 3, &rumble_row); // after the three pages of assignments
@@ -346,6 +358,11 @@ void dl_menu_init(void) {
   DlPage *pf = &dl_pages[dl_page(dl_texts[T_TAB_PADFN], padfn_rows, 1)];
   for (int k = 1; k < (int)(sizeof padfn_rows / sizeof padfn_rows[0]); k++)
     if (saves || (k != 1 && k != 2)) pf->rows[pf->n++] = &padfn_rows[k];
+  if (dl_game->hide & DL_HIDE_TURBO) { // its speed, its key and its controller button
+    page_drop(PG_CTRL, &dl_cfg.turbo);
+    page_drop(PG_KEYS, &dl_key_vk[DL_BTNS]);
+    page_drop(PG_PADFN, &dl_pad_code[FN_TURBO]);
+  }
   DlPage *ph = &dl_pages[dl_page(dl_texts[T_TAB_HOT], NULL, 0)];
   for (int k = 0; k < (int)(sizeof hot_rows / sizeof hot_rows[0]); k++)
     if ((saves || k > HK_NEXT) && (k != HK_REWIND || dl_rewind_ok())) ph->rows[ph->n++] = &hot_rows[k];

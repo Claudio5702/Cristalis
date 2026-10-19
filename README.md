@@ -14,7 +14,7 @@ one game. A Linux build is experimental.
 **No game assets are included**, in this repository or in the releases: the pictures, sounds, music
 and texts are read from your own copy of the game. The repository holds none of the game's code
 either: the translated code is generated from a `default.xex` when the program is built, and the
-programs on the [Releases page](https://github.com/Claudio5702/Cristalis/releases/latest) are built that way. **Version 1.05, a beta**: played by few
+programs on the [Releases page](https://github.com/Claudio5702/Cristalis/releases/latest) are built that way. **Version 1.06, a beta**: played by few
 people so far.
 
 **You must supply your own copy of Crystal Defenders (Xbox 360).** Crystal Defenders belongs to
@@ -114,8 +114,7 @@ changed on the Controls page.
 | LB / RB | Q / W | LB / RB (L1 / R1) |
 | Start / Back | Enter / Right Shift | Start / Back (Options / Share); held, Back opens the pause menu |
 
-`Esc`: pause menu — `F11` or `Alt+Enter`: full screen — `F12`: screenshot into `captures\` —
-`Tab` (held): fast-forward.
+`Esc`: pause menu — `F11` or `Alt+Enter`: full screen — `F12`: screenshot into `captures\`.
 
 ## Files
 
@@ -167,7 +166,7 @@ Proton.
 How the project works, how to build it, translate the game's code again, check it and make the
 installer: [docs/DEVELOPERS.md](docs/DEVELOPERS.md).
 
-What changed in each version (now 1.05): [CHANGELOG.md](CHANGELOG.md).
+What changed in each version (now 1.06): [CHANGELOG.md](CHANGELOG.md).
 
 ## FAQ
 

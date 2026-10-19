@@ -16,7 +16,7 @@ experimentell.
 Bilder, Töne, Musik und Texte werden aus Ihrer eigenen Kopie des Spiels gelesen. Das Repository
 enthält auch keinen Code des Spiels: Der übersetzte Code wird beim Bauen des Programms aus einer
 `default.xex` erzeugt, und die Programme auf der [Release-Seite](https://github.com/Claudio5702/Cristalis/releases/latest) werden so gebaut.
-**Version 1.05, eine Beta**: bisher von wenigen gespielt.
+**Version 1.06, eine Beta**: bisher von wenigen gespielt.
 
 **Sie brauchen Ihre eigene Kopie von Crystal Defenders (Xbox 360).** Crystal Defenders gehört Square
 Enix; dieses Projekt steht in keiner Verbindung zu Square Enix und wird von Square Enix nicht
@@ -122,8 +122,7 @@ QWERTY-Tastaturen); alle lassen sich auf der Seite Steuerung ändern.
 | LB / RB | Q / W | LB / RB (L1 / R1) |
 | Start / Back | Enter / rechte Umschalttaste | Start / Back (Options / Share); gehalten öffnet Back das Pausenmenü |
 
-`Esc`: Pausenmenü — `F11` oder `Alt+Enter`: Vollbild — `F12`: Screenshot in `captures\` — `Tab`
-(gehalten): schneller Vorlauf.
+`Esc`: Pausenmenü — `F11` oder `Alt+Enter`: Vollbild — `F12`: Screenshot in `captures\`.
 
 Auf einer deutschen QWERTZ-Tastatur ergeben die QWERTY-Positionen oben: X / Y für A / B, S / A für
 X / Y und Q / W für LB / RB.
@@ -182,7 +181,7 @@ zu erzwingen. Die Windows-Version läuft auch über Proton.
 Wie das Projekt funktioniert, wie man es baut, den Code des Spiels neu übersetzt, prüft und das
 Installationsprogramm erstellt: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (auf Englisch).
 
-Was sich in jeder Version geändert hat (jetzt 1.05): [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
+Was sich in jeder Version geändert hat (jetzt 1.06): [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
 
 ## Häufige Fragen
 

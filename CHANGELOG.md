@@ -6,6 +6,12 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## 1.06
+
+- **DarkLauncher 2.06**: its fast forward is no longer offered (`DL_HIDE_TURBO`): it could not really
+  speed this game up, which makes each picture when DarkLauncher asks for it, and it juddered. The
+  game's own fast forward stays. The READMEs no longer name the Tab key for it.
+
 ## 1.05
 
 - **No more crash when the program closes** (Windows): after DarkLauncher had saved everything, the
