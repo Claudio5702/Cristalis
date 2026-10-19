@@ -164,7 +164,9 @@ static void run_mark_write(void) {
   fclose(f);
 }
 
-// An error that ends the program: what and where, added to the marker (then Windows does as usual).
+// An error that ends the program: what and where, added to the marker; then the filter that was there
+// before (the game's, if it set one), or what Windows does as usual.
+static LPTOP_LEVEL_EXCEPTION_FILTER crash_before;
 static LONG WINAPI crash_filter(EXCEPTION_POINTERS *ep) {
   FILE *f = fopen(run_mark, "a");
   if (f && ep && ep->ExceptionRecord) {
@@ -178,7 +180,7 @@ static LONG WINAPI crash_filter(EXCEPTION_POINTERS *ep) {
             (unsigned long long)((uintptr_t)at - (uintptr_t)m));
   }
   if (f) fclose(f);
-  return EXCEPTION_CONTINUE_SEARCH;
+  return crash_before ? crash_before(ep) : EXCEPTION_CONTINUE_SEARCH;
 }
 
 // ---- the crash report: "<settings file>.crash.txt", written at the start of the run after one that
@@ -926,12 +928,13 @@ static int http_get(const char *url, char *out, int cap) { // the body, or -1
   CloseFn h_close = (CloseFn)(void *)GetProcAddress(w, "WinHttpCloseHandle");
   TimeoutsFn h_timeouts = (TimeoutsFn)(void *)GetProcAddress(w, "WinHttpSetTimeouts");
   if (!h_open || !h_crack || !h_connect || !h_request || !h_send || !h_receive || !h_read || !h_close) return -1;
-  wchar_t wurl[1024], host[256], path[1024];
+  wchar_t wurl[1024], host[256], path[2048], extra[1024];
   MultiByteToWideChar(CP_UTF8, 0, url, -1, wurl, 1024);
   struct { DWORD size; LPWSTR scheme; DWORD scheme_n; int scheme_kind; LPWSTR host; DWORD host_n; WORD port; LPWSTR user; DWORD user_n; LPWSTR pass;
            DWORD pass_n; LPWSTR path; DWORD path_n; LPWSTR extra; DWORD extra_n; } uc = {sizeof uc};
-  uc.host = host, uc.host_n = 256, uc.path = path, uc.path_n = 1024, uc.scheme_n = (DWORD)-1, uc.extra_n = (DWORD)-1;
+  uc.host = host, uc.host_n = 256, uc.path = path, uc.path_n = 1024, uc.scheme_n = (DWORD)-1, uc.extra = extra, uc.extra_n = 1024;
   if (!h_crack(wurl, 0, 0, &uc)) return -1;
+  wcsncat(path, extra, 2047 - wcslen(path)); // "?..." after the path
   HI s = h_open(L"" PROJECT_NAME, 0, NULL, NULL, 0), c = NULL, r = NULL;
   if (s && h_timeouts) h_timeouts(s, 5000, 5000, 5000, 5000);
   if (s) c = h_connect(s, host, uc.port, 0);
@@ -992,7 +995,7 @@ static DWORD WINAPI update_thread(void *arg) {
     char *page = nl ? nl + strspn(nl, "\r\n") : NULL;
     if (nl) *nl = 0;
     if (page) page[strcspn(page, "\r\n")] = 0;
-    snprintf(upd_version, sizeof upd_version, "%s", body);
+    snprintf(upd_version, sizeof upd_version, "%s", body[0] >= '0' && body[0] <= '9' ? body : ""); // an error's page is no version
     snprintf(upd_page, sizeof upd_page, "%s", page && !strncmp(page, "http", 4) ? page : "");
     if (upd_version[0] && dl_game->version && version_cmp(upd_version, dl_game->version) > 0) result = 2;
   }
@@ -1010,6 +1013,7 @@ void dl_online_start(void) {
 
 const wchar_t *dl_update_text(void) {
   static wchar_t out[96];
+  if (!dl_cfg.updates) return NULL;
   if (upd_state == 2) _snwprintf(out, 95, TX(T_UPD_NEW), upd_version);
   else if (upd_state == 3 && dl_cfg.updates) lstrcpynW(out, TX(T_UPD_NONE), 96);
   else return NULL;
@@ -1023,7 +1027,7 @@ void dl_update_open(void) {
 
 void dl_online_follow(void) {
   static LONG told;
-  if (upd_state == 2 && !told) { // once: a note, and "Play" says it
+  if (upd_state == 2 && !told && dl_cfg.updates && dl_mode != M_GAME) { // once, in the menus: a note, and "Play" says it
     told = 1;
     dl_note(dl_update_text());
     dl_dirty = true;
@@ -1046,6 +1050,7 @@ static int play_frame(const DlInput *in, s16 *audio, int audio_max, int ahead) {
   int n = dl_game->frame(in, dl_pic, audio, audio_max);
   if (ahead <= 0 || !dl_ahead_ok()) return n;
   size_t size = dl_game->state_size();
+  if (!size) return n;
   if (size > ahead_cap) {
     void *more = realloc(ahead_state, size);
     if (!more) return n;
@@ -1256,7 +1261,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     dl_start_done = true;
     return gpu_check();
   }
-  if (!bench_secs) { run_mark_write(); SetUnhandledExceptionFilter(crash_filter); } // the marker is removed when the program closes normally
+  if (!bench_secs) { run_mark_write(); crash_before = SetUnhandledExceptionFilter(crash_filter); } // the marker is removed when the program closes normally
   if (dl_cfg.gpu) dl_gpu_prepare(); // the shaders, on a second thread; GDI shows the first pictures
   ShowWindow(dl_hwnd, SW_SHOW);
   bool want_full = dl_cfg.fullscreen;

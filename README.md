@@ -74,21 +74,24 @@ At start-up DarkLauncher shows its settings screen, with the game running in the
 starts it; in game, **Esc** (or the controller's View button, held) opens a pause menu over the paused
 picture: resume, screenshot, settings, quit.
 
-A bar on the left lists the sections; the page of the section under the selection is shown beside
-it. Enter or Right goes into it, Esc comes back.
+A bar on the left holds Play, Screenshots, Game, Achievements and Settings, with Quit at the bottom;
+the page of the entry under the selection is shown beside it. Enter or Right goes into it, Esc comes
+back.
 
 - **Screenshots**: the screenshots taken, newest first. Enter opens one, Delete twice moves it to the
   Recycle Bin.
 - **Game**: the "Not connected to Xbox LIVE" notice and the choice of the storage device
   (both as on an offline console; from the next start).
 - **Achievements**: the game's twelve achievements, with the date each was earned and what each asks for.
-- **Languages**: the game's language (the game restarts in it) and the menu's.
-- **Picture**: the internal resolution (1280×720, 1920×1080, 2560×1440 or 3840×2160), full screen, integer scaling,
-  display through the graphics card or in software, filter, scanlines, CRT, HDR, vertical sync,
-  frame rate, and "Try it full size".
-- **Sound**: the volume and the sounds of the menu.
-- **Controls**: the keyboard keys and controller buttons of the game, vibration, and the shortcuts.
-- At the bottom: the game folder, the default settings, quit.
+- **Settings**: a page that leads to the rest.
+  - **Languages**: the game's language (the game restarts in it) and the menu's.
+  - **Picture**: the internal resolution (1280×720, 1920×1080, 2560×1440 or 3840×2160), a preset,
+    full screen, integer scaling, display through the graphics card or in software, filter,
+    scanlines, CRT, HDR, vertical sync, the frame rate shown, "Try it full size", and accessibility
+    (high contrast, colour-blind filter, less motion, large help text).
+  - **Sound**: the volume and the sounds of the menu.
+  - **Controls**: the keyboard keys and controller buttons of the game, vibration, and the shortcuts.
+  - The game folder, and the default settings.
 
 ![The Picture page](docs/screenshots/picture-en.png)
 

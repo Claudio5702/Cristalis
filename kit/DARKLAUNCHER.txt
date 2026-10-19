@@ -1,21 +1,21 @@
-DarkLauncher 1.3 (commit dd0d670), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h B4CE1492E1517FEC
+DarkLauncher 1.32 (commit 9e1a25b), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h BF30D776585D80CF
 file dl_achieve.c 7717926FD2027AF9
-file dl_app.c BC0106FA025E4F72
+file dl_app.c F96A3CC94B776ADD
 file dl_draw.c 5D10309DEC48C32D
 file dl_gpu.c B0C74AE61AB65583
 file dl_input.c 19EDC10485F9795D
-file dl_int.h 6F10B2A96D6F86DB
-file dl_menu.c A9A02DB1BA1D6676
+file dl_int.h DBF1ECDC9BB817C5
+file dl_menu.c 09A6A3220FFC9AC8
 file dl_packs.c 10AE1C0391C7EF4F
-file dl_saves.c 86E583E792FBEF1D
+file dl_saves.c 5D9784EA85DE7AA1
 file dl_sony.c AD231D89B5ECF6E7
-file dl_text.c 2FFCB1350BC70558
+file dl_text.c D5F0E76B6D43BC97
 file linux/dl_gdi.c 51ED378B11D7CDF3
 file linux/dl_gl.c D5B70332FD72697A
 file linux/dl_icons.c E4F2AC1F462F8241
 file linux/dl_pads.c 8E993CA41AF3586A
-file linux/dl_win32.c 3083F302EE056F9C
+file linux/dl_win32.c D5CCC4F7841CDC3A
 file linux/include/d3d11.h 2F5DDD6DA7026E0C
 file linux/include/dwmapi.h 2F5DDD6DA7026E0C
 file linux/include/dxgi1_6.h 2F5DDD6DA7026E0C

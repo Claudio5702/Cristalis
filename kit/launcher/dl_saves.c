@@ -100,7 +100,7 @@ HBITMAP dl_picture_load(const char *path, int *w, int *h) {
   if (!tried) {
     tried = true;
     HMODULE gp = LoadLibraryA("gdiplus.dll");
-    int(WINAPI * startup)(ULONG_PTR *, const GpStartupInput *, void *) = NULL;
+    int(WINAPI * startup)(ULONG_PTR *, const void *, void *) = NULL; // GdiplusStartup (the input is a GpStartupInput)
     if (gp) {
       startup = (void *)GetProcAddress(gp, "GdiplusStartup");
       from_file = (void *)GetProcAddress(gp, "GdipCreateBitmapFromFile");
@@ -402,16 +402,32 @@ static int edit_slot = -1; // slot whose name is being typed (F2)
 static bool osk;
 static int osk_x, osk_y, osk_page;
 static bool osk_caps;
-#define OSK_PAGES 4
+#define OSK_PAGES 6
 static const wchar_t *const osk_rows[OSK_PAGES][3] = {
     {L"abcdefghij", L"klmnopqrst", L"uvwxyz-'.!"},
     {L"1234567890", L"&@#+=?:;()", L"/,_~*%$<>\u20AC"},
     {L"\u00E0\u00E2\u00E4\u00E7\u00E9\u00E8\u00EA\u00EB\u00EE\u00EF", L"\u00F4\u00F6\u00F9\u00FB\u00FC\u00F1\u00DF\u00E3\u00F5\u00E1",
      L"\u00ED\u00F3\u00FA\u00EC\u00F2\u00E5\u00E6\u00F8\u0153\u00BF"},
+    // the kana: a-ho, ma-n with the long mark and small ya yu yo, then the voiced ones and the small ones
     {L"\u3042\u3044\u3046\u3048\u304A\u304B\u304D\u304F\u3051\u3053", L"\u3055\u3057\u3059\u305B\u305D\u305F\u3061\u3064\u3066\u3068",
      L"\u306A\u306B\u306C\u306D\u306E\u306F\u3072\u3075\u3078\u307B"},
+    {L"\u307E\u307F\u3080\u3081\u3082\u3084\u3086\u3088\u3089\u308A", L"\u308B\u308C\u308D\u308F\u3092\u3093\u30FC\u3083\u3085\u3087",
+     L"\u304C\u304E\u3050\u3052\u3054\u3056\u3058\u305A\u305C\u305E"},
+    {L"\u3060\u3062\u3065\u3067\u3069\u3070\u3073\u3076\u3079\u307C", L"\u3071\u3074\u3077\u307A\u307D\u3041\u3043\u3045\u3047\u3049",
+     L"\u3063\u308E\u3001\u3002\u30FB\uFF01\uFF1F\u300C\u300D\u301C"},
 };
-static const wchar_t *const osk_page_names[OSK_PAGES] = {L"abc", L"123", L"\u00E0\u00E9", L"\u3042"};
+static const wchar_t *const osk_page_names[OSK_PAGES] = {L"abc", L"123", L"\u00E0\u00E9", L"\u3042", L"\u307E", L"\u3060"};
+
+// The controller's buttons as the help names them: A B X Y LB RB, or a PlayStation pad's.
+static void pad_names(const wchar_t **a, const wchar_t **b, const wchar_t **x, const wchar_t **y, const wchar_t **lb, const wchar_t **rb) {
+  bool ps = dl_input_kind == DL_IN_PS || dl_input_kind == DL_IN_PS_HID;
+  *a = ps ? TX(T_PS_CROSS) : L"A";
+  *b = ps ? TX(T_PS_CIRCLE) : L"B";
+  *x = ps ? TX(T_PS_SQUARE) : L"X";
+  *y = ps ? TX(T_PS_TRIANGLE) : L"Y";
+  *lb = ps ? L"L1" : L"LB";
+  *rb = ps ? L"R1" : L"RB";
+}
 
 // The character of a key, with capitals (Latin letters) or katakana (kana); 0 for none.
 static wchar_t osk_char(int page, int x, int y) {
@@ -495,13 +511,23 @@ static void saves_row(int k, wchar_t *label, wchar_t *value) {
 }
 static const wchar_t *saves_help(int k) {
   static wchar_t buf[512];
-  if (edit_slot >= 0) return osk ? TX(T_SVH_OSK) : TX(T_SVH_NAME);
+  const wchar_t *pa, *pb, *px, *py, *plb, *prb;
+  pad_names(&pa, &pb, &px, &py, &plb, &prb);
+  if (edit_slot >= 0 && osk) {
+    _snwprintf(buf, 511, TX(T_SVH_OSK), pa, pb, py, plb, prb, px);
+    buf[511] = 0;
+    return buf;
+  }
+  if (edit_slot >= 0) return TX(T_SVH_NAME);
   if (is_more(k)) return more_help ? dl_tr(more_help) : L"";
   if (is_backups(k)) return TX(T_H_BACKUPS);
   if (confirm == k) return TX(T_SVH_CONFIRM);
   if (k >= DL_SLOTS) return sv_used[k] ? TX(T_SVH_AUTO) : TX(T_SVH_AUTO_EMPTY);
   if (!sv_used[k]) return dl_started ? TX(T_SVH_SAVE) : TX(T_SVH_EMPTY);
-  _snwprintf(buf, 511, L"%ls%ls", TX(T_SVH_LOAD), dl_input_kind == DL_IN_KEYS ? TX(T_SVH_F2) : TX(T_SVH_X));
+  wchar_t named[160];
+  _snwprintf(named, 159, TX(T_SVH_X), px);
+  named[159] = 0;
+  _snwprintf(buf, 511, L"%ls%ls", TX(T_SVH_LOAD), dl_input_kind == DL_IN_KEYS ? TX(T_SVH_F2) : named);
   buf[511] = 0;
   return buf;
 }
@@ -654,7 +680,7 @@ void dl_saves_osk_sample(bool on) {
   edit_slot = on ? 0 : -1;
   osk_x = 3;
   osk_y = 1;
-  osk_page = 0;
+  osk_page = dl_cfg.ui_lang == 0 ? 4 : 0; // in Japanese, the second page of kana
   lstrcpyW(edit_buf, L"Abc");
 }
 
@@ -738,9 +764,18 @@ static long long age_of(const char *path) {
   return (long long)time(NULL) - (long long)(t / 10000000ull - 11644473600ull);
 }
 
+// The name of a file's copies: its own, and a fingerprint of its whole path (two saves of the same
+// name in two folders, a language's each, are kept apart).
+static void bk_name(const char *path, char *out) {
+  unsigned h = 2166136261u;
+  for (const char *c = path; *c; c++) h = (h ^ (unsigned char)*c) * 16777619u;
+  snprintf(out, MAX_PATH, "%s.%08x", leaf(path), h);
+}
+
 static void backup_make(const char *path, bool force) {
   if (!file_exists(path)) return;
-  const char *name = leaf(path);
+  char name[MAX_PATH];
+  bk_name(path, name);
   char newest[MAX_PATH], a[MAX_PATH], b[MAX_PATH], d[MAX_PATH];
   bk_path(newest, name, 1);
   long long age = age_of(newest);
@@ -870,6 +905,7 @@ static void bk_enter(int k) {
     DeleteFileA(pic);
   }
   if (ok && b.state == -2) { dl_relaunch(); return; }
+  if (ok && b.state == -1 && dl_started) { dl_session_resume(); return; } // in play, the session would be written over at the close: taken up now
   if (ok) dl_note(TX(T_BK_RESTORED));
   bk_open();
   saves_open();

@@ -79,21 +79,25 @@ Al arrancar, DarkLauncher muestra su pantalla de ajustes, con el juego en marcha
 **Jugar** lo inicia; durante la partida, **Esc** (o el botón View del mando, mantenido) abre un menú
 de pausa sobre la imagen detenida: volver a la partida, captura, ajustes, salir.
 
-Una barra a la izquierda lista las secciones; la página de la sección seleccionada se muestra a su
-lado. Intro o Derecha entra en ella, Esc vuelve.
+Una barra a la izquierda reúne Jugar, Capturas, Juego, Logros y Ajustes, con Salir abajo del todo; la
+página de la entrada seleccionada se muestra a su lado. Intro o Derecha entra en ella, Esc vuelve.
 
 - **Capturas**: las capturas de pantalla tomadas, las más recientes primero. Intro abre una, Supr
   dos veces la envía a la Papelera de reciclaje.
 - **Juego**: el aviso «No conectado a Xbox LIVE» y la elección del dispositivo de almacenamiento
   (ambos como en una consola sin conexión; a partir del siguiente arranque).
 - **Logros**: los doce logros del juego, con la fecha de cada uno y lo que pide.
-- **Idiomas**: el idioma del juego (el juego se reinicia en él) y el del menú.
-- **Imagen**: la resolución interna (1280×720, 1920×1080, 2560×1440 o 3840×2160), pantalla
-  completa, escala entera, imagen por la tarjeta gráfica o por software, filtro, scanlines, filtro
-  CRT, HDR, sincronización vertical, velocidad de fotogramas y «Probar en grande».
-- **Sonido**: el volumen y los sonidos del menú.
-- **Controles**: las teclas del teclado y los botones del mando del juego, la vibración y los atajos.
-- Abajo: la carpeta del juego, los ajustes por defecto, salir.
+- **Ajustes**: una página que lleva al resto.
+  - **Idiomas**: el idioma del juego (el juego se reinicia en él) y el del menú.
+  - **Imagen**: la resolución interna (1280×720, 1920×1080, 2560×1440 o 3840×2160), un preajuste,
+    pantalla completa, escala entera, imagen por la tarjeta gráfica o por software, filtro,
+    scanlines, filtro CRT, HDR, sincronización vertical, mostrar los fotogramas por segundo,
+    «Probar en grande» y accesibilidad (alto contraste, filtro para daltónicos, menos movimiento,
+    ayuda en grande).
+  - **Sonido**: el volumen y los sonidos del menú.
+  - **Controles**: las teclas del teclado y los botones del mando del juego, la vibración y los
+    atajos.
+  - La carpeta del juego y los ajustes por defecto.
 
 ![La página Imagen](docs/screenshots/picture-en.png)
 

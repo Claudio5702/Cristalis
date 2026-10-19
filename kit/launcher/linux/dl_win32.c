@@ -246,8 +246,16 @@ DWORD GetModuleFileNameA(HMODULE m, char *out, DWORD n) {
 // Errors that end the program: the signals, as Windows' exceptions, to the filter; then the signal
 // does what it does by default.
 static LPTOP_LEVEL_EXCEPTION_FILTER crash_filter_fn;
+static const int fatal_sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT};
+static struct sigaction fatal_before[sizeof fatal_sigs / sizeof fatal_sigs[0]];
 
 static void on_fatal_signal(int sig, siginfo_t *si, void *ctx) {
+  for (size_t k = 0; k < sizeof fatal_sigs / sizeof fatal_sigs[0]; k++) { // the game's own handler first
+    if (fatal_sigs[k] != sig) continue;
+    struct sigaction *b = &fatal_before[k];
+    if ((b->sa_flags & SA_SIGINFO) && b->sa_sigaction) { b->sa_sigaction(sig, si, ctx); return; }
+    if (!(b->sa_flags & SA_SIGINFO) && b->sa_handler != SIG_DFL && b->sa_handler != SIG_IGN) { b->sa_handler(sig); return; }
+  }
   EXCEPTION_RECORD r = {0};
   EXCEPTION_POINTERS ep = {&r, ctx};
   r.ExceptionCode = sig == SIGSEGV || sig == SIGBUS ? 0xC0000005 : sig == SIGILL ? 0xC000001D : sig == SIGFPE ? 0xC0000094 : 0x40000015;
@@ -270,10 +278,15 @@ LPTOP_LEVEL_EXCEPTION_FILTER SetUnhandledExceptionFilter(LPTOP_LEVEL_EXCEPTION_F
   struct sigaction sa;
   memset(&sa, 0, sizeof sa);
   sa.sa_sigaction = on_fatal_signal;
-  sa.sa_flags = SA_SIGINFO | SA_RESETHAND;
+  sa.sa_flags = SA_SIGINFO;
   sigemptyset(&sa.sa_mask);
-  static const int sigs[] = {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGABRT};
-  for (size_t k = 0; k < sizeof sigs / sizeof sigs[0]; k++) sigaction(sigs[k], &sa, NULL);
+  for (size_t k = 0; k < sizeof fatal_sigs / sizeof fatal_sigs[0]; k++) {
+    struct sigaction before;
+    if (sigaction(fatal_sigs[k], NULL, &before)) continue;
+    if (before.sa_sigaction == on_fatal_signal) continue; // set already
+    fatal_before[k] = before;
+    sigaction(fatal_sigs[k], &sa, NULL);
+  }
   return old;
 }
 

@@ -6,7 +6,8 @@ own copy of the game (Xbox 360, Xbox Live Arcade).
 STARTING
   "Crystal Defenders" shortcut (desktop or Start menu), or crystal_defenders.exe.
   The settings screen (DarkLauncher) opens first: Play, Screenshots, Game,
-  Achievements, Languages, Picture, Sound, Controls, Game folder, Defaults, Quit.
+  Achievements, Settings (Languages, Picture, Sound, Controls, Game folder,
+  Defaults), Quit.
   It works with the keyboard, a controller or the mouse.
 
 IN THE GAME
@@ -17,11 +18,13 @@ IN THE GAME
 
 CONTROLS
   Keyboard keys and controller buttons are chosen on the Controls page. Any
-  XInput (Xbox-type) controller works without setup.
+  XInput (Xbox-type) controller works without setup, and so do PlayStation 4
+  and 5 controllers.
 
 LANGUAGES
-  Languages > Game language: the language of the game's texts (the game restarts).
-  Languages > Menu language: that of the settings screen.
+  Settings > Languages > Game language: the language of the game's texts (the
+  game restarts). Settings > Languages > Menu language: that of the settings
+  screen.
 
 FILES
   userdata\ ................ saves and achievements

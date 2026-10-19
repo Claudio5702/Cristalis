@@ -84,22 +84,24 @@ Beim Start zeigt DarkLauncher seinen Einstellungsbildschirm, mit dem laufenden S
 **Spielen** startet es; im Spiel öffnet **Esc** (oder die View-Taste des Controllers, gehalten) ein
 Pausenmenü über dem angehaltenen Bild: zurück zum Spiel, Screenshot, Einstellungen, beenden.
 
-Eine Leiste links listet die Bereiche auf; die Seite des gewählten Bereichs erscheint daneben. Enter
-oder Rechts öffnet sie, Esc kehrt zurück.
+Eine Leiste links enthält Spielen, Screenshots, Spiel, Erfolge und Einstellungen, ganz unten Beenden;
+die Seite des gewählten Eintrags erscheint daneben. Enter oder Rechts öffnet sie, Esc kehrt zurück.
 
 - **Screenshots**: die aufgenommenen Screenshots, die neuesten zuerst. Enter öffnet einen, zweimal
   Entf verschiebt ihn in den Papierkorb.
 - **Spiel**: der Hinweis „Nicht mit Xbox LIVE verbunden" und die Wahl des Speichergeräts (beides wie
   auf einer Konsole ohne Netz; ab dem nächsten Start).
 - **Erfolge**: die zwölf Erfolge des Spiels, mit dem Datum jedes Erfolgs und was er verlangt.
-- **Sprachen**: die Sprache des Spiels (das Spiel startet in ihr neu) und die des Menüs.
-- **Bild**: die interne Auflösung (1280×720, 1920×1080, 2560×1440 oder 3840×2160), Vollbild,
-  Ganzzahl-Skalierung, Anzeige über die Grafikkarte oder in Software, Filter, Scanlines,
-  Röhren-Filter, HDR, vertikale Synchronisation, Bildrate und „Groß ausprobieren".
-- **Ton**: die Lautstärke und die Töne des Menüs.
-- **Steuerung**: die Tastatur-Tasten und Controller-Knöpfe des Spiels, die Vibration und die
-  Tastenkürzel.
-- Unten: der Spielordner, die Standardeinstellungen, beenden.
+- **Einstellungen**: eine Seite, die zum Rest führt.
+  - **Sprachen**: die Sprache des Spiels (das Spiel startet in ihr neu) und die des Menüs.
+  - **Bild**: die interne Auflösung (1280×720, 1920×1080, 2560×1440 oder 3840×2160), eine Vorgabe,
+    Vollbild, Ganzzahl-Skalierung, Anzeige über die Grafikkarte oder in Software, Filter, Scanlines,
+    Röhren-Filter, HDR, vertikale Synchronisation, die Anzeige der Bildrate, „Groß ausprobieren" und
+    Barrierefreiheit (hoher Kontrast, Farbenblind-Filter, weniger Bewegung, große Hilfetexte).
+  - **Ton**: die Lautstärke und die Töne des Menüs.
+  - **Steuerung**: die Tastatur-Tasten und Controller-Knöpfe des Spiels, die Vibration und die
+    Tastenkürzel.
+  - Der Spielordner und die Standardeinstellungen.
 
 ![Die Seite Bild](docs/screenshots/picture-en.png)
 

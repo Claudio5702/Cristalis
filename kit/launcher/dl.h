@@ -10,7 +10,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "1.3"
+#define DL_VERSION "1.32"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -72,7 +72,8 @@ typedef struct DlTheme {
   // A picture for an icon of the navigation bar, known by its Segoe MDL2 Assets character (dl_section;
   // DarkLauncher's own: 0xE768 Play, 0xE74E Saves, 0xE722 Screenshots, 0xE774 Languages, 0xE7F4 Picture,
   // 0xE767 Sound, 0xE765 Controls, 0xE8B7 Folder, 0xE7A7 Defaults, 0xE72C Restart, 0xE7E8 Quit), or
-  // icon 0: the window's and the taskbar's.
+  // icon 0: the window's and the taskbar's. Since 1.32 the bar shows 0xE713 Settings, which opens
+  // Languages, Picture, Sound, Controls, Folder, Defaults and Restart as rows of a page.
   const uint32_t *(*icon)(unsigned icon, int *w, int *h);
   // The menus' sounds (kind 0 moving, 1 choosing): n mono 16-bit samples, rate per second.
   const int16_t *(*sound)(int kind, int *n, int *rate);

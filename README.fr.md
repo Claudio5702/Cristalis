@@ -82,23 +82,25 @@ Au démarrage, DarkLauncher affiche son écran de réglages, avec le jeu qui tou
 **Jouer** le lance ; en jeu, **Échap** (ou le bouton View de la manette, maintenu) ouvre un menu de
 pause par-dessus l'image figée : reprendre la partie, capture d'écran, réglages, quitter.
 
-Une barre à gauche liste les rubriques ; la page de la rubrique sélectionnée s'affiche à côté.
-Entrée ou Droite y entre, Échap en revient.
+Une barre à gauche réunit Jouer, Captures, Jeu, Succès et Paramètres, avec Quitter tout en bas ; la
+page de l'entrée sélectionnée s'affiche à côté. Entrée ou Droite y entre, Échap en revient.
 
 - **Captures** : les captures d'écran prises, les plus récentes d'abord. Entrée en ouvre une,
   Suppr deux fois l'envoie à la Corbeille.
 - **Jeu** : l'avis « Non connecté à Xbox LIVE » et le choix du périphérique de stockage (tous deux
   comme sur une console hors ligne ; à partir du démarrage suivant).
 - **Succès** : les douze succès du jeu, avec la date de chacun et ce qu'il demande.
-- **Langues** : la langue du jeu (le jeu redémarre dans celle-ci) et celle du menu.
-- **Image** : la résolution interne (1280×720, 1920×1080, 2560×1440 ou 3840×2160), le plein écran,
-  l'échelle entière, l'affichage par la carte graphique ou par le processeur, le filtre, les
-  scanlines, le filtre CRT, le HDR, la synchro verticale, la fréquence d'images et « Essayer en
-  grand ».
-- **Son** : le volume et les sons du menu.
-- **Commandes** : les touches du clavier et les boutons de manette du jeu, la vibration et les
-  raccourcis.
-- En bas : le dossier du jeu, les réglages par défaut, quitter.
+- **Paramètres** : une page qui mène au reste.
+  - **Langues** : la langue du jeu (le jeu redémarre dans celle-ci) et celle du menu.
+  - **Image** : la résolution interne (1280×720, 1920×1080, 2560×1440 ou 3840×2160), un préréglage,
+    le plein écran, l'échelle entière, l'affichage par la carte graphique ou par le processeur, le
+    filtre, les scanlines, le filtre CRT, le HDR, la synchro verticale, l'affichage des images par
+    seconde, « Essayer en grand » et l'accessibilité (contraste élevé, filtre pour daltoniens,
+    moins de mouvement, aide en grand).
+  - **Son** : le volume et les sons du menu.
+  - **Commandes** : les touches du clavier et les boutons de manette du jeu, la vibration et les
+    raccourcis.
+  - Le dossier du jeu, et les réglages par défaut.
 
 ![La page Image](docs/screenshots/picture-en.png)
 

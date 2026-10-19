@@ -82,22 +82,25 @@ nell'anteprima. **Gioca** lo avvia; durante la partita, **Esc** (o il pulsante V
 tenuto premuto) apre un menu di pausa sopra l'immagine ferma: riprendi la partita, screenshot,
 impostazioni, esci.
 
-Una barra a sinistra elenca le sezioni; la pagina della sezione selezionata appare accanto. Invio o
-Destra vi entra, Esc torna indietro.
+Una barra a sinistra riunisce Gioca, Screenshot, Opzioni, Obiettivi e Impostazioni, con Esci in fondo;
+la pagina della voce selezionata appare accanto. Invio o Destra vi entra, Esc torna indietro.
 
 - **Screenshot**: gli screenshot scattati, dal più recente. Invio ne apre uno, Canc due volte lo
   sposta nel Cestino.
 - **Opzioni**: l'avviso «Non connesso a Xbox LIVE» e la scelta del dispositivo di memorizzazione
   (entrambi come su una console offline; dall'avvio successivo).
 - **Obiettivi**: i dodici obiettivi del gioco, con la data di ciascuno e ciò che richiede.
-- **Lingue**: la lingua del gioco (il gioco si riavvia in essa) e quella del menu.
-- **Immagine**: la risoluzione interna (1280×720, 1920×1080, 2560×1440 o 3840×2160), schermo intero,
-  scala intera, immagine tramite la scheda grafica o via software, filtro, scanline, filtro CRT, HDR,
-  sincronizzazione verticale, frequenza dei fotogrammi e «Prova in grande».
-- **Audio**: il volume e i suoni del menu.
-- **Comandi**: i tasti della tastiera e i pulsanti del controller del gioco, la vibrazione e le
-  scorciatoie.
-- In basso: la cartella del gioco, le impostazioni predefinite, esci.
+- **Impostazioni**: una pagina che porta al resto.
+  - **Lingue**: la lingua del gioco (il gioco si riavvia in essa) e quella del menu.
+  - **Immagine**: la risoluzione interna (1280×720, 1920×1080, 2560×1440 o 3840×2160), una
+    preimpostazione, schermo intero, scala intera, immagine tramite la scheda grafica o via
+    software, filtro, scanline, filtro CRT, HDR, sincronizzazione verticale, la visualizzazione dei
+    fotogrammi al secondo, «Prova in grande» e accessibilità (contrasto elevato, filtro per
+    daltonici, meno movimento, aiuto in grande).
+  - **Audio**: il volume e i suoni del menu.
+  - **Comandi**: i tasti della tastiera e i pulsanti del controller del gioco, la vibrazione e le
+    scorciatoie.
+  - La cartella del gioco e le impostazioni predefinite.
 
 ![La pagina Immagine](docs/screenshots/picture-en.png)
 

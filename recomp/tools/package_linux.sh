@@ -62,9 +62,10 @@ Needs: x86-64 Linux with glibc 2.35 or newer (Ubuntu 22.04, Debian 12, Fedora 36
 SteamOS 3.5 and later), OpenGL 3.3, FreeType and fontconfig (standard on desktop
 systems). SDL3 comes with it, in lib/.
 
-The settings screen: Play, Screenshots, Game, Achievements, Languages (the
-game's and the menu's), Picture (internal resolution up to 3840 x 2160, filters,
-full screen), Sound, Controls (keys, controller buttons, vibration).
+The settings screen: Play, Screenshots, Game, Achievements, and Settings:
+Languages (the game's and the menu's), Picture (internal resolution up to
+3840 x 2160, filters, full screen), Sound, Controls (keys, controller buttons,
+vibration).
 
 In the game:
   Escape, or the controller's Back/View held ... pause menu

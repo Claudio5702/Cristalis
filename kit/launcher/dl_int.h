@@ -193,7 +193,7 @@ extern DlSection dl_secs[DL_MAX_SECTIONS];
 extern int dl_sec_n, dl_sec_top; // entries before dl_sec_top: upper group of the bar
 
 // the kit's pages, in this order (DL_PAGE_LANGS, DL_PAGE_IMAGE, DL_PAGE_SOUND first)
-enum { PG_CTRL = DL_PAGE_SOUND + 1, PG_KEYS, PG_PAD, PG_PADFN, PG_HOT, PG_SAVES, PG_SHOTS, PG_A11Y, PG_BACKUPS, PG_NEWS, PG_WELCOME, PG_WELCOME_CTRL, PG_WELCOME_SCREEN, PG_NET };
+enum { PG_CTRL = DL_PAGE_SOUND + 1, PG_KEYS, PG_PAD, PG_PADFN, PG_HOT, PG_SAVES, PG_SHOTS, PG_A11Y, PG_BACKUPS, PG_NEWS, PG_WELCOME, PG_WELCOME_CTRL, PG_WELCOME_SCREEN, PG_NET, PG_SETTINGS };
 void dl_page_insert(int page, int at, const DlRow *row);
 void dl_menu_init(void);   // the kit's pages and the first entry, before the game's setup()
 void dl_menu_finish(void); // the kit's entries after the game's ones
@@ -265,6 +265,7 @@ enum {
   T_AHEAD, T_H_AHEAD, T_AHEAD_1, T_AHEAD_2,
   T_SAFE_REPORT, T_H_SAFE_REPORT, T_M_REPORT,
   T_SVH_X, T_SVH_OSK,
+  T_H_SETTINGS, T_TAB_SETTINGS,
   T_NET, T_H_NET, T_TAB_NET, T_DISCORD, T_H_DISCORD, T_DS_PLAYING, T_DS_MENUS, T_UPDATES, T_H_UPDATES, T_UPD_NEW, T_UPD_NONE, T_UPD_OPEN, T_H_UPD_OPEN,
   T_TAB_NEWS, T_H_NEWS, T_TAB_WELCOME, T_W_NEXT, T_H_W_LANG, T_H_W_CTRL, T_W_PLAY, T_H_W_PLAY,
   T_PRESET, T_H_PRESET, T_PRE_CUSTOM, T_PRE_ORIGINAL, T_PRE_LARGE, T_PRE_CRT, T_PRE_FAST,

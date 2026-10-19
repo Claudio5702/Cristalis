@@ -298,6 +298,19 @@ static const DlRow net_updates_row = {DL_SWITCH, dl_texts[T_UPDATES], dl_texts[T
 static const DlRow net_open_row = {DL_ACTION, dl_texts[T_UPD_OPEN], dl_texts[T_H_UPD_OPEN], NULL, 0, NULL, NULL, dl_update_open};
 static const DlRow net_row = {.kind = DL_PAGE, .label = dl_texts[T_NET], .help = dl_texts[T_H_NET], .page = PG_NET};
 
+// ---- Settings: one entry of the bar for the kit's pages and its rarer actions
+static void settings_folder(void) { ShellExecuteA(NULL, "open", dl_base_dir, NULL, NULL, SW_SHOWNORMAL); }
+static void settings_defaults(void) { dl_defaults(false); }
+static const DlRow settings_rows[] = {
+    {.kind = DL_PAGE, .label = dl_texts[T_LANGS], .help = dl_texts[T_H_LANGS], .page = DL_PAGE_LANGS},
+    {.kind = DL_PAGE, .label = dl_texts[T_IMAGE], .help = dl_texts[T_H_IMAGE], .page = DL_PAGE_IMAGE},
+    {.kind = DL_PAGE, .label = dl_texts[T_SOUND], .help = dl_texts[T_H_SOUND], .page = DL_PAGE_SOUND},
+    {.kind = DL_PAGE, .label = dl_texts[T_CTRL], .help = dl_texts[T_H_CTRL], .page = PG_CTRL},
+    {DL_ACTION, dl_texts[T_FOLDER], dl_texts[T_H_FOLDER], NULL, 0, NULL, NULL, settings_folder},
+    {DL_ACTION, dl_texts[T_DEFAULTS], dl_texts[T_H_DEFAULTS], NULL, 0, NULL, NULL, settings_defaults},
+};
+static const DlRow settings_reset_row = {DL_ACTION, dl_texts[T_RESET], dl_texts[T_H_RESET], NULL, 0, NULL, NULL, dl_restart};
+
 void dl_menu_init(void) {
   bool saves = dl_game->save_state && dl_game->load_state;
   if (dl_game->pad_layout || dl_game->pad_menu) pad_rows[sizeof pad_rows / sizeof pad_rows[0] - 1].help = dl_texts[T_PH_DEFAULTS_GAME];
@@ -328,6 +341,8 @@ void dl_menu_init(void) {
   if (DISCORD_APP_ID[0]) pn->rows[pn->n++] = &net_discord_row;
   if (UPDATE_URL[0]) { pn->rows[pn->n++] = &net_updates_row; pn->rows[pn->n++] = &net_open_row; }
   if (pn->n) dl_page_insert(PG_CTRL, dl_pages[PG_CTRL].n, &net_row); // the last row of the Controls page
+  dl_page(dl_texts[T_TAB_SETTINGS], settings_rows, sizeof settings_rows / sizeof settings_rows[0]);
+  if (dl_game->reset) dl_page_insert(PG_SETTINGS, dl_pages[PG_SETTINGS].n, &settings_reset_row); // a game that cannot restart has no such row
   add_section(SEC_PLAY, -1, 0xE768, dl_texts[T_PLAY], dl_texts[T_H_PLAY]);
   if (saves) add_section(SEC_PAGE, PG_SAVES, 0xE74E, dl_texts[T_SAVES], dl_texts[T_H_SAVES]);
   add_section(SEC_PAGE, PG_SHOTS, 0xE722, dl_texts[T_SHOTS], dl_texts[T_H_SHOTS]);
@@ -361,14 +376,9 @@ void dl_safe_page_open(void) {
 }
 
 void dl_menu_finish(void) {
-  add_section(SEC_PAGE, DL_PAGE_LANGS, 0xE774, dl_texts[T_LANGS], dl_texts[T_H_LANGS]);
-  add_section(SEC_PAGE, DL_PAGE_IMAGE, 0xE7F4, dl_texts[T_IMAGE], dl_texts[T_H_IMAGE]);
-  add_section(SEC_PAGE, DL_PAGE_SOUND, 0xE767, dl_texts[T_SOUND], dl_texts[T_H_SOUND]);
-  add_section(SEC_PAGE, PG_CTRL, 0xE765, dl_texts[T_CTRL], dl_texts[T_H_CTRL]);
+  // the kit's pages and rarer actions behind one entry (Settings), then Quit alone at the bottom
+  add_section(SEC_PAGE, PG_SETTINGS, 0xE713, dl_texts[T_PA_SETTINGS], dl_texts[T_H_SETTINGS]);
   dl_sec_top = dl_sec_n;
-  add_section(SEC_FOLDER, -1, 0xE8B7, dl_texts[T_FOLDER], dl_texts[T_H_FOLDER]);
-  add_section(SEC_DEFAULTS, -1, 0xE7A7, dl_texts[T_DEFAULTS], dl_texts[T_H_DEFAULTS]);
-  if (dl_game->reset) add_section(SEC_RESET, -1, 0xE72C, dl_texts[T_RESET], dl_texts[T_H_RESET]); // a game that cannot restart has no such entry
   add_section(SEC_QUIT, -1, 0xE7E8, dl_texts[T_QUIT], dl_texts[T_H_QUIT]);
   // the safe mode page, reached only after a crash (made always, so that --ui-audit sees it)
   safe_page = dl_page(dl_texts[T_SAFE_TAB], safe_rows, sizeof safe_rows / sizeof safe_rows[0]);
@@ -1026,13 +1036,17 @@ int dl_audit(void) {
       list_read = -1;
       dl_sel = 0;
       page_rows(PG_SAVES);
-      dl_saves_osk_sample(true);
-      dl_draw_menu(wdc);
-      if (dl_menu_bits) {
-        GetClientRect(dl_hwnd, &rc);
-        snprintf(path, sizeof path, "%s" DL_SEP "%d_keyboard.png", dl_audit_dir, l);
-        dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
+      for (int pass = 0; pass < 2; pass++) { // with an Xbox pad, then a PlayStation one (the help names their buttons)
+        dl_input_kind = pass ? DL_IN_PS_HID : DL_IN_XBOX;
+        dl_saves_osk_sample(true);
+        dl_draw_menu(wdc);
+        if (dl_menu_bits) {
+          GetClientRect(dl_hwnd, &rc);
+          snprintf(path, sizeof path, "%s" DL_SEP "%d_keyboard%s.png", dl_audit_dir, l, pass ? "_ps" : "");
+          dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
+        }
       }
+      dl_input_kind = DL_IN_KEYS;
       dl_saves_osk_sample(false);
     }
     pause_rows(); // the pause menu, each row selected
