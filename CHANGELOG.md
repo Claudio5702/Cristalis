@@ -6,11 +6,16 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
-## Next version (not numbered yet)
+## 1.02
+
+The first public version: ready-made programs on the Releases page, as Unleashed Recompiled
+does (no game asset in them; the player's own copy is still needed).
 
 - **DarkLauncher 1.33**: a sturdier crash report (the error line is written without the C library's
   heap, a lock that blocks it no longer hangs the program, a stack overflow is reported). Nothing
   changes for the player; the report still names the error on Windows (checked with a forced crash).
+- The READMEs say where to download it (`CrystalDefendersRecomp-Setup.exe` for Windows, the Linux
+  archive), and what the releases hold and do not hold.
 
 ## 1.01
 

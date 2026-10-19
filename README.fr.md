@@ -11,9 +11,11 @@ natif : le code PowerPC du jeu est traduit à l'avance en C++ avec
 [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) et s'exécute sur un petit environnement
 écrit pour ce seul jeu. Une version Linux est expérimentale.
 
-Ce dépôt ne contient **aucune donnée du jeu ni aucun de son code** : le code traduit est produit
-chez vous à partir de votre propre `default.xex`, et les images, les sons et les textes sont lus
-dans votre propre copie du jeu.
+**Aucune ressource du jeu n'est fournie**, ni dans ce dépôt ni dans les releases : les images, les
+sons, la musique et les textes sont lus dans votre propre copie du jeu. Le dépôt ne contient pas non
+plus de code du jeu : le code traduit est produit à partir d'un `default.xex` au moment de compiler le
+programme, et les programmes de la [page des releases](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) sont compilés ainsi. **Version 1.02,
+une bêta** : jouée par peu de personnes jusqu'ici.
 
 **Vous devez fournir votre propre copie de Crystal Defenders (Xbox 360).** Crystal Defenders
 appartient à Square Enix ; ce projet n'est ni affilié à Square Enix ni approuvé par elle.
@@ -26,10 +28,13 @@ appartient à Square Enix ; ce projet n'est ni affilié à Square Enix ni approu
 
 ## Jouer
 
+Téléchargez la dernière version sur la [page des releases](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest), et uniquement là :
+`CrystalDefendersRecomp-Setup.exe` pour Windows, `CrystalDefendersRecomp-linux-x86_64.tar.gz` pour Linux.
+
 1. Copiez le jeu depuis votre console : le dossier `CRYSTAL DEFENDERS` (ou le dossier qui porte
    l'identifiant du titre, `58410989`) tel qu'il se trouve sur le stockage de la console, par
    exemple sur une clé USB.
-2. Avec l'installeur : placez ce dossier à côté de `Crystal Defenders - Setup.exe` et lancez-le.
+2. Avec l'installeur : placez ce dossier à côté de `CrystalDefendersRecomp-Setup.exe` et lancez-le.
    Le jeu est installé à partir de ce dossier, avec des raccourcis et une entrée dans la liste des
    applications de Windows. Sans le dossier, la dernière fenêtre de l'installeur demande où il se
    trouve.
@@ -176,7 +181,7 @@ compatibilité. La version Windows tourne aussi avec Proton.
 Le fonctionnement du projet, comment le compiler, traduire à nouveau le code du jeu, le vérifier et
 faire l'installeur : [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (en anglais).
 
-Ce qui a changé à chaque version (actuellement 1.01) : [CHANGELOG.md](CHANGELOG.md) (en anglais).
+Ce qui a changé à chaque version (actuellement 1.02) : [CHANGELOG.md](CHANGELOG.md) (en anglais).
 
 ## Questions fréquentes
 
@@ -184,9 +189,9 @@ Ce qui a changé à chaque version (actuellement 1.01) : [CHANGELOG.md](CHANGELO
 pour le PC (recompilation statique) ; ce que faisait le matériel de la console (graphismes, son
 XMA, fonctions du système) est réécrit pour Windows.
 
-**Pourquoi faut-il ma propre copie ?** Le dépôt ne contient rien du jeu : le code traduit est
-produit à partir de votre `default.xex`, et le jeu lit ses images, ses sons et ses textes dans
-votre copie.
+**Pourquoi faut-il ma propre copie ?** Ni le dépôt ni les releases ne contiennent les images, les
+sons, la musique ou les textes du jeu : le programme les lit dans votre copie, après avoir vérifié que
+c'est la bonne.
 
 **Puis-je utiliser mes sauvegardes de la console ?** Les sauvegardes sont dans `userdata\`, au
 format du jeu lui-même ; copier des sauvegardes entre la console et le PC n'a pas été essayé.

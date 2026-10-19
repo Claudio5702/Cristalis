@@ -27,6 +27,7 @@ $files = [ordered]@{
     'avutil-60.dll' = Join-Path $build 'avutil-60.dll'
     'swresample-6.dll' = Join-Path $build 'swresample-6.dll'
     'FFmpeg-LICENSE.txt' = Join-Path $ffmpeg 'LICENSE.txt'
+    'LICENSE.txt' = Join-Path (Split-Path (Split-Path $PSScriptRoot)) 'LICENSE' # this project's (MIT)
     'LISEZMOI.txt' = Join-Path $PSScriptRoot 'setup\LISEZMOI.txt'
     'README.txt' = Join-Path $PSScriptRoot 'setup\README.txt'
 }

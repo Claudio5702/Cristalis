@@ -11,9 +11,11 @@ game's PowerPC code is translated ahead of time to C++ with
 [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) and runs on a small runtime written for this
 one game. A Linux build is experimental.
 
-This repository contains **no game data and none of the game's code**: the translated code is
-generated locally from your own `default.xex`, and the pictures, sounds and texts are read from your
-own copy of the game.
+**No game assets are included**, in this repository or in the releases: the pictures, sounds, music
+and texts are read from your own copy of the game. The repository holds none of the game's code
+either: the translated code is generated from a `default.xex` when the program is built, and the
+programs on the [Releases page](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) are built that way. **Version 1.02, a beta**: played by few
+people so far.
 
 **You must supply your own copy of Crystal Defenders (Xbox 360).** Crystal Defenders belongs to
 Square Enix; this project is not affiliated with or endorsed by Square Enix.
@@ -25,9 +27,12 @@ Square Enix; this project is not affiliated with or endorsed by Square Enix.
 
 ## Playing
 
+Download the latest release from the [Releases page](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest), and only from there:
+`CrystalDefendersRecomp-Setup.exe` for Windows, `CrystalDefendersRecomp-linux-x86_64.tar.gz` for Linux.
+
 1. Copy the game from your console: the `CRYSTAL DEFENDERS` folder (or the folder named after its
    title id, `58410989`) as found on the console's storage, for example on a USB drive.
-2. With the installer: put that folder next to `Crystal Defenders - Setup.exe` and run it. The game
+2. With the installer: put that folder next to `CrystalDefendersRecomp-Setup.exe` and run it. The game
    is installed from it, with shortcuts and an entry in Windows' list of applications. Without the
    folder, the last window of the installer asks where it is.
 3. Without the installer: run `crystal_defenders.exe`. On the first start it asks for that folder
@@ -160,7 +165,7 @@ Proton.
 How the project works, how to build it, translate the game's code again, check it and make the
 installer: [docs/DEVELOPERS.md](docs/DEVELOPERS.md).
 
-What changed in each version (now 1.01): [CHANGELOG.md](CHANGELOG.md).
+What changed in each version (now 1.02): [CHANGELOG.md](CHANGELOG.md).
 
 ## FAQ
 
@@ -168,8 +173,8 @@ What changed in each version (now 1.01): [CHANGELOG.md](CHANGELOG.md).
 the PC (static recompilation); what the console's hardware did (graphics, XMA sound, the system's
 functions) is written again for Windows.
 
-**Why do I need my own copy?** The repository holds none of the game: the translated code is
-generated from your `default.xex`, and the game reads its pictures, sounds and texts from your copy.
+**Why do I need my own copy?** Neither the repository nor the releases hold the game's pictures,
+sounds, music or texts: the program reads them from your copy, after checking it is the expected one.
 
 **Can I use my saves from the console?** The saves are in `userdata\`, in the game's own format;
 copying saves between the console and the PC has not been tried.

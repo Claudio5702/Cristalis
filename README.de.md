@@ -12,9 +12,11 @@ laufen: Der PowerPC-Code des Spiels wird im Voraus mit
 kleinen Laufzeitumgebung, die nur für dieses Spiel geschrieben wurde. Eine Linux-Version ist
 experimentell.
 
-Dieses Repository enthält **keine Daten des Spiels und nichts von seinem Code**: Der übersetzte Code
-wird bei Ihnen aus Ihrer eigenen `default.xex` erzeugt, und Bilder, Töne und Texte werden aus Ihrer
-eigenen Kopie des Spiels gelesen.
+**Es sind keine Ressourcen des Spiels enthalten**, weder in diesem Repository noch in den Releases:
+Bilder, Töne, Musik und Texte werden aus Ihrer eigenen Kopie des Spiels gelesen. Das Repository
+enthält auch keinen Code des Spiels: Der übersetzte Code wird beim Bauen des Programms aus einer
+`default.xex` erzeugt, und die Programme auf der [Release-Seite](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) werden so gebaut.
+**Version 1.02, eine Beta**: bisher von wenigen gespielt.
 
 **Sie brauchen Ihre eigene Kopie von Crystal Defenders (Xbox 360).** Crystal Defenders gehört Square
 Enix; dieses Projekt steht in keiner Verbindung zu Square Enix und wird von Square Enix nicht
@@ -28,10 +30,13 @@ unterstützt.
 
 ## Spielen
 
+Laden Sie die neueste Version von der [Release-Seite](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) herunter, und nur von dort:
+`CrystalDefendersRecomp-Setup.exe` für Windows, `CrystalDefendersRecomp-linux-x86_64.tar.gz` für Linux.
+
 1. Kopieren Sie das Spiel von Ihrer Konsole: den Ordner `CRYSTAL DEFENDERS` (oder den Ordner mit der
    Titel-ID, `58410989`), so wie er auf dem Speicher der Konsole liegt, zum Beispiel auf einem
    USB-Stick.
-2. Mit dem Installationsprogramm: Legen Sie diesen Ordner neben `Crystal Defenders - Setup.exe` und
+2. Mit dem Installationsprogramm: Legen Sie diesen Ordner neben `CrystalDefendersRecomp-Setup.exe` und
    starten Sie es. Das Spiel wird aus diesem Ordner installiert, mit Verknüpfungen und einem Eintrag
    in der Windows-Liste der Apps. Ohne den Ordner fragt das letzte Fenster des Installationsprogramms,
    wo er liegt.
@@ -177,7 +182,7 @@ zu erzwingen. Die Windows-Version läuft auch über Proton.
 Wie das Projekt funktioniert, wie man es baut, den Code des Spiels neu übersetzt, prüft und das
 Installationsprogramm erstellt: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (auf Englisch).
 
-Was sich in jeder Version geändert hat (jetzt 1.01): [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
+Was sich in jeder Version geändert hat (jetzt 1.02): [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
 
 ## Häufige Fragen
 
@@ -185,9 +190,9 @@ Was sich in jeder Version geändert hat (jetzt 1.01): [CHANGELOG.md](CHANGELOG.m
 PC übersetzt (statische Rekompilierung); was die Hardware der Konsole tat (Grafik, XMA-Ton,
 Systemfunktionen), ist für Windows neu geschrieben.
 
-**Warum brauche ich meine eigene Kopie?** Das Repository enthält nichts vom Spiel: Der übersetzte
-Code wird aus Ihrer `default.xex` erzeugt, und das Spiel liest seine Bilder, Töne und Texte aus Ihrer
-Kopie.
+**Warum brauche ich meine eigene Kopie?** Weder das Repository noch die Releases enthalten Bilder,
+Töne, Musik oder Texte des Spiels: Das Programm liest sie aus Ihrer Kopie, nachdem es geprüft hat,
+dass sie die erwartete ist.
 
 **Kann ich meine Spielstände von der Konsole verwenden?** Die Spielstände liegen in `userdata\`, im
 eigenen Format des Spiels; Spielstände zwischen Konsole und PC zu kopieren wurde nicht ausprobiert.

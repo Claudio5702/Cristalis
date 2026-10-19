@@ -11,9 +11,11 @@ Windows: il codice PowerPC del gioco viene tradotto in anticipo in C++ con
 [XenonRecomp](https://github.com/hedge-dev/XenonRecomp) e gira su un piccolo ambiente scritto solo
 per questo gioco. Una versione per Linux è sperimentale.
 
-Questo repository **non contiene dati del gioco né parte del suo codice**: il codice tradotto viene
-generato sul tuo computer a partire dal tuo `default.xex`, e immagini, suoni e testi vengono letti
-dalla tua copia del gioco.
+**Non è inclusa alcuna risorsa del gioco**, né in questo repository né nelle release: immagini,
+suoni, musica e testi vengono letti dalla tua copia del gioco. Il repository non contiene nemmeno
+codice del gioco: il codice tradotto viene generato da un `default.xex` quando si compila il
+programma, e i programmi della [pagina delle release](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest) sono compilati così. **Versione 1.02,
+una beta**: finora giocata da poche persone.
 
 **Ti serve la tua copia di Crystal Defenders (Xbox 360).** Crystal Defenders appartiene a Square
 Enix; questo progetto non è affiliato a Square Enix né approvato da essa.
@@ -26,10 +28,13 @@ Enix; questo progetto non è affiliato a Square Enix né approvato da essa.
 
 ## Giocare
 
+Scarica l'ultima versione dalla [pagina delle release](https://github.com/Claudio5702/CrystalDefendersRecomp/releases/latest), e solo da lì:
+`CrystalDefendersRecomp-Setup.exe` per Windows, `CrystalDefendersRecomp-linux-x86_64.tar.gz` per Linux.
+
 1. Copia il gioco dalla tua console: la cartella `CRYSTAL DEFENDERS` (o la cartella con
    l'identificativo del titolo, `58410989`) così come si trova nella memoria della console, per
    esempio su una chiavetta USB.
-2. Con il programma di installazione: metti quella cartella accanto a `Crystal Defenders - Setup.exe`
+2. Con il programma di installazione: metti quella cartella accanto a `CrystalDefendersRecomp-Setup.exe`
    e avvialo. Il gioco viene installato da essa, con collegamenti e una voce nell'elenco delle app di
    Windows. Senza la cartella, l'ultima finestra del programma di installazione chiede dove si trova.
 3. Senza il programma di installazione: avvia `crystal_defenders.exe`. Al primo avvio chiede quella
@@ -172,7 +177,7 @@ compatibilità. La versione per Windows gira anche con Proton.
 Come funziona il progetto, come compilarlo, tradurre di nuovo il codice del gioco, verificarlo e
 creare il programma di installazione: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (in inglese).
 
-Cosa è cambiato in ogni versione (ora 1.01): [CHANGELOG.md](CHANGELOG.md) (in inglese).
+Cosa è cambiato in ogni versione (ora 1.02): [CHANGELOG.md](CHANGELOG.md) (in inglese).
 
 ## Domande frequenti
 
@@ -180,8 +185,8 @@ Cosa è cambiato in ogni versione (ora 1.01): [CHANGELOG.md](CHANGELOG.md) (in i
 PC (ricompilazione statica); ciò che faceva l'hardware della console (grafica, audio XMA, funzioni
 del sistema) è riscritto per Windows.
 
-**Perché mi serve la mia copia?** Il repository non contiene nulla del gioco: il codice tradotto
-viene generato dal tuo `default.xex`, e il gioco legge immagini, suoni e testi dalla tua copia.
+**Perché mi serve la mia copia?** Né il repository né le release contengono immagini, suoni, musica
+o testi del gioco: il programma li legge dalla tua copia, dopo aver verificato che sia quella attesa.
 
 **Posso usare i miei salvataggi della console?** I salvataggi sono in `userdata\`, nel formato
 proprio del gioco; copiare salvataggi tra la console e il PC non è stato provato.

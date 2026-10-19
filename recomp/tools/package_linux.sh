@@ -3,10 +3,11 @@
 # DarkLauncher (CD_DARKLAUNCHER, the default) and -DCD_FFMPEG_ROOT=<static FFmpeg>, so that the
 # program needs nothing from the system but the C library, OpenGL, FreeType and fontconfig: SDL3,
 # which few systems have yet, goes into lib/, where the program looks first.
-# Usage: package_linux.sh <build directory> <output directory>
+# Usage: package_linux.sh <build directory> <output directory> [FFmpeg source directory]
 set -e
 build=${1:?build directory}
 out=${2:?output directory}
+ffmpeg_src=${3:-}
 here=$(cd "$(dirname "$0")" && pwd)
 name=CrystalDefendersRecomp-linux-x86_64
 dest="$out/$name"
@@ -40,6 +41,11 @@ cat > "$dest/crystal_defenders.sh" <<'EOF'
 cd "$(dirname "$(readlink -f "$0")")" && exec ./crystal_defenders "$@"
 EOF
 chmod +x "$dest/crystal_defenders.sh" "$dest/crystal_defenders"
+
+# The licenses: this project's (MIT), FFmpeg's (LGPL 2.1, built in) and SDL3's (zlib), when found.
+cp "$here/../../LICENSE" "$dest/LICENSE.txt"
+[ -n "$ffmpeg_src" ] && [ -f "$ffmpeg_src/COPYING.LGPLv2.1" ] && cp "$ffmpeg_src/COPYING.LGPLv2.1" "$dest/FFmpeg-LICENSE.txt"
+for f in /usr/share/licenses/sdl3/LICENSE /usr/share/licenses/sdl3/LICENSE.txt /usr/share/doc/libsdl3*/copyright; do [ -f "$f" ] && cp "$f" "$dest/SDL3-LICENSE.txt" && break; done
 
 cat > "$dest/README.txt" <<'EOF'
 CrystalDefendersRecomp - unofficial native Linux build (experimental)

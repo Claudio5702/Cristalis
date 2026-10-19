@@ -338,27 +338,20 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"すっきりしたメニュー|左のバーは「プレイ」「キャプチャ」「ゲーム」「実績」「設定」だけになりました。言語、画面、サウンド、操作は「設定」の中です。\n"
-    L"アクセシビリティ|「画面」にプリセットと、ハイコントラスト、色覚フィルター、動きを減らす、大きなヘルプの設定が加わりました。\n"
-    L"より詳しいクラッシュレポート|Windows では、レポートにエラーの種類も記録されます。",
-    L"Menu allégé|La barre de gauche ne garde que Jouer, Captures, Jeu, Succès et Paramètres ; Langues, Image, Son et Commandes sont dans Paramètres.\n"
-    L"Accessibilité|La page Image gagne un préréglage et une page Accessibilité : contraste élevé, filtre pour daltoniens, moins de mouvement, aide en grand.\n"
-    L"Rapport de plantage plus précis|Sous Windows, le rapport nomme aussi l'erreur.",
-    L"Lighter menu|The bar on the left keeps only Play, Screenshots, Game, Achievements and Settings; Languages, Picture, Sound and Controls are in Settings.\n"
-    L"Accessibility|The Picture page gains a preset and an Accessibility page: high contrast, colour-blind filter, less motion, large help text.\n"
-    L"More precise crash report|On Windows, the report also names the error.",
-    L"Menú más ligero|La barra de la izquierda solo tiene Jugar, Capturas, Juego, Logros y Ajustes; Idiomas, Imagen, Sonido y Controles están en Ajustes.\n"
-    L"Accesibilidad|La página Imagen gana un preajuste y una página Accesibilidad: alto contraste, filtro para daltónicos, menos movimiento, ayuda en grande.\n"
-    L"Informe de fallo más preciso|En Windows, el informe también nombra el error.",
-    L"Menu mais leve|A barra da esquerda tem só Jogar, Capturas, Jogo, Conquistas e Configurações; Idiomas, Imagem, Som e Controles estão em Configurações.\n"
-    L"Acessibilidade|A página Imagem ganha uma predefinição e uma página Acessibilidade: alto contraste, filtro para daltônicos, menos movimento, ajuda grande.\n"
-    L"Relatório de falha mais preciso|No Windows, o relatório também diz qual foi o erro.",
-    L"Schlankeres Menü|Die Leiste links enthält nur noch Spielen, Screenshots, Spiel, Erfolge und Einstellungen; Sprachen, Bild, Ton und Steuerung sind unter Einstellungen.\n"
-    L"Barrierefreiheit|Die Seite Bild bekommt eine Voreinstellung und eine Seite Barrierefreiheit: hoher Kontrast, Farbenblind-Filter, weniger Bewegung, große Hilfetexte.\n"
-    L"Genauerer Absturzbericht|Unter Windows nennt der Bericht auch den Fehler.",
-    L"Menu più leggero|La barra a sinistra tiene solo Gioca, Screenshot, Opzioni, Obiettivi e Impostazioni; Lingue, Immagine, Audio e Comandi sono in Impostazioni.\n"
-    L"Accessibilità|La pagina Immagine guadagna una preimpostazione e una pagina Accessibilità: contrasto elevato, filtro per daltonici, meno movimento, aiuto in grande.\n"
-    L"Rapporto di crash più preciso|Su Windows, il rapporto indica anche l'errore." };
+    L"最初の公開版|リリースページから、インストーラー付きでそのまま入手できるようになりました。\n"
+    L"より丈夫なクラッシュレポート|レポートがプログラムを止めることはなくなり、スタックの使い切りも記録されます。",
+    L"Première version publique|Le jeu est proposé tout prêt sur la page des releases, avec son installeur.\n"
+    L"Rapport de plantage plus solide|Il ne bloque plus jamais le programme, et signale aussi une pile épuisée.",
+    L"First public version|The game comes ready to use on the Releases page, with its installer.\n"
+    L"Sturdier crash report|It never blocks the program any more, and also reports a stack overflow.",
+    L"Primera versión pública|El juego se ofrece listo en la página de releases, con su instalador.\n"
+    L"Informe de fallo más sólido|Ya no bloquea nunca el programa y también indica una pila agotada.",
+    L"Primeira versão pública|O jogo é oferecido pronto na página de releases, com seu instalador.\n"
+    L"Relatório de falha mais sólido|Nunca mais trava o programa e também informa uma pilha esgotada.",
+    L"Erste öffentliche Version|Das Spiel gibt es fertig auf der Release-Seite, mit Installationsprogramm.\n"
+    L"Robusterer Absturzbericht|Er blockiert das Programm nie mehr und meldet auch einen Stapelüberlauf.",
+    L"Prima versione pubblica|Il gioco è disponibile già pronto nella pagina delle release, con il suo programma di installazione.\n"
+    L"Rapporto di crash più solido|Non blocca più il programma e segnala anche uno stack esaurito." };
 
 // ---- The game ----
 
