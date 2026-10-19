@@ -38,6 +38,7 @@ set(RUNTIME_SOURCES
     runtime/kernel.cpp
     runtime/kernel_objects.cpp
     runtime/kernel_io.cpp
+    runtime/game_state.cpp
     runtime/video.cpp
     runtime/gpu.cpp
     runtime/audio.cpp

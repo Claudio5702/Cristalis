@@ -1,6 +1,7 @@
 // File I/O imports. Guest paths on game:\ and d:\ map to the directory holding
 // default.xex; every other device maps under .\userdata\<device>\.
 #include "kernel_objects.h"
+#include "game_state.h"
 #include "xex_header.h"
 
 #include "content.h"
@@ -143,6 +144,7 @@ static void OpenFile(PPCContext& ctx, uint32_t disposition)
     object->host = host;
     Store32(handleOut, ObjectCreateHandle(object));
     Log("File open: '%s'", guestPath.c_str());
+    GameStateFileOpened(guestPath.c_str());
     SetIoStatus(ioStatus, STATUS_SUCCESS, 1);
     ctx.r3.u64 = STATUS_SUCCESS;
 }

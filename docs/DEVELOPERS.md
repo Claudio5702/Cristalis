@@ -15,7 +15,9 @@ the game's data or its translated code: both come from your own copy of the game
      draws into Direct3D 11 ones (`renderer.cpp`);
    - XMA sound decoded with FFmpeg and the game's mixer driven like the console's (`audio.cpp`);
    - files (`kernel_io.cpp`), saves and achievements (`xam_content.cpp`, `achievements.cpp`), the
-     settings (`config.cpp`), the first start without the game's data (`setup.cpp`).
+     settings (`config.cpp`), the first start without the game's data (`setup.cpp`), and where the
+     player is (`game_state.cpp`: the pack and stage from the files the game opens, the wave from one
+     byte of its memory) for DarkLauncher's crash report and Discord status.
 3. **DarkLauncher** (`kit/launcher`, from the [DarkLauncher](https://github.com/Claudio5702/DarkLauncher)
    kit) owns the window, the settings screen, the controls and the sound output. The game's side is
    `runtime/darklauncher.cpp`; see below.

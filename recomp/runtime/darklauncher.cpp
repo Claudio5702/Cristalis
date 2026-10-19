@@ -10,6 +10,7 @@
 
 #include "achievements.h"
 #include "config.h"
+#include "game_state.h"
 #include "guest.h"
 #include "xex_header.h"
 
@@ -304,6 +305,67 @@ void SafeMode()
     g_scaleSetting = 0;
 }
 
+// ---- Where the player is ----
+
+// "W1 · Stage 2 · Wave 5", in the game's own words (its screens say Stage and Wave in every language);
+// empty outside a stage. For the crash report and the status Discord shows.
+static void WhereLine(char* out, int n, const char* dot)
+{
+    GameState state = GameStateNow();
+    if (state.pack == 0)
+        out[0] = 0;
+    else if (state.wave == 0)
+        snprintf(out, size_t(n), "W%d %s Stage %d", state.pack, dot, state.stage);
+    else
+        snprintf(out, size_t(n), "W%d %s Stage %d %s Wave %d", state.pack, dot, state.stage, dot, state.wave);
+}
+
+void Report(char* out, int n)
+{
+    WhereLine(out, n, ",");
+    if (out[0] == 0)
+        snprintf(out, size_t(n), "menus");
+}
+
+void Status(char* out, int n)
+{
+    WhereLine(out, n, "\xC2\xB7"); // empty: DarkLauncher's own "Playing" or "In the menus"
+}
+
+// ---- What is new ----
+
+constexpr const char* kVersion = "1.0";
+// One line per news: its title, then | and what it is.
+const DlText t_news = {
+    L"Linux|Windows と同じ設定画面、ポーズメニュー、コントローラーで Linux でも動きます。\n"
+    L"内部解像度|ゲームを 3840×2160 まで描けます。「画面」ページで選べます。\n"
+    L"PlayStation のコントローラー|PS4 と PS5 のコントローラーがそのまま使え、振動もします。\n"
+    L"クラッシュレポート|クラッシュの後、どのステージのどのウェーブだったかを記録します。",
+    L"Linux|Le jeu tourne aussi sous Linux, avec le même écran de réglages, le menu de pause et les manettes.\n"
+    L"Résolution interne|Le jeu peut être dessiné jusqu'en 3840 × 2160 : page Image.\n"
+    L"Manettes PlayStation|Les manettes PS4 et PS5 marchent telles quelles, avec la vibration.\n"
+    L"Rapport de plantage|Après un plantage, le rapport dit où en était la partie : stage et wave.",
+    L"Linux|The game also runs on Linux, with the same settings screen, pause menu and controllers.\n"
+    L"Internal resolution|The game can be drawn at up to 3840 × 2160: Picture page.\n"
+    L"PlayStation controllers|PS4 and PS5 controllers work as they are, with vibration.\n"
+    L"Crash report|After a crash, the report says where the game was: stage and wave.",
+    L"Linux|El juego también funciona en Linux, con la misma pantalla de ajustes, el menú de pausa y los mandos.\n"
+    L"Resolución interna|El juego puede dibujarse hasta 3840 × 2160: página Imagen.\n"
+    L"Mandos de PlayStation|Los mandos de PS4 y PS5 funcionan tal cual, con vibración.\n"
+    L"Informe de fallo|Tras un fallo, el informe dice dónde estaba la partida: stage y wave.",
+    L"Linux|O jogo também roda no Linux, com a mesma tela de ajustes, o menu de pausa e os controles.\n"
+    L"Resolução interna|O jogo pode ser desenhado em até 3840 × 2160: página Imagem.\n"
+    L"Controles de PlayStation|Os controles de PS4 e PS5 funcionam como estão, com vibração.\n"
+    L"Relatório de falha|Depois de uma falha, o relatório diz onde estava a partida: stage e wave.",
+    L"Linux|Das Spiel läuft auch unter Linux, mit demselben Einstellungsbildschirm, Pausenmenü und Controllern.\n"
+    L"Interne Auflösung|Das Spiel kann bis 3840 × 2160 gezeichnet werden: Seite Bild.\n"
+    L"PlayStation-Controller|PS4- und PS5-Controller funktionieren direkt, mit Vibration.\n"
+    L"Absturzbericht|Nach einem Absturz sagt der Bericht, wo das Spiel war: Stage und Wave.",
+    L"Linux|Il gioco gira anche su Linux, con la stessa schermata delle impostazioni, il menu di pausa e i controller.\n"
+    L"Risoluzione interna|Il gioco può essere disegnato fino a 3840 × 2160: pagina Immagine.\n"
+    L"Controller PlayStation|I controller PS4 e PS5 funzionano così come sono, con vibrazione.\n"
+    L"Rapporto di crash|Dopo un crash, il rapporto dice dov'era la partita: stage e wave." };
+
 // ---- The game ----
 
 DWORD WINAPI GuestThread(void*)
@@ -458,6 +520,10 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.frame = Frame;
     game.setup = Setup;
     game.safe_mode = SafeMode;
+    game.report = Report;
+    game.status = Status;
+    game.version = kVersion;
+    game.news = t_news;
     // An Xbox game: its buttons in the Xbox places at first, and View held (not pressed) opens the
     // pause menu, so a short press stays the game's Back.
     game.pad_layout = DL_PAD_XBOX;
