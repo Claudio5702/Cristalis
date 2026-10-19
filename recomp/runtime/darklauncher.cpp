@@ -95,8 +95,11 @@ void ApplySettings()
 const DlText t_subtitle = { L"Windows 向け非公式ネイティブ移植版", L"portage natif non officiel pour Windows", L"unofficial native port for Windows",
     L"adaptación nativa no oficial para Windows", L"versão nativa não oficial para Windows", L"inoffizielle native Portierung für Windows", L"conversione nativa non ufficiale per Windows" };
 #else
-const DlText t_subtitle = { L"Linux 向け非公式ネイティブ移植版", L"portage natif non officiel pour Linux", L"unofficial native port for Linux",
-    L"adaptación nativa no oficial para Linux", L"versão nativa não oficial para Linux", L"inoffizielle native Portierung für Linux", L"conversione nativa non ufficiale per Linux" };
+// experimental: so far only run under WSL, Linux running inside Windows
+const DlText t_subtitle = { L"Linux 向け非公式ネイティブ移植版（試験版）", L"portage natif non officiel pour Linux (expérimental)",
+    L"unofficial native port for Linux (experimental)", L"adaptación nativa no oficial para Linux (experimental)",
+    L"versão nativa não oficial para Linux (experimental)", L"inoffizielle native Portierung für Linux (experimentell)",
+    L"conversione nativa non ufficiale per Linux (sperimentale)" };
 #endif
 
 const DlText t_gameLanguage = { L"ゲームの言語", L"Langue du jeu", L"Game language", L"Idioma del juego", L"Idioma do jogo", L"Spielsprache", L"Lingua del gioco" };
@@ -113,8 +116,14 @@ const DlText t_hLanguageRow = { L"Enter：この言語でゲームを再起動�
     L"Intro: reinicia el juego en este idioma. Se pierde lo que no esté guardado.",
     L"Enter: reinicia o jogo neste idioma. O que não foi salvo é perdido.",
     L"Eingabe: startet das Spiel in dieser Sprache neu. Nicht Gespeichertes geht verloren.", L"Invio: riavvia il gioco in questa lingua. Ciò che non è salvato va perso." };
+// the language the game takes from the system
+#ifdef _WIN32
 const DlText t_automatic = { L"自動（Windows）", L"Automatique (Windows)", L"Automatic (Windows)", L"Automático (Windows)", L"Automático (Windows)",
     L"Automatisch (Windows)", L"Automatica (Windows)" };
+#else
+const DlText t_automatic = { L"自動（システム）", L"Automatique (système)", L"Automatic (system)", L"Automático (sistema)", L"Automático (sistema)",
+    L"Automatisch (System)", L"Automatica (sistema)" };
+#endif
 
 const DlText t_resolution = { L"内部解像度", L"Résolution interne", L"Internal resolution", L"Resolución interna", L"Resolução interna", L"Interne Auflösung", L"Risoluzione interna" };
 const DlText t_hResolution = { L"ゲームが画像を描く大きさです。大きいほど大画面でくっきりしますが、重くなります。",
