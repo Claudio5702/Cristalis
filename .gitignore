@@ -28,3 +28,6 @@
 /recomp/build/
 /recomp/bin/
 /recomp/run/
+
+# Logs of a test run, wherever the program was started from.
+*.log
