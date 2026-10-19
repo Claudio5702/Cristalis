@@ -14,10 +14,12 @@ on DarkLauncher's "What's new" page.
 
 ## 1.03
 
+The first public version: ready-made programs on the Releases page, as Unleashed Recompiled
+does (no game asset in them; the player's own copy is still needed).
+
 - **DarkLauncher 2.01**, open source under the MIT license ("DarkLauncher contributors"): its source
   is in `kit/launcher` as before, with its license (`kit/launcher/LICENSE`), which the installer and
   the Linux archive now carry as `DarkLauncher-LICENSE.txt`.
-
 - **Linux: the game no longer stops at its title screen.** Each draw gave the vertex buffer a new
   store (`glBufferData`, a few hundred times a picture); under WSL, Mesa's driver for Direct3D 12 locked
   up in its own thread at the title screen, and the "40 pictures a second" measured were DarkLauncher
@@ -27,7 +29,6 @@ on DarkLauncher's "What's new" page.
 - Linux: the picture is read back for DarkLauncher without waiting for the graphics card (two pixel
   buffers, shown one picture later), so that a slower machine such as the Steam Deck keeps the card and
   the processor busy at once.
-
 - The project is now called **Cristalis**, "Crystal Defenders Recomp", as Kahna is "Bahamut Lagoon
   Recomp": the setup screen, the window title, the READMEs, the installer and the crash report say so.
   The program's files keep their names (`crystal_defenders.exe`, `.ini`, saves), and an installed copy
@@ -41,14 +42,14 @@ on DarkLauncher's "What's new" page.
 
 ## 1.02
 
-The first public version: ready-made programs on the Releases page, as Unleashed Recompiled
-does (no game asset in them; the player's own copy is still needed).
+Prepared as the first public version, with ready-made programs on the Releases page; never
+published, as the name Cristalis and DarkLauncher's license came first.
 
 - **DarkLauncher 1.33**: a sturdier crash report (the error line is written without the C library's
   heap, a lock that blocks it no longer hangs the program, a stack overflow is reported). Nothing
   changes for the player; the report still names the error on Windows (checked with a forced crash).
-- The READMEs say where to download it (`Cristalis-Setup.exe` for Windows, the Linux
-  archive), and what the releases hold and do not hold.
+- The READMEs say where to download it (the Windows installer, the Linux archive), and what the
+  releases hold and do not hold.
 
 ## 1.01
 

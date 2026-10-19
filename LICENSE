@@ -20,5 +20,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-This license covers the code in this repository only. It grants no rights to
-Crystal Defenders itself, which belongs to Square Enix and is not included.
+This license covers the code in this repository only, but kit/launcher: DarkLauncher
+is under its own MIT license, with its own copyright holder (kit/launcher/LICENSE).
+It grants no rights to Crystal Defenders itself, which belongs to Square Enix and is
+not included.

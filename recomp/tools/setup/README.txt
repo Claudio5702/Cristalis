@@ -11,8 +11,8 @@ STARTING
   It works with the keyboard, a controller or the mouse.
 
 IN THE GAME
-  Escape, or the controller's View button .... pause menu (resume, screenshot,
-                                               settings, quit)
+  Escape, or the controller's View button (held) ... pause menu (resume,
+                                                    screenshot, settings, quit)
   F11 ........................................ full screen
   F12 ........................................ screenshot (captures folder)
 
@@ -38,4 +38,6 @@ UNINSTALLING
   Saves and game data are kept unless you tick the box.
 
 Audio decoding uses FFmpeg (https://ffmpeg.org), LGPL, see FFmpeg-LICENSE.txt.
+The settings screen is DarkLauncher, MIT license, see DarkLauncher-LICENSE.txt.
+This program: MIT license, see LICENSE.txt.
 Source code: https://github.com/Claudio5702/Cristalis

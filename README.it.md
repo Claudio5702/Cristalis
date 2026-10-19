@@ -37,7 +37,7 @@ Scarica l'ultima versione dalla [pagina delle release](https://github.com/Claudi
 2. Con il programma di installazione: metti quella cartella accanto a `Cristalis-Setup.exe`
    e avvialo. Il gioco viene installato da essa, con collegamenti e una voce nell'elenco delle app di
    Windows. Senza la cartella, l'ultima finestra del programma di installazione chiede dove si trova.
-3. Senza il programma di installazione: avvia `crystal_defenders.exe`. Al primo avvio chiede quella
+3. Compilato da te, senza il programma di installazione: avvia `crystal_defenders.exe`. Al primo avvio chiede quella
    cartella (o una cartella che contenga già `default.xex` e `Media`), oppure la prende subito se si
    trova accanto al programma.
 
@@ -68,7 +68,7 @@ segnala se non lo è.
   nelle impostazioni; il gioco si riavvia nella nuova lingua.
 - **Immagine tramite la scheda grafica**: il gioco disegnato a 1280×720, 1920×1080, 2560×1440 o
   3840×2160, poi nitido, sfumato o con bordi ammorbiditi a qualsiasi dimensione della finestra;
-  scanline, un filtro CRT piatto o curvo, HDR.
+  scanline, un filtro CRT piatto o curvo, HDR (Windows).
 - **Obiettivi salvati sul computer**, con un avviso sopra il gioco e un elenco nelle impostazioni.
 - **Il comportamento offline della console, su richiesta**: l'avviso «Non connesso a Xbox LIVE» e
   la scelta del dispositivo di memorizzazione sono disattivati per impostazione predefinita e si
@@ -78,6 +78,7 @@ segnala se non lo è.
 - **Controller**: Xbox (XInput), e PlayStation 4 e 5 letti direttamente (USB o Bluetooth), con
   vibrazione su entrambi; tasti e pulsanti scelti nella pagina Comandi. Un controller PlayStation 3
   richiede il driver DsHidMini.
+- **Un rapporto di crash** che dice dov'era la partita («W1, Stage 2, Wave 5»), scritto all'avvio successivo.
 - **Un programma di installazione e uno di disinstallazione**, in sei lingue.
 
 ## Schermata delle impostazioni
@@ -137,11 +138,12 @@ Tutto resta nella cartella del programma:
 | `captures\` | screenshot |
 | `crystal_defenders.ini` | impostazioni |
 | `crystal_defenders.log` | registro dell'ultima sessione (`.prev.log`: quella precedente) |
+| `crystal_defenders.ini.crash.txt` | rapporto di crash, scritto all'avvio dopo un crash |
 
 ## Disinstallare
 
 Se installato con il programma di installazione: avvia `Uninstall.exe` nella cartella del gioco,
-oppure rimuovi «Crystal Defenders» dall'elenco delle app installate nelle impostazioni di Windows.
+oppure rimuovi «Cristalis (Crystal Defenders)» dall'elenco delle app installate nelle impostazioni di Windows.
 Per impostazione predefinita i tuoi salvataggi, le impostazioni, gli screenshot e i dati del gioco
 restano nella cartella, nel caso tu reinstalli; spunta la casella per eliminarli anche loro, e la
 cartella se ne va con essi. Senza il programma di installazione: elimina la cartella.
@@ -165,7 +167,7 @@ compatibilità. La versione per Windows gira anche con Proton.
 
 ## Limiti noti
 
-- Niente classifiche online: richiedevano Xbox LIVE.
+- Niente classifiche online: richiedevano Xbox LIVE. I migliori punteggi del gioco, salvati sul computer, funzionano.
 - Niente salvataggi di stato: il gioco è un programma Xbox 360 completo con i propri thread; salva da
   solo.
 - I loop della musica sono gestiti dall'ambiente anziché dal meccanismo proprio della console.
@@ -202,7 +204,7 @@ proprio del gioco; copiare salvataggi tra la console e il PC non è stato provat
 ## Licenza
 
 Il codice sorgente di questo progetto è sotto licenza MIT (vedi [LICENSE](LICENSE)). Questa licenza
-non copre il gioco, i suoi dati né il suo codice.
+non copre il gioco, i suoi dati né il suo codice. Anche DarkLauncher (`kit/launcher`) è sotto licenza MIT, con un proprio titolare ([kit/launcher/LICENSE](kit/launcher/LICENSE)).
 
 ## Ringraziamenti
 

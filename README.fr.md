@@ -38,7 +38,7 @@ Téléchargez la dernière version sur la [page des releases](https://github.com
    Le jeu est installé à partir de ce dossier, avec des raccourcis et une entrée dans la liste des
    applications de Windows. Sans le dossier, la dernière fenêtre de l'installeur demande où il se
    trouve.
-3. Sans l'installeur : lancez `crystal_defenders.exe`. Au premier démarrage, il demande ce dossier
+3. Compilé vous-même, sans l'installeur : lancez `crystal_defenders.exe`. Au premier démarrage, il demande ce dossier
    (ou un dossier qui contient déjà `default.xex` et `Media`), ou le prend tout de suite s'il se
    trouve à côté du programme.
 
@@ -69,7 +69,7 @@ n'est pas le cas.
   dans les réglages ; le jeu redémarre dans la nouvelle langue.
 - **Affichage par la carte graphique** : le jeu dessiné en 1280×720, 1920×1080, 2560×1440 ou
   3840×2160, puis net, lissé ou aux bords adoucis à toutes les tailles de fenêtre ; scanlines,
-  filtre CRT plat ou bombé, HDR.
+  filtre CRT plat ou bombé, HDR (Windows).
 - **Succès enregistrés sur l'ordinateur**, avec une notification par-dessus le jeu et une liste dans
   les réglages.
 - **Le comportement hors ligne de la console, sur demande** : l'avis « Non connecté à Xbox LIVE »
@@ -79,6 +79,7 @@ n'est pas le cas.
 - **Manettes** : Xbox (XInput), ainsi que PlayStation 4 et 5 lues directement (USB ou Bluetooth),
   avec vibration sur les deux ; touches et boutons choisis sur la page Commandes. Une manette
   PlayStation 3 a besoin du pilote DsHidMini.
+- **Un rapport de plantage** qui dit où en était la partie (« W1, Stage 2, Wave 5 »), écrit au démarrage suivant.
 - **Un installeur et un désinstalleur**, en six langues.
 
 ## Écran de réglages
@@ -140,11 +141,12 @@ Tout reste dans le dossier du programme :
 | `captures\` | les captures d'écran |
 | `crystal_defenders.ini` | les réglages |
 | `crystal_defenders.log` | le journal de la dernière session (`.prev.log` : celle d'avant) |
+| `crystal_defenders.ini.crash.txt` | le rapport de plantage, écrit au démarrage après un plantage |
 
 ## Désinstaller
 
-Installé avec l'installeur : lancez `Uninstall.exe` dans le dossier du jeu, ou retirez « Crystal
-Defenders » de la liste des applications installées dans les paramètres de Windows. Par défaut, vos
+Installé avec l'installeur : lancez `Uninstall.exe` dans le dossier du jeu, ou retirez « Cristalis (Crystal
+Defenders) » de la liste des applications installées dans les paramètres de Windows. Par défaut, vos
 sauvegardes, vos réglages, vos captures et les données du jeu restent dans le dossier, au cas où vous
 réinstalleriez ; cochez la case pour les supprimer aussi, et le dossier part avec eux. Sans
 l'installeur : supprimez le dossier.
@@ -168,7 +170,7 @@ compatibilité. La version Windows tourne aussi avec Proton.
 
 ## Limites connues
 
-- Pas de classements en ligne : ils demandaient Xbox LIVE.
+- Pas de classements en ligne : ils demandaient Xbox LIVE. Les meilleurs scores du jeu, gardés sur l'ordinateur, fonctionnent.
 - Pas de sauvegardes d'état : le jeu est un programme Xbox 360 complet avec ses propres fils
   d'exécution ; il sauvegarde lui-même.
 - Les boucles de musique sont gérées par l'environnement plutôt que par le mécanisme propre à la
@@ -207,7 +209,7 @@ format du jeu lui-même ; copier des sauvegardes entre la console et le PC n'a p
 ## Licence
 
 Le code source de ce projet est sous licence MIT (voir [LICENSE](LICENSE)). Cette licence ne couvre
-ni le jeu, ni ses données, ni son code.
+ni le jeu, ni ses données, ni son code. DarkLauncher (`kit/launcher`) est lui aussi sous licence MIT, avec son propre titulaire ([kit/launcher/LICENSE](kit/launcher/LICENSE)).
 
 ## Remerciements
 

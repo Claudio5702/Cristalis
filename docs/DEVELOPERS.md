@@ -18,8 +18,8 @@ the game's data or its translated code: both come from your own copy of the game
      settings (`config.cpp`), the first start without the game's data (`setup.cpp`), and where the
      player is (`game_state.cpp`: the pack and stage from the files the game opens, the wave from one
      byte of its memory) for DarkLauncher's crash report and Discord status.
-3. **DarkLauncher** (`kit/launcher`, from the [DarkLauncher](../kit/launcher)
-   kit) owns the window, the settings screen, the controls and the sound output. The game's side is
+3. **DarkLauncher** (`kit/launcher`, copied from the DarkLauncher kit, MIT license with its own
+   holder) owns the window, the settings screen, the controls and the sound output. The game's side is
    `runtime/darklauncher.cpp`; see below.
 
 ### The game on DarkLauncher
@@ -78,8 +78,9 @@ for DarkLauncher, as on Windows. SDL2 is then not used at all (two SDLs cannot b
 
 Needs clang, CMake, Ninja, SDL3 (SDL2 for the earlier version), FreeType, fontconfig, OpenGL and EGL
 development packages, and FFmpeg: a static build with only the XMA decoders (`-DCD_FFMPEG_ROOT=...`)
-keeps the program free of the system's FFmpeg. `recomp/tools/package_linux.sh <build> <out>`
-assembles the release, with SDL3 in `lib/` (the program looks there first) and the icon.
+keeps the program free of the system's FFmpeg. `recomp/tools/package_linux.sh <build> <out>
+[<FFmpeg source>]` assembles the release, with SDL3 in `lib/` (the program looks there first), the
+icon and the licenses (this project's, DarkLauncher's, FFmpeg's from that source, SDL3's).
 
 ## Checking
 
@@ -89,7 +90,7 @@ real installation:
 ```powershell
 build\crystal_defenders.exe <default.xex> --ui-audit <folder> --ini <copy.ini>   # 0 issues, 7 languages
 build\crystal_defenders.exe <default.xex> --gpu-check <folder> --ini <copy.ini>  # "ok" for every picture
-build\crystal_defenders.exe <default.xex> --bench 30 --ini <copy.ini>            # pictures per second, sound gaps
+build\crystal_defenders.exe <default.xex> --bench 30 --ini <copy.ini>            # pictures per second, new ones, sound gaps
 ```
 
 Other options: `--play` (straight into the game), `--nomouse`, `--no-theme` (DarkLauncher's own look),
@@ -103,22 +104,23 @@ Test hooks, as environment variables:
 | `CD_AUTOPAD`, `CD_AUTOPAD_START`, `CD_AUTOPAD_SHOTS` | classic version: taps buttons on a timer, saves the picture before each |
 | `CD_SCREENSHOT=n,n…`, `CD_SCALE=n` | classic version: saves those frames; draws at that multiple of 1280×720 |
 | `CD_AUDIO_DUMP=<file>` | keeps everything played, raw 48 kHz stereo 16-bit |
-| `CD_STATS=1` | one line of sound statistics every five seconds |
+| `CD_STATS=1` | statistics: sound every five seconds; pictures, draws and the time of each picture every two |
 | `CD_SETUP_SOURCE=<folder>` | first start: takes the game from there without asking |
 | `CD_LAUNCHER_SHOT=<file.bmp>` | classic version: draws the start screen once into a file |
 
 ## The installer
 
-`recomp/tools/make_installer.ps1` packs `build\` into `dist\Crystal Defenders - Setup.exe` (the
-program, the FFmpeg DLLs, the read-me files; never the game's data, saves or settings). The program
-holds the game's code translated to C++, so the installer is for your own use only.
+`recomp/tools/make_installer.ps1` packs `build\` into `dist\Cristalis-Setup.exe` (the program, the
+FFmpeg DLLs, the licenses, the read-me files; never the game's data, saves or settings). The program
+holds the game's code translated to C++, but none of its assets: it is published on the Releases
+page, as Unleashed Recompiled does, and the player installs the game's data from their own copy.
 
 The installer (`recomp/tools/setup`) has one window, shortcuts, an entry in Windows' list of
-applications and an uninstaller. It installs the game's data from the console's folder placed next
+applications and an uninstaller (`Uninstall.exe`, given the grey icon, `setup.rc`). It installs the game's data from the console's folder placed next
 to it, or asks for it at the end, through the program's `--install-from`. Silent use, for tests:
 
 ```powershell
-"Crystal Defenders - Setup.exe" /S /D=C:\scratch\cd /NOSHORTCUTS
+Cristalis-Setup.exe /S /D=C:\scratch\cd /NOSHORTCUTS
 C:\scratch\cd\Uninstall.exe /S          # keeps the saves, settings and game data
 C:\scratch\cd\Uninstall.exe /S /ALL     # removes everything
 ```
@@ -130,7 +132,7 @@ C:\scratch\cd\Uninstall.exe /S /ALL     # removes everything
 | `recomp/config` | XenonRecomp configuration: function bounds, jump tables, hooks |
 | `recomp/runtime` | the runtime (see above); `linux/` for the Linux build |
 | `recomp/tools` | scripts used during the port, packaging, the installer (`setup/`) |
-| `recomp/resources` | the program's icon (an original crystal, drawn by `tools/make_icon.ps1`) |
-| `kit/launcher` | DarkLauncher, copied from its repository (not changed here) |
+| `recomp/resources` | the icons, drawn by `tools/make_icon.ps1`: the initial C of Cristalis with an original crystal, and a grey copy for the uninstaller |
+| `kit/launcher` | DarkLauncher, copied from its repository by its `sync_to_project.ps1` (not changed here), MIT license (`kit/launcher/LICENSE`) |
 | `project.h` | this project's names for DarkLauncher and its installer |
 | `build.ps1`, `recompile.ps1` | build, and translate the game's code again |

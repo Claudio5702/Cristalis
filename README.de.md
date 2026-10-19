@@ -40,7 +40,7 @@ Laden Sie die neueste Version von der [Release-Seite](https://github.com/Claudio
    starten Sie es. Das Spiel wird aus diesem Ordner installiert, mit Verknüpfungen und einem Eintrag
    in der Windows-Liste der Apps. Ohne den Ordner fragt das letzte Fenster des Installationsprogramms,
    wo er liegt.
-3. Ohne das Installationsprogramm: Starten Sie `crystal_defenders.exe`. Beim ersten Start fragt es
+3. Selbst gebaut, ohne das Installationsprogramm: Starten Sie `crystal_defenders.exe`. Beim ersten Start fragt es
    nach diesem Ordner (oder einem Ordner, der schon `default.xex` und `Media` enthält), oder nimmt
    ihn sofort, wenn er neben dem Programm liegt.
 
@@ -71,7 +71,7 @@ wenn nicht.
   Japanisch), in den Einstellungen gewählt; das Spiel startet in der neuen Sprache neu.
 - **Anzeige über die Grafikkarte**: das Spiel in 1280×720, 1920×1080, 2560×1440 oder 3840×2160
   gezeichnet, dann scharf, geglättet oder mit weichen Kanten in jeder Fenstergröße; Scanlines, ein
-  flacher oder gewölbter Röhren-Filter, HDR.
+  flacher oder gewölbter Röhren-Filter, HDR (Windows).
 - **Erfolge auf dem Computer gespeichert**, mit einer Meldung über dem Spiel und einer Liste in den
   Einstellungen.
 - **Das Offline-Verhalten der Konsole auf Wunsch**: der Hinweis „Nicht mit Xbox LIVE verbunden" und
@@ -81,6 +81,7 @@ wenn nicht.
 - **Controller**: Xbox (XInput) sowie PlayStation 4 und 5 direkt gelesen (USB oder Bluetooth), mit
   Vibration bei beiden; Tasten und Knöpfe werden auf der Seite Steuerung gewählt. Ein PlayStation-3-
   Controller braucht den Treiber DsHidMini.
+- **Ein Absturzbericht**, der sagt, wo das Spiel war („W1, Stage 2, Wave 5"), beim nächsten Start geschrieben.
 - **Ein Installations- und ein Deinstallationsprogramm**, in sechs Sprachen.
 
 ## Einstellungsbildschirm
@@ -141,11 +142,12 @@ Alles bleibt im Ordner des Programms:
 | `captures\` | Screenshots |
 | `crystal_defenders.ini` | Einstellungen |
 | `crystal_defenders.log` | Protokoll der letzten Sitzung (`.prev.log`: der davor) |
+| `crystal_defenders.ini.crash.txt` | Absturzbericht, beim Start nach einem Absturz geschrieben |
 
 ## Deinstallieren
 
 Mit dem Installationsprogramm installiert: Starten Sie `Uninstall.exe` im Spielordner oder entfernen
-Sie „Crystal Defenders" aus der Liste der installierten Apps in den Windows-Einstellungen.
+Sie „Cristalis (Crystal Defenders)" aus der Liste der installierten Apps in den Windows-Einstellungen.
 Standardmäßig bleiben Ihre Spielstände, Einstellungen, Screenshots und die Daten des Spiels im
 Ordner, falls Sie neu installieren; setzen Sie das Häkchen, um sie ebenfalls zu entfernen, dann
 verschwindet auch der Ordner. Ohne das Installationsprogramm: Löschen Sie den Ordner.
@@ -169,7 +171,7 @@ zu erzwingen. Die Windows-Version läuft auch über Proton.
 
 ## Bekannte Grenzen
 
-- Keine Online-Bestenlisten: Sie brauchten Xbox LIVE.
+- Keine Online-Bestenlisten: Sie brauchten Xbox LIVE. Die eigenen Bestenlisten des Spiels auf dem Computer funktionieren.
 - Keine Speicherstände des Zustands: Das Spiel ist ein vollständiges Xbox-360-Programm mit eigenen
   Threads; es speichert selbst.
 - Musikschleifen werden von der Laufzeitumgebung behandelt statt vom eigenen Mechanismus der
@@ -209,7 +211,7 @@ eigenen Format des Spiels; Spielstände zwischen Konsole und PC zu kopieren wurd
 ## Lizenz
 
 Der Quellcode dieses Projekts steht unter der MIT-Lizenz (siehe [LICENSE](LICENSE)). Diese Lizenz
-gilt nicht für das Spiel, seine Daten oder seinen Code.
+gilt nicht für das Spiel, seine Daten oder seinen Code. DarkLauncher (`kit/launcher`) steht ebenfalls unter der MIT-Lizenz, mit eigenem Rechteinhaber ([kit/launcher/LICENSE](kit/launcher/LICENSE)).
 
 ## Danksagungen
 

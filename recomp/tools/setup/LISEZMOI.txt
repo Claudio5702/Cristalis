@@ -11,8 +11,8 @@ LANCER
   Il se manie au clavier, a la manette ou a la souris.
 
 EN JEU
-  Echap, ou le bouton View de la manette .... menu de pause (reprendre,
-                                              capture, reglages, quitter)
+  Echap, ou le bouton View de la manette (maintenu) ... menu de pause
+                                    (reprendre, capture, reglages, quitter)
   F11 ......................................... plein ecran
   F12 ......................................... capture d'ecran (dossier captures)
 
@@ -38,4 +38,6 @@ DESINSTALLER
   Les sauvegardes et les donnees du jeu sont gardees, sauf si vous cochez la case.
 
 Le decodage audio utilise FFmpeg (https://ffmpeg.org), LGPL, voir FFmpeg-LICENSE.txt.
+L'ecran des reglages est DarkLauncher, licence MIT, voir DarkLauncher-LICENSE.txt.
+Ce programme : licence MIT, voir LICENSE.txt.
 Code source : https://github.com/Claudio5702/Cristalis

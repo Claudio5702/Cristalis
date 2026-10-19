@@ -37,7 +37,7 @@ Descarga la última versión de la [página de releases](https://github.com/Clau
 2. Con el instalador: pon esa carpeta junto a `Cristalis-Setup.exe` y ejecútalo. El juego
    se instala desde ella, con accesos directos y una entrada en la lista de aplicaciones de Windows.
    Sin la carpeta, la última ventana del instalador pregunta dónde está.
-3. Sin el instalador: ejecuta `crystal_defenders.exe`. En el primer arranque pide esa carpeta (o una
+3. Compilado por ti, sin el instalador: ejecuta `crystal_defenders.exe`. En el primer arranque pide esa carpeta (o una
    carpeta que ya contenga `default.xex` y `Media`), o la toma enseguida si está junto al programa.
 
 Los datos del juego se guardan entonces en una carpeta `game` junto al programa; la carpeta de la
@@ -67,7 +67,7 @@ es.
   los ajustes; el juego se reinicia en el nuevo idioma.
 - **Imagen a través de la tarjeta gráfica**: el juego dibujado a 1280×720, 1920×1080, 2560×1440 o
   3840×2160, y luego nítido, suavizado o con bordes suavizados en cualquier tamaño de ventana;
-  scanlines, un filtro CRT plano o curvo, HDR.
+  scanlines, un filtro CRT plano o curvo, HDR (Windows).
 - **Logros guardados en el ordenador**, con un aviso sobre el juego y una lista en los ajustes.
 - **El comportamiento sin conexión de la consola, si se desea**: el aviso «No conectado a Xbox LIVE»
   y la elección del dispositivo de almacenamiento están desactivados por defecto y se pueden activar.
@@ -76,6 +76,7 @@ es.
 - **Mandos**: Xbox (XInput), y PlayStation 4 y 5 leídos directamente (USB o Bluetooth), con
   vibración en ambos; teclas y botones elegidos en la página Controles. Un mando de PlayStation 3
   necesita el controlador DsHidMini.
+- **Un informe de fallo** que dice dónde estaba la partida («W1, Stage 2, Wave 5»), escrito en el siguiente arranque.
 - **Un instalador y un desinstalador**, en seis idiomas.
 
 ## Pantalla de ajustes
@@ -134,11 +135,12 @@ Todo se queda en la carpeta del programa:
 | `captures\` | capturas de pantalla |
 | `crystal_defenders.ini` | ajustes |
 | `crystal_defenders.log` | registro de la última sesión (`.prev.log`: la anterior) |
+| `crystal_defenders.ini.crash.txt` | informe de fallo, escrito al arrancar tras un fallo |
 
 ## Desinstalar
 
-Instalado con el instalador: ejecuta `Uninstall.exe` en la carpeta del juego, o quita «Crystal
-Defenders» de la lista de aplicaciones instaladas en la configuración de Windows. Por defecto, tus
+Instalado con el instalador: ejecuta `Uninstall.exe` en la carpeta del juego, o quita «Cristalis (Crystal
+Defenders)» de la lista de aplicaciones instaladas en la configuración de Windows. Por defecto, tus
 partidas, ajustes, capturas y los datos del juego se quedan en la carpeta, por si reinstalas; marca
 la casilla para borrarlos también, y la carpeta se va con ellos. Sin el instalador: borra la
 carpeta.
@@ -162,7 +164,7 @@ compatibilidad. La versión de Windows también funciona con Proton.
 
 ## Límites conocidos
 
-- Sin clasificaciones en línea: necesitaban Xbox LIVE.
+- Sin clasificaciones en línea: necesitaban Xbox LIVE. Las mejores puntuaciones del juego, guardadas en el ordenador, funcionan.
 - Sin guardado de estado: el juego es un programa completo de Xbox 360 con sus propios hilos; guarda
   por sí mismo.
 - Los bucles de música los gestiona el entorno en lugar del mecanismo propio de la consola.
@@ -200,7 +202,7 @@ del juego; copiar partidas entre la consola y el PC no se ha probado.
 ## Licencia
 
 El código fuente de este proyecto está bajo la licencia MIT (ver [LICENSE](LICENSE)). Esa licencia
-no cubre el juego, sus datos ni su código.
+no cubre el juego, sus datos ni su código. DarkLauncher (`kit/launcher`) también está bajo la licencia MIT, con su propio titular ([kit/launcher/LICENSE](kit/launcher/LICENSE)).
 
 ## Agradecimientos
 
@@ -216,4 +218,4 @@ escribió él, siguiendo las peticiones y las pruebas del autor del proyecto.
 - [Xenia](https://xenia.jp): su documentación de la Xbox 360, usada como referencia.
 - [llvm-mingw](https://github.com/mstorsjo/llvm-mingw): el compilador del programa y del instalador.
 
-Y, por supuesto, a Square Enix, que creó Crystal Defenders.
+Y, por supuesto, Square Enix, que creó Crystal Defenders.

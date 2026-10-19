@@ -35,7 +35,7 @@ Download the latest release from the [Releases page](https://github.com/Claudio5
 2. With the installer: put that folder next to `Cristalis-Setup.exe` and run it. The game
    is installed from it, with shortcuts and an entry in Windows' list of applications. Without the
    folder, the last window of the installer asks where it is.
-3. Without the installer: run `crystal_defenders.exe`. On the first start it asks for that folder
+3. Built yourself, without the installer: run `crystal_defenders.exe`. On the first start it asks for that folder
    (or a folder already holding `default.xex` and `Media`), or takes it at once when it lies next
    to the program.
 
@@ -65,12 +65,13 @@ is not.
 - **Six languages of the game** (French, English, German, Spanish, Italian, Japanese), chosen in the
   settings; the game restarts in the new one.
 - **Display through the graphics card**: the game drawn at 1280×720, 1920×1080, 2560×1440 or 3840×2160, then sharp,
-  smooth or smooth-edged at any window size; scanlines, a flat or curved CRT look, HDR.
+  smooth or smooth-edged at any window size; scanlines, a flat or curved CRT look, HDR (Windows).
 - **Achievements stored on the computer**, with a notice over the game and a list in the settings.
 - **The console's own offline behaviour on request**: the "Not connected to Xbox LIVE" notice and
   the choice of the storage device are off by default, and can be turned on.
 - **Screenshots** of the picture as shown, filters included, and a gallery in the settings.
 - **Controllers**: Xbox (XInput), and PlayStation 4 and 5 read directly (USB or Bluetooth), with vibration on both; keys and buttons chosen on the Controls page. A PlayStation 3 pad needs the DsHidMini driver.
+- **A crash report** that says where the game was ("W1, Stage 2, Wave 5"), written at the next start.
 - **An installer and an uninstaller**, in six languages.
 
 ## Settings screen
@@ -128,10 +129,11 @@ Everything stays in the program's folder:
 | `captures\` | screenshots |
 | `crystal_defenders.ini` | settings |
 | `crystal_defenders.log` | log of the last session (`.prev.log`: the one before) |
+| `crystal_defenders.ini.crash.txt` | the crash report, written at the start after a crash |
 
 ## Uninstalling
 
-Installed with the installer: run `Uninstall.exe` in the game folder, or remove "Crystal Defenders"
+Installed with the installer: run `Uninstall.exe` in the game folder, or remove "Cristalis (Crystal Defenders)"
 from the list of installed applications in the Windows settings. By default your saves, settings,
 screenshots and the game's data stay in the folder, in case you reinstall; tick the box to remove
 them as well, and the folder goes with them. Without the installer: delete the folder.
@@ -155,7 +157,7 @@ Proton.
 
 ## Known limits
 
-- No online leaderboards: they needed Xbox LIVE.
+- No online leaderboards: they needed Xbox LIVE. The game's own high scores, kept on the computer, work.
 - No save states: the game is a whole Xbox 360 program with its own threads; it saves by itself.
 - Music loops are handled by the runtime rather than by the console's own mechanism.
 - Tested by very few people so far; controllers have been tried less than the keyboard, and PlayStation pads and vibration not yet on real hardware.
@@ -190,7 +192,7 @@ copying saves between the console and the PC has not been tried.
 ## License
 
 The source code of this project is under the MIT license (see [LICENSE](LICENSE)). That license does
-not cover the game, its data or its code.
+not cover the game, its data or its code. DarkLauncher (`kit/launcher`) is under the MIT license too, with its own holder ([kit/launcher/LICENSE](kit/launcher/LICENSE)).
 
 ## Credits
 
@@ -206,4 +208,4 @@ it, following the requests and the tests of the project's author.
 - [Xenia](https://xenia.jp): its documentation of the Xbox 360, used as reference.
 - [llvm-mingw](https://github.com/mstorsjo/llvm-mingw): the compiler of the program and the installer.
 
-And of course to Square Enix, who made Crystal Defenders.
+And of course Square Enix, who made Crystal Defenders.
