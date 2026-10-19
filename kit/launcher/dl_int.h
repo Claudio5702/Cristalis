@@ -16,6 +16,37 @@
 #ifndef UPDATE_URL
 #define UPDATE_URL "" // a text file (http or https): the newest version on its first line, its page on the second
 #endif
+// The newest release of a GitHub repository ("owner/repo") instead of UPDATE_URL: its tag is the version
+// ("v1.07": 1.07), its page the release's. UPDATE_GITHUB_API: where GitHub's API answers (the demo: a
+// local server, for tests). UPDATE_ASSET_*: the file of the release that updates the game (an installer
+// that takes /S /D=<folder> /NOSHORTCUTS /WAIT=<pid> /RUN on Windows, an archive of the program's
+// folder on Linux); "": the release's page only.
+#ifndef UPDATE_GITHUB
+#define UPDATE_GITHUB ""
+#endif
+#ifndef UPDATE_GITHUB_API
+#define UPDATE_GITHUB_API "https://api.github.com"
+#endif
+#ifndef UPDATE_ASSET_WINDOWS
+#define UPDATE_ASSET_WINDOWS ""
+#endif
+#ifndef UPDATE_ASSET_LINUX
+#define UPDATE_ASSET_LINUX ""
+#endif
+#ifdef _WIN32
+#define UPDATE_ASSET UPDATE_ASSET_WINDOWS
+#else
+#define UPDATE_ASSET UPDATE_ASSET_LINUX
+#endif
+#define DL_UPDATE_ON (UPDATE_URL[0] != 0 || UPDATE_GITHUB[0] != 0) // the project looks for a newer version
+// The player's own folders and files, never written over by an update on Linux (project.h, as the
+// uninstaller keeps them)
+#ifndef SETUP_PERSONAL_FOLDERS
+#define SETUP_PERSONAL_FOLDERS "saves", "captures"
+#endif
+#ifndef SETUP_PERSONAL_FILES
+#define SETUP_PERSONAL_FILES FILE_STEM ".ini"
+#endif
 
 // The separator of a path's parts: Windows' own, or "/" elsewhere (the paths given to the game are the
 // system's).
@@ -202,6 +233,8 @@ void dl_online_start(void);      // dl_app.c: the look for a newer version, at s
 void dl_online_follow(void);     // from the main loop: Discord's status, the result of that look
 const wchar_t *dl_update_text(void); // "Version 1.4 is out." when a newer version was found, else NULL
 void dl_update_open(void);       // its page in the browser
+void dl_update_install(void);    // "Update": downloads the release's file, checks it, installs it and starts again
+const wchar_t *dl_update_install_show(int v); // beside that row: the progress, "ready", "failed"...
 void dl_discord_changed(void);   // the Discord switch moved
 bool dl_news_open(void);       // the game's news, the first time its version starts; false: none to show
 void dl_welcome_open(void);    // the first start's pages (language, controls, display)
@@ -267,6 +300,7 @@ enum {
   T_SVH_X, T_SVH_OSK,
   T_H_SETTINGS, T_TAB_SETTINGS,
   T_NET, T_H_NET, T_TAB_NET, T_DISCORD, T_H_DISCORD, T_DS_PLAYING, T_DS_MENUS, T_UPDATES, T_H_UPDATES, T_UPD_NEW, T_UPD_NONE, T_UPD_OPEN, T_H_UPD_OPEN,
+  T_UPD_INSTALL, T_H_UPD_INSTALL, T_UPD_ST_NONE, T_UPD_ST_PAGE, T_UPD_ST_READY, T_UPD_ST_FAIL, T_UPD_FAIL_NOTE, T_UPD_RESTART,
   T_TAB_NEWS, T_H_NEWS, T_TAB_WELCOME, T_W_NEXT, T_H_W_LANG, T_H_W_CTRL, T_W_PLAY, T_H_W_PLAY,
   T_H_CTRL_NT, T_H_KEYS_NT, T_PH_FN_NT, T_KH_DEFAULTS_NT, // without fast forward (DL_HIDE_TURBO)
   T_PRESET, T_H_PRESET, T_H_PRESET_NOCRT, T_PRE_CUSTOM, T_PRE_ORIGINAL, T_PRE_LARGE, T_PRE_CRT, T_PRE_FAST,

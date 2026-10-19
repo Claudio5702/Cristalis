@@ -10,6 +10,9 @@
 //
 //   Setup.exe                     interactive: one window (folder, shortcuts, what happens with the game's data)
 //   Setup.exe /S /D=C:\some\dir   silent; add /NOSHORTCUTS to skip the shortcuts and the Windows entry
+//   ... /WAIT=<pid> /RUN          an update started by the game (DarkLauncher's "Update"): waits for that
+//                                 process to end before writing, then starts the game again; the Windows
+//                                 entry of that folder, if there is one, gets the new version
 //
 // The installer also drops a copy of itself without payload as Uninstall.exe. Started without
 // payload it removes what was installed ("/S" silent; "/ALL" also removes saves, settings and game data).
@@ -526,13 +529,16 @@ static int uninstall(const char *self, const char *dir, bool all) {
 int main(int argc, char **argv) {
   char self[MAX_PATH], self_dir[MAX_PATH], dest[MAX_PATH] = "";
   const char *forced_lang = NULL;
-  bool shortcuts = true, all = false;
+  bool shortcuts = true, all = false, run_after = false;
+  unsigned long wait_pid = 0;
   for (int k = 1; k < argc; k++) {
     if (!_stricmp(argv[k], "/S")) silent = true;
     else if (!_stricmp(argv[k], "/ALL")) all = true;
     else if (!_strnicmp(argv[k], "/LANG=", 6)) forced_lang = argv[k] + 6;
     else if (!_stricmp(argv[k], "/NOSHORTCUTS")) { shortcuts = false; no_system = true; }
     else if (!_strnicmp(argv[k], "/D=", 3)) snprintf(dest, sizeof dest, "%s", argv[k] + 3);
+    else if (!_strnicmp(argv[k], "/WAIT=", 6)) wait_pid = strtoul(argv[k] + 6, NULL, 10);
+    else if (!_stricmp(argv[k], "/RUN")) run_after = true;
   }
   { // window program: print to the terminal it was started from, if any
     HANDLE ho = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -585,8 +591,38 @@ int main(int argc, char **argv) {
   size_t dn = strlen(dest);
   while (dn > 3 && dest[dn - 1] == '\\') dest[--dn] = 0;
 
-  // ---- files
+  // ---- an update: the game that asked for it has ended, and its program can be written over
   char path[MAX_PATH];
+  if (wait_pid) {
+    HANDLE p = OpenProcess(SYNCHRONIZE, FALSE, (DWORD)wait_pid);
+    if (p) {
+      WaitForSingleObject(p, 60000);
+      CloseHandle(p);
+    }
+    snprintf(path, sizeof path, "%s\\" EXE, dest);
+    for (int k = 0; k < 60; k++) {
+      HANDLE h = CreateFileA(path, GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL);
+      if (h != INVALID_HANDLE_VALUE || GetLastError() == ERROR_FILE_NOT_FOUND) {
+        if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
+        break;
+      }
+      Sleep(500);
+    }
+    // the Windows entry, when it is this folder's, shows the new version (no shortcut is made)
+    HKEY key;
+    char where[MAX_PATH] = "";
+    DWORD size = sizeof where;
+    if (RegOpenKeyExA(HKEY_CURRENT_USER, UNINST_KEY, 0, KEY_READ, &key) == ERROR_SUCCESS) {
+      if (RegQueryValueExA(key, "InstallLocation", NULL, NULL, (BYTE *)where, &size) != ERROR_SUCCESS) where[0] = 0;
+      RegCloseKey(key);
+    }
+    where[sizeof where - 1] = 0;
+    size_t wn = strlen(where);
+    while (wn > 3 && where[wn - 1] == '\\') where[--wn] = 0;
+    if (!_stricmp(where, dest)) no_system = false;
+  }
+
+  // ---- files
   snprintf(path, sizeof path, "%s\\x", dest);
   make_dirs(path);
   static char buf[1 << 16];
@@ -674,6 +710,7 @@ int main(int argc, char **argv) {
     _snwprintf(line, 1023, L"installed %u files to %hs (game data %hs)", count, dest, ready ? "ready" : "missing");
     line[1023] = 0;
     say(GetStdHandle(STD_OUTPUT_HANDLE), line);
+    if (run_after && ready) ShellExecuteA(NULL, "open", exe, NULL, dest, SW_SHOWNORMAL); // the updated game, started again
     return 0;
   }
   // ---- result: start the game when it is ready to run, otherwise ask for the player's copy; the

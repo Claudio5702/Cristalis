@@ -345,13 +345,13 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"セーブデータは saves に|セーブデータはゲームフォルダーの saves フォルダーに入りました（以前は userdata）。前のセーブデータは自動で移されています。",
-    L"Sauvegardes dans saves|Vos sauvegardes sont maintenant dans le dossier saves du jeu (avant : userdata). Les anciennes y ont été déplacées toutes seules.",
-    L"Saves in saves|Your saves are now in the game's saves folder (before: userdata). The old ones were moved there by themselves.",
-    L"Partidas en saves|Sus partidas están ahora en la carpeta saves del juego (antes: userdata). Las anteriores se movieron allí solas.",
-    L"Jogos salvos em saves|Seus jogos salvos agora ficam na pasta saves do jogo (antes: userdata). Os antigos foram movidos para lá sozinhos.",
-    L"Spielstände in saves|Ihre Spielstände liegen jetzt im Ordner saves des Spiels (vorher: userdata). Die alten wurden von selbst dorthin verschoben.",
-    L"Salvataggi in saves|I salvataggi sono ora nella cartella saves del gioco (prima: userdata). Quelli vecchi sono stati spostati lì da soli." };
+    L"セーブデータと更新|セーブデータはゲームフォルダーの saves フォルダーに入りました（以前は userdata、自動で移されています）。設定 → インターネットで新しいバージョンの確認をオンにすると、ゲームを自動で更新できます。",
+    L"Sauvegardes et mises à jour|Vos sauvegardes sont maintenant dans le dossier saves du jeu (avant : userdata ; elles y ont été déplacées toutes seules). Activez Paramètres → Internet → Nouvelles versions pour que le jeu se mette à jour lui-même.",
+    L"Saves and updates|Your saves are now in the game's saves folder (before: userdata; they were moved there by themselves). Turn on Settings → Internet → New versions and the game updates itself.",
+    L"Partidas y actualizaciones|Sus partidas están ahora en la carpeta saves del juego (antes: userdata; se movieron allí solas). Active Ajustes → Internet → Nuevas versiones y el juego se actualizará solo.",
+    L"Jogos salvos e atualizações|Seus jogos salvos agora ficam na pasta saves do jogo (antes: userdata; foram movidos sozinhos). Ative Configurações → Internet → Novas versões e o jogo se atualiza sozinho.",
+    L"Spielstände und Updates|Ihre Spielstände liegen jetzt im Ordner saves des Spiels (vorher: userdata; sie wurden von selbst verschoben). Schalten Sie Einstellungen → Internet → Neue Versionen ein, dann aktualisiert sich das Spiel selbst.",
+    L"Salvataggi e aggiornamenti|I salvataggi sono ora nella cartella saves del gioco (prima: userdata; sono stati spostati da soli). Attivate Impostazioni → Internet → Nuove versioni e il gioco si aggiornerà da solo." };
 
 // ---- The game ----
 

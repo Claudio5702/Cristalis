@@ -14,14 +14,12 @@
 #include <errno.h>
 #include <unistd.h>
 #include <dlfcn.h>
-// libcurl's write callback (the update look on Linux): the body, as much as fits
-static size_t http_take(char *p, size_t size, size_t n, void *ctx) {
-  struct { char *out; int cap, n; } *s = ctx;
-  size_t len = size * n, room = (size_t)(s->cap - s->n);
-  memcpy(s->out + s->n, p, len < room ? len : room);
-  s->n += (int)(len < room ? len : room);
-  return len;
-}
+#include <dirent.h>
+#include <fnmatch.h>
+#include <spawn.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+extern char **environ;
 #endif
 
 DlCfg dl_cfg = {.ui_lang = 2, .volume = 10, .menu_sound = 1, .gpu = 1, .turbo = 0, .pause_menu = 1, .bg_pause = 1, .rumble = 1};
@@ -923,12 +921,30 @@ static void discord_follow(bool now) {
 
 void dl_discord_changed(void) { discord_follow(true); }
 
-// ---- a newer version: UPDATE_URL read on a thread of its own, once at start
+// ---- a newer version: UPDATE_URL, or the newest release on GitHub (UPDATE_GITHUB), read on a thread of
+// its own once at start; with UPDATE_ASSET, "Update" downloads the release's file, checks its size and
+// its SHA-256 (as GitHub gives them) and installs it
 static volatile LONG upd_state; // 0 nothing yet, 1 looking, 2 a newer version, 3 none newer (or no answer)
 static char upd_version[32], upd_page[512];
+static char upd_asset_url[1024];      // the release's file for this system (UPDATE_ASSET), if it may be installed
+static long long upd_asset_size;
+static unsigned char upd_asset_sha[32];
+static volatile LONG upd_get; // 0 not asked, 1 under way, 2 checked (and on Linux put in place), 3 failed
+static volatile LONG upd_pct;
 
-static int http_get(const char *url, char *out, int cap) { // the body, or -1
-  int n = -1;
+// A GET: the body to sink (false from it stops), true when it all came with "200 OK". The User-Agent
+// is the project's name (GitHub refuses a request without one). long_wait: a download, limited only
+// when the connection stalls.
+typedef bool (*HttpSink)(void *ctx, const char *data, int n);
+#ifndef _WIN32
+typedef struct { HttpSink sink; void *ctx; } CurlSink;
+static size_t http_take(char *p, size_t size, size_t n, void *ctx) { // libcurl's write callback
+  CurlSink *c = ctx;
+  return c->sink(c->ctx, p, (int)(size * n)) ? size * n : 0;
+}
+#endif
+static bool http_fetch(const char *url, HttpSink sink, void *ctx, bool long_wait) {
+  bool ok = false;
 #ifdef _WIN32
   typedef void *HI;
   typedef HI(WINAPI * OpenFn)(LPCWSTR, DWORD, LPCWSTR, LPCWSTR, DWORD);
@@ -937,36 +953,41 @@ static int http_get(const char *url, char *out, int cap) { // the body, or -1
   typedef HI(WINAPI * RequestFn)(HI, LPCWSTR, LPCWSTR, LPCWSTR, LPCWSTR, LPCWSTR *, DWORD);
   typedef BOOL(WINAPI * SendFn)(HI, LPCWSTR, DWORD, void *, DWORD, DWORD, DWORD_PTR);
   typedef BOOL(WINAPI * ReceiveFn)(HI, void *);
+  typedef BOOL(WINAPI * QueryFn)(HI, DWORD, LPCWSTR, void *, DWORD *, DWORD *);
   typedef BOOL(WINAPI * ReadFn)(HI, void *, DWORD, DWORD *);
   typedef BOOL(WINAPI * CloseFn)(HI);
   typedef BOOL(WINAPI * TimeoutsFn)(HI, int, int, int, int);
   HMODULE w = LoadLibraryA("winhttp.dll");
-  if (!w) return -1;
+  if (!w) return false;
   OpenFn h_open = (OpenFn)(void *)GetProcAddress(w, "WinHttpOpen");
   CrackFn h_crack = (CrackFn)(void *)GetProcAddress(w, "WinHttpCrackUrl");
   ConnectFn h_connect = (ConnectFn)(void *)GetProcAddress(w, "WinHttpConnect");
   RequestFn h_request = (RequestFn)(void *)GetProcAddress(w, "WinHttpOpenRequest");
   SendFn h_send = (SendFn)(void *)GetProcAddress(w, "WinHttpSendRequest");
   ReceiveFn h_receive = (ReceiveFn)(void *)GetProcAddress(w, "WinHttpReceiveResponse");
+  QueryFn h_query = (QueryFn)(void *)GetProcAddress(w, "WinHttpQueryHeaders");
   ReadFn h_read = (ReadFn)(void *)GetProcAddress(w, "WinHttpReadData");
   CloseFn h_close = (CloseFn)(void *)GetProcAddress(w, "WinHttpCloseHandle");
   TimeoutsFn h_timeouts = (TimeoutsFn)(void *)GetProcAddress(w, "WinHttpSetTimeouts");
-  if (!h_open || !h_crack || !h_connect || !h_request || !h_send || !h_receive || !h_read || !h_close) return -1;
+  if (!h_open || !h_crack || !h_connect || !h_request || !h_send || !h_receive || !h_query || !h_read || !h_close) return false;
   wchar_t wurl[1024], host[256], path[2048], extra[1024];
   MultiByteToWideChar(CP_UTF8, 0, url, -1, wurl, 1024);
   struct { DWORD size; LPWSTR scheme; DWORD scheme_n; int scheme_kind; LPWSTR host; DWORD host_n; WORD port; LPWSTR user; DWORD user_n; LPWSTR pass;
            DWORD pass_n; LPWSTR path; DWORD path_n; LPWSTR extra; DWORD extra_n; } uc = {sizeof uc};
   uc.host = host, uc.host_n = 256, uc.path = path, uc.path_n = 1024, uc.scheme_n = (DWORD)-1, uc.extra = extra, uc.extra_n = 1024;
-  if (!h_crack(wurl, 0, 0, &uc)) return -1;
+  if (!h_crack(wurl, 0, 0, &uc)) return false;
   wcsncat(path, extra, 2047 - wcslen(path)); // "?..." after the path
   HI s = h_open(L"" PROJECT_NAME, 0, NULL, NULL, 0), c = NULL, r = NULL;
-  if (s && h_timeouts) h_timeouts(s, 5000, 5000, 5000, 5000);
+  if (s && h_timeouts) h_timeouts(s, 5000, 5000, 5000, long_wait ? 30000 : 5000);
   if (s) c = h_connect(s, host, uc.port, 0);
   if (c) r = h_request(c, L"GET", path, NULL, NULL, NULL, uc.scheme_kind == 2 ? 0x00800000 /* WINHTTP_FLAG_SECURE */ : 0);
-  if (r && h_send(r, NULL, 0, NULL, 0, 0, 0) && h_receive(r, NULL)) {
-    n = 0;
+  DWORD code = 0, code_n = sizeof code;
+  if (r && h_send(r, L"Accept: application/vnd.github+json\r\n", (DWORD)-1, NULL, 0, 0, 0) && h_receive(r, NULL) &&
+      h_query(r, 19 | 0x20000000 /* WINHTTP_QUERY_STATUS_CODE | WINHTTP_QUERY_FLAG_NUMBER */, NULL, &code, &code_n, NULL) && code == 200) {
+    static char buf[1 << 16];
     DWORD got;
-    while (n < cap && h_read(r, out + n, (DWORD)(cap - n), &got) && got) n += (int)got;
+    ok = true;
+    while (ok && h_read(r, buf, sizeof buf, &got) && got) ok = sink(ctx, buf, (int)got);
   }
   if (r) h_close(r);
   if (c) h_close(c);
@@ -974,27 +995,183 @@ static int http_get(const char *url, char *out, int cap) { // the body, or -1
 #else
   typedef void CURL;
   void *lib = dlopen("libcurl.so.4", RTLD_NOW);
-  if (!lib) return -1;
+  if (!lib) return false;
   CURL *(*easy_init)(void) = (CURL * (*)(void)) dlsym(lib, "curl_easy_init");
   int (*easy_setopt)(CURL *, int, ...) = (int (*)(CURL *, int, ...))dlsym(lib, "curl_easy_setopt");
   int (*easy_perform)(CURL *) = (int (*)(CURL *))dlsym(lib, "curl_easy_perform");
   void (*easy_cleanup)(CURL *) = (void (*)(CURL *))dlsym(lib, "curl_easy_cleanup");
   CURL *h = easy_init && easy_setopt && easy_perform && easy_cleanup ? easy_init() : NULL;
   if (h) {
-    struct { char *out; int cap, n; } sink = {out, cap, 0};
+    CurlSink cs = {sink, ctx};
     size_t (*take)(char *, size_t, size_t, void *) = http_take;
     easy_setopt(h, 10002 /* CURLOPT_URL */, url);
+    easy_setopt(h, 10018 /* CURLOPT_USERAGENT */, PROJECT_NAME);
     easy_setopt(h, 20011 /* CURLOPT_WRITEFUNCTION */, take);
-    easy_setopt(h, 10001 /* CURLOPT_WRITEDATA */, &sink);
-    easy_setopt(h, 13 /* CURLOPT_TIMEOUT */, 10L);
+    easy_setopt(h, 10001 /* CURLOPT_WRITEDATA */, &cs);
+    easy_setopt(h, 45 /* CURLOPT_FAILONERROR */, 1L);
+    if (long_wait) {
+      easy_setopt(h, 19 /* CURLOPT_LOW_SPEED_LIMIT */, 1L);
+      easy_setopt(h, 20 /* CURLOPT_LOW_SPEED_TIME */, 30L);
+    } else easy_setopt(h, 13 /* CURLOPT_TIMEOUT */, 10L);
     easy_setopt(h, 52 /* CURLOPT_FOLLOWLOCATION */, 1L);
     easy_setopt(h, 99 /* CURLOPT_NOSIGNAL */, 1L);
-    if (!easy_perform(h)) n = sink.n;
+    ok = !easy_perform(h);
     easy_cleanup(h);
   }
 #endif
-  return n;
+  return ok;
 }
+
+typedef struct { char *out; int cap, n; } MemSink;
+static bool mem_sink(void *ctx, const char *d, int n) { // as much as fits
+  MemSink *m = ctx;
+  int room = m->cap - m->n;
+  memcpy(m->out + m->n, d, (size_t)(n < room ? n : room));
+  m->n += n < room ? n : room;
+  return true;
+}
+static int http_get(const char *url, char *out, int cap) { // the body, or -1
+  MemSink m = {out, cap, 0};
+  return http_fetch(url, mem_sink, &m, false) ? m.n : -1;
+}
+
+// ---- SHA-256 (FIPS 180-4), for the release's file
+typedef struct { uint32_t h[8]; uint64_t len; unsigned char buf[64]; int n; } Sha256;
+static const uint32_t sha_k[64] = {
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5, 0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3,
+    0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174, 0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967, 0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13,
+    0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85, 0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3, 0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208,
+    0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2};
+#define SHA_ROR(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
+static void sha_block(Sha256 *s, const unsigned char *p) {
+  uint32_t w[64], v[8];
+  for (int k = 0; k < 16; k++) w[k] = (uint32_t)p[4 * k] << 24 | (uint32_t)p[4 * k + 1] << 16 | (uint32_t)p[4 * k + 2] << 8 | p[4 * k + 3];
+  for (int k = 16; k < 64; k++) {
+    uint32_t s0 = SHA_ROR(w[k - 15], 7) ^ SHA_ROR(w[k - 15], 18) ^ (w[k - 15] >> 3), s1 = SHA_ROR(w[k - 2], 17) ^ SHA_ROR(w[k - 2], 19) ^ (w[k - 2] >> 10);
+    w[k] = w[k - 16] + s0 + w[k - 7] + s1;
+  }
+  memcpy(v, s->h, sizeof v);
+  for (int k = 0; k < 64; k++) {
+    uint32_t t1 = v[7] + (SHA_ROR(v[4], 6) ^ SHA_ROR(v[4], 11) ^ SHA_ROR(v[4], 25)) + ((v[4] & v[5]) ^ (~v[4] & v[6])) + sha_k[k] + w[k];
+    uint32_t t2 = (SHA_ROR(v[0], 2) ^ SHA_ROR(v[0], 13) ^ SHA_ROR(v[0], 22)) + ((v[0] & v[1]) ^ (v[0] & v[2]) ^ (v[1] & v[2]));
+    memmove(v + 1, v, 7 * sizeof v[0]);
+    v[4] += t1;
+    v[0] = t1 + t2;
+  }
+  for (int k = 0; k < 8; k++) s->h[k] += v[k];
+}
+static void sha_init(Sha256 *s) {
+  static const uint32_t h0[8] = {0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19};
+  memcpy(s->h, h0, sizeof h0);
+  s->len = 0;
+  s->n = 0;
+}
+static void sha_add(Sha256 *s, const void *data, size_t n) {
+  const unsigned char *p = data;
+  s->len += n;
+  while (n) {
+    size_t take = 64 - (size_t)s->n < n ? 64 - (size_t)s->n : n;
+    memcpy(s->buf + s->n, p, take);
+    s->n += (int)take, p += take, n -= take;
+    if (s->n == 64) { sha_block(s, s->buf); s->n = 0; }
+  }
+}
+static void sha_end(Sha256 *s, unsigned char out[32]) {
+  uint64_t bits = s->len * 8;
+  unsigned char pad = 0x80, zero = 0, len[8];
+  sha_add(s, &pad, 1);
+  while (s->n != 56) sha_add(s, &zero, 1);
+  for (int k = 0; k < 8; k++) len[k] = (unsigned char)(bits >> (56 - 8 * k));
+  sha_add(s, len, 8);
+  for (int k = 0; k < 8; k++) out[4 * k] = (unsigned char)(s->h[k] >> 24), out[4 * k + 1] = (unsigned char)(s->h[k] >> 16),
+                               out[4 * k + 2] = (unsigned char)(s->h[k] >> 8), out[4 * k + 3] = (unsigned char)s->h[k];
+}
+
+// ---- the little JSON GitHub's answer needs: the members of an object, one level down
+static const char *json_ws(const char *p) { while (*p == ' ' || *p == '\t' || *p == '\r' || *p == '\n') p++; return p; }
+static const char *json_skip(const char *p) { // past one value
+  p = json_ws(p);
+  if (*p == '"') {
+    for (p++; *p && *p != '"'; p++)
+      if (*p == '\\' && p[1]) p++;
+    return *p ? p + 1 : p;
+  }
+  if (*p == '{' || *p == '[') {
+    int depth = 0;
+    for (; *p; p++) {
+      if (*p == '"') { p = json_skip(p) - 1; continue; }
+      if (*p == '{' || *p == '[') depth++;
+      else if ((*p == '}' || *p == ']') && --depth == 0) return p + 1;
+    }
+    return p;
+  }
+  while (*p && *p != ',' && *p != '}' && *p != ']') p++;
+  return p;
+}
+static void json_str(const char *v, char *out, int cap) { // a string value, its escapes undone (\uXXXX: ASCII only)
+  int n = 0;
+  v = json_ws(v);
+  if (*v++ != '"') { out[0] = 0; return; }
+  for (; *v && *v != '"' && n < cap - 1; v++) {
+    char c = *v;
+    if (c == '\\' && v[1]) {
+      c = *++v;
+      if (c == 'n') c = '\n';
+      else if (c == 't') c = '\t';
+      else if (c == 'u' && v[1] && v[2] && v[3] && v[4]) { c = (char)strtol((char[]){v[1], v[2], v[3], v[4], 0}, NULL, 16); v += 4; }
+    }
+    out[n++] = c;
+  }
+  out[n] = 0;
+}
+// Calls found(key, value) for each member of the object at p ('{'); returns past it.
+static const char *json_members(const char *p, void (*found)(const char *key, const char *value, void *ctx), void *ctx) {
+  p = json_ws(p);
+  if (*p != '{') return json_skip(p);
+  p++;
+  for (;;) {
+    p = json_ws(p);
+    if (*p != '"') break;
+    char key[64];
+    json_str(p, key, sizeof key);
+    p = json_ws(json_skip(p));
+    if (*p++ != ':') break;
+    const char *v = json_ws(p);
+    found(key, v, ctx);
+    p = json_ws(json_skip(v));
+    if (*p == ',') p++;
+    else break;
+  }
+  p = json_ws(p);
+  return *p == '}' ? p + 1 : p;
+}
+
+typedef struct { char name[256], url[1024], digest[96]; long long size; } Asset;
+typedef struct { char tag[64], page[512]; Asset pick; bool picked; } Release;
+static void asset_member(const char *key, const char *v, void *ctx) {
+  Asset *a = ctx;
+  if (!strcmp(key, "name")) json_str(v, a->name, sizeof a->name);
+  else if (!strcmp(key, "browser_download_url")) json_str(v, a->url, sizeof a->url);
+  else if (!strcmp(key, "digest")) json_str(v, a->digest, sizeof a->digest);
+  else if (!strcmp(key, "size")) a->size = strtoll(v, NULL, 10);
+}
+static void release_member(const char *key, const char *v, void *ctx) {
+  Release *r = ctx;
+  if (!strcmp(key, "tag_name")) json_str(v, r->tag, sizeof r->tag);
+  else if (!strcmp(key, "html_url")) json_str(v, r->page, sizeof r->page);
+  else if (!strcmp(key, "assets") && *v == '[') { // the release's files: the one of this system
+    const char *p = json_ws(v + 1);
+    while (*p == '{') {
+      Asset a = {0};
+      p = json_ws(json_members(p, asset_member, &a));
+      if (UPDATE_ASSET[0] && !strcmp(a.name, UPDATE_ASSET)) { r->pick = a; r->picked = true; }
+      if (*p == ',') p = json_ws(p + 1);
+    }
+  }
+}
+static int hex_digit(char c) { return c >= '0' && c <= '9' ? c - '0' : c >= 'a' && c <= 'f' ? c - 'a' + 10 : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1; }
 
 // "1.10" > "1.9": the numbers compared one by one
 static int version_cmp(const char *a, const char *b) {
@@ -1008,27 +1185,73 @@ static int version_cmp(const char *a, const char *b) {
   return 0;
 }
 
+// The release's file may be installed: a name, a size, a SHA-256 from GitHub, and https (or the local
+// server of the tests, when UPDATE_GITHUB_API is one)
+static bool asset_ok(const Asset *a) {
+  if (a->size <= 0 || a->size > (2LL << 30) || strncmp(a->digest, "sha256:", 7) || strlen(a->digest) != 7 + 64) return false;
+  for (int k = 0; k < 32; k++) {
+    int hi = hex_digit(a->digest[7 + 2 * k]), lo = hex_digit(a->digest[8 + 2 * k]);
+    if (hi < 0 || lo < 0) return false;
+    upd_asset_sha[k] = (unsigned char)(hi << 4 | lo);
+  }
+  bool local = !strncmp(UPDATE_GITHUB_API, "http://127.0.0.1:", 17);
+  return !strncmp(a->url, "https://", 8) || (local && !strncmp(a->url, "http://127.0.0.1:", 17));
+}
+
 static DWORD WINAPI update_thread(void *arg) {
   (void)arg;
-  char body[2048];
-  int n = http_get(UPDATE_URL, body, sizeof body - 1);
   LONG result = 3;
-  if (n > 0) {
-    body[n] = 0;
-    char *nl = strpbrk(body, "\r\n");
-    char *page = nl ? nl + strspn(nl, "\r\n") : NULL;
-    if (nl) *nl = 0;
-    if (page) page[strcspn(page, "\r\n")] = 0;
-    snprintf(upd_version, sizeof upd_version, "%s", body[0] >= '0' && body[0] <= '9' ? body : ""); // an error's page is no version
-    snprintf(upd_page, sizeof upd_page, "%s", page && !strncmp(page, "http", 4) ? page : "");
-    if (upd_version[0] && dl_game->version && version_cmp(upd_version, dl_game->version) > 0) result = 2;
+  if (UPDATE_GITHUB[0]) { // GitHub's newest release (not the drafts nor the pre-releases)
+    int cap = 1 << 19;
+    char *body = malloc((size_t)cap + 1);
+    int n = body ? http_get(UPDATE_GITHUB_API "/repos/" UPDATE_GITHUB "/releases/latest", body, cap) : -1;
+    if (n > 0) {
+      body[n] = 0;
+      static Release r;
+      memset(&r, 0, sizeof r);
+      json_members(body, release_member, &r);
+      const char *v = r.tag[0] == 'v' || r.tag[0] == 'V' ? r.tag + 1 : r.tag;
+      snprintf(upd_version, sizeof upd_version, "%s", *v >= '0' && *v <= '9' ? v : "");
+      snprintf(upd_page, sizeof upd_page, "%s", !strncmp(r.page, "http", 4) ? r.page : "");
+      if (r.picked && asset_ok(&r.pick)) {
+        snprintf(upd_asset_url, sizeof upd_asset_url, "%s", r.pick.url);
+        upd_asset_size = r.pick.size;
+      }
+      if (upd_version[0] && dl_game->version && version_cmp(upd_version, dl_game->version) > 0) result = 2;
+    }
+    free(body);
+  } else {
+    char body[2048];
+    int n = http_get(UPDATE_URL, body, sizeof body - 1);
+    if (n > 0) {
+      body[n] = 0;
+      char *nl = strpbrk(body, "\r\n");
+      char *page = nl ? nl + strspn(nl, "\r\n") : NULL;
+      if (nl) *nl = 0;
+      if (page) page[strcspn(page, "\r\n")] = 0;
+      snprintf(upd_version, sizeof upd_version, "%s", body[0] >= '0' && body[0] <= '9' ? body : ""); // an error's page is no version
+      snprintf(upd_page, sizeof upd_page, "%s", page && !strncmp(page, "http", 4) ? page : "");
+      if (upd_version[0] && dl_game->version && version_cmp(upd_version, dl_game->version) > 0) result = 2;
+    }
   }
   InterlockedExchange(&upd_state, result);
   return 0;
 }
 
 void dl_online_start(void) {
-  if (!UPDATE_URL[0] || !dl_cfg.updates || upd_state == 1) return;
+#ifdef _WIN32
+  static bool cleaned; // the installer of an update done before, left in the temporary folder
+  if (!cleaned && UPDATE_ASSET[0] != 0 && upd_get == 0) {
+    cleaned = true;
+    char dir[MAX_PATH], file[MAX_PATH];
+    GetTempPathA(MAX_PATH, dir);
+    snprintf(file, sizeof file, "%s%s-update\\%s", dir, FILE_STEM, UPDATE_ASSET);
+    DeleteFileA(file);
+    snprintf(file, sizeof file, "%s%s-update", dir, FILE_STEM);
+    RemoveDirectoryA(file);
+  }
+#endif
+  if (!DL_UPDATE_ON || !dl_cfg.updates || upd_state == 1) return;
   InterlockedExchange(&upd_state, 1);
   HANDLE t = CreateThread(NULL, 0, update_thread, NULL, 0, NULL);
   if (t) CloseHandle(t);
@@ -1049,8 +1272,176 @@ void dl_update_open(void) {
   if (upd_state == 2 && upd_page[0]) ShellExecuteA(dl_hwnd, "open", upd_page, NULL, NULL, SW_SHOWNORMAL);
 }
 
+// ---- "Update": the release's file downloaded and checked on a thread, then installed
+static char upd_file[MAX_PATH];
+#ifdef _WIN32
+static bool update_run; // Windows: the installer is started once this program has closed
+#endif
+
+typedef struct { FILE *f; Sha256 sha; long long got; } FileSink;
+static bool file_sink(void *ctx, const char *d, int n) {
+  FileSink *s = ctx;
+  if (s->got + n > upd_asset_size || fwrite(d, 1, (size_t)n, s->f) != (size_t)n) return false; // more than GitHub said: refused
+  sha_add(&s->sha, d, (size_t)n);
+  s->got += n;
+  InterlockedExchange(&upd_pct, (LONG)(s->got * 100 / upd_asset_size));
+  return true;
+}
+
+#ifndef _WIN32
+// Linux: the archive's files put in place of the program's, never over the player's own (project.h's
+// personal folders and files); each file is renamed in, so that a running program is not cut short
+static int run_wait(char *const argv[]) {
+  pid_t pid;
+  if (posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ)) return -1;
+  int status = 0;
+  return waitpid(pid, &status, 0) == pid && WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+static char apply_top[MAX_PATH];
+static int apply_failed;
+static bool personal(const char *rel) {
+  static const char *const folders[] = {SETUP_PERSONAL_FOLDERS, NULL}, *const files[] = {SETUP_PERSONAL_FILES, NULL};
+  size_t first = strcspn(rel, "/");
+  if (!strncmp(rel, ".update", 7) && first == 7) return true;
+  for (int k = 0; folders[k]; k++)
+    if (strlen(folders[k]) == first && !strncmp(rel, folders[k], first)) return true;
+  if (!rel[first]) // a file next to the program
+    for (int k = 0; files[k]; k++)
+      if (!fnmatch(files[k], rel, 0)) return true;
+  return false;
+}
+static void apply_dir(const char *dir) { // each file under dir, put in its place beside the program
+  DIR *d = opendir(dir);
+  struct dirent *e;
+  while (d && (e = readdir(d))) {
+    if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue;
+    char path[MAX_PATH * 2];
+    snprintf(path, sizeof path, "%s/%s", dir, e->d_name);
+    struct stat st;
+    if (lstat(path, &st)) { apply_failed++; continue; }
+    const char *rel = path + strlen(apply_top) + 1;
+    if (personal(rel)) continue;
+    if (S_ISDIR(st.st_mode)) { apply_dir(path); continue; }
+    char to[MAX_PATH * 3];
+    snprintf(to, sizeof to, "%s%s", dl_base_dir, rel);
+    for (char *c = strchr(to + strlen(dl_base_dir), '/'); c; c = strchr(c + 1, '/')) { *c = 0; mkdir(to, 0755); *c = '/'; }
+    if (rename(path, to)) apply_failed++;
+  }
+  if (d) closedir(d);
+}
+static bool update_apply(const char *archive) {
+  char dir[MAX_PATH];
+  snprintf(dir, sizeof dir, "%s.update" DL_SEP "new", dl_base_dir);
+  char *rm[] = {"rm", "-rf", dir, NULL};
+  run_wait(rm);
+  char *mk[] = {"mkdir", "-p", dir, NULL};
+  char *tar[] = {"tar", "-xzf", (char *)archive, "-C", dir, NULL};
+  if (run_wait(mk) || run_wait(tar)) return false; // nothing is replaced before the archive is all out
+  // the archive's one folder (Game-linux-x86_64/), or its files themselves
+  snprintf(apply_top, sizeof apply_top, "%s", dir);
+  DIR *d = opendir(dir);
+  int entries = 0;
+  char only[256] = "";
+  struct dirent *e;
+  while (d && (e = readdir(d)))
+    if (strcmp(e->d_name, ".") && strcmp(e->d_name, "..")) { entries++; snprintf(only, sizeof only, "%s", e->d_name); }
+  if (d) closedir(d);
+  struct stat st;
+  char inner[MAX_PATH * 2];
+  snprintf(inner, sizeof inner, "%s/%s", dir, only);
+  if (entries == 1 && !stat(inner, &st) && S_ISDIR(st.st_mode)) snprintf(apply_top, sizeof apply_top, "%s", inner);
+  apply_failed = 0;
+  apply_dir(apply_top);
+  run_wait(rm);
+  return !apply_failed;
+}
+#endif
+
+static DWORD WINAPI install_thread(void *arg) {
+  (void)arg;
+#ifdef _WIN32
+  char dir[MAX_PATH];
+  GetTempPathA(MAX_PATH, dir);
+  snprintf(upd_file, sizeof upd_file, "%s%s-update", dir, FILE_STEM);
+  CreateDirectoryA(upd_file, NULL);
+  snprintf(upd_file, sizeof upd_file, "%s%s-update\\%s", dir, FILE_STEM, UPDATE_ASSET);
+#else
+  snprintf(upd_file, sizeof upd_file, "%s.update", dl_base_dir);
+  mkdir(upd_file, 0755);
+  snprintf(upd_file, sizeof upd_file, "%s.update/%s", dl_base_dir, UPDATE_ASSET);
+#endif
+  FileSink s = {fopen(upd_file, "wb")};
+  sha_init(&s.sha);
+  bool ok = s.f && http_fetch(upd_asset_url, file_sink, &s, true);
+  if (s.f) fclose(s.f);
+  unsigned char got[32];
+  sha_end(&s.sha, got);
+  ok = ok && s.got == upd_asset_size && !memcmp(got, upd_asset_sha, 32); // the file GitHub described, to the byte
+#ifndef _WIN32
+  ok = ok && update_apply(upd_file);
+  remove(upd_file); // put in place: the archive is no longer needed
+#endif
+  if (!ok) remove(upd_file);
+  InterlockedExchange(&upd_get, ok ? 2 : 3);
+  return 0;
+}
+
+void dl_update_install(void) {
+  if (upd_get == 1 || upd_get == 2) return;
+  if (upd_state != 2) { dl_note(TX(T_UPD_NONE)); return; }
+  if (!upd_asset_url[0]) { dl_update_open(); return; } // no file to install: its page
+  InterlockedExchange(&upd_pct, 0);
+  InterlockedExchange(&upd_get, 1);
+  HANDLE t = CreateThread(NULL, 0, install_thread, NULL, 0, NULL);
+  if (t) CloseHandle(t);
+  else upd_get = 3;
+  dl_dirty = true;
+}
+
+const wchar_t *dl_update_install_show(int v) {
+  (void)v;
+  static wchar_t out[32];
+  if (upd_state != 2) return upd_state == 3 ? TX(T_UPD_ST_NONE) : L"";
+  if (!upd_asset_url[0]) return TX(T_UPD_ST_PAGE);
+  if (upd_get == 1) { _snwprintf(out, 31, L"%ld %%", upd_pct); out[31] = 0; return out; }
+  if (upd_get == 2) return TX(T_UPD_ST_READY);
+  if (upd_get == 3) return TX(T_UPD_ST_FAIL);
+  _snwprintf(out, 31, L"%hs", upd_version);
+  out[31] = 0;
+  return out;
+}
+
+static void update_follow(void) {
+  static LONG shown_pct = -1, told;
+  static DWORD ready_at;
+  if (upd_get == 1 && upd_pct != shown_pct) { shown_pct = upd_pct; dl_dirty = true; }
+  if (upd_get == 3 && !told) { told = 1; dl_note(TX(T_UPD_FAIL_NOTE)); dl_dirty = true; }
+  if (upd_get == 2) {
+    if (!ready_at) { ready_at = GetTickCount() | 1; dl_note(TX(T_UPD_RESTART)); dl_dirty = true; }
+    else if (GetTickCount() - ready_at > 1500) { // the note seen, then the program closes as usual
+#ifdef _WIN32
+      update_run = true; // the installer, once this window is gone
+      dl_running = false;
+#else
+      dl_relaunch(); // its new files are in place: started again
+#endif
+    }
+  }
+}
+
 void dl_online_follow(void) {
   static LONG told;
+  update_follow();
+  static bool test_once; // DL_TEST_UPDATE (tests): "Update" chosen by itself once a file to install is found
+  if (!test_once && upd_state == 2 && upd_asset_url[0] && getenv("DL_TEST_UPDATE")) {
+    test_once = true;
+#ifdef _WIN32
+    SetEnvironmentVariableA("DL_TEST_UPDATE", NULL); // not for the program started again afterwards
+#else
+    unsetenv("DL_TEST_UPDATE");
+#endif
+    dl_update_install();
+  }
   if (upd_state == 2 && !told && dl_cfg.updates && dl_mode != M_GAME) { // once, in the menus: a note, and "Play" says it
     told = 1;
     dl_note(dl_update_text());
@@ -1244,7 +1635,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   if (game->rumble) add_setting("rumble", &dl_cfg.rumble, 0, 1, 2);
   if (dl_ahead_ok()) add_setting("run_ahead", &dl_cfg.ahead, 0, 2, 2);
   if (DISCORD_APP_ID[0]) add_setting("discord", &dl_cfg.discord, 0, 1, 0); // kept by "Defaults": the player's choice
-  if (UPDATE_URL[0]) add_setting("update_check", &dl_cfg.updates, 0, 1, 0);
+  if (DL_UPDATE_ON) add_setting("update_check", &dl_cfg.updates, 0, 1, 0);
   add_setting("state_slot", &dl_slot, 0, DL_SLOTS - 1, 0);
   add_setting("a11y_contrast", &dl_cfg.contrast, 0, 1, 0); // kept by "Defaults": a player who needs them keeps them
   add_setting("a11y_cvd", &dl_cfg.cvd, 0, 3, 0);
@@ -1462,6 +1853,25 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   dl_gpu_stop();
   if (wave_out) { waveOutReset(wave_out); waveOutClose(wave_out); }
   run_mark_clear(); // a normal close
+#ifdef _WIN32
+  if (update_run) { // the release's installer, silent, over this folder: it waits for this program to end, then starts it again
+    DestroyWindow(dl_hwnd);
+    wchar_t file[MAX_PATH], dir[MAX_PATH], cmd[3 * MAX_PATH];
+    MultiByteToWideChar(CP_ACP, 0, upd_file, -1, file, MAX_PATH);
+    MultiByteToWideChar(CP_ACP, 0, dl_base_dir, -1, dir, MAX_PATH);
+    size_t dn = wcslen(dir);
+    while (dn > 3 && dir[dn - 1] == L'\\') dir[--dn] = 0;
+    _snwprintf(cmd, 3 * MAX_PATH - 1, L"\"%ls\" /S \"/D=%ls\" /NOSHORTCUTS /WAIT=%lu /RUN", file, dir, (unsigned long)GetCurrentProcessId());
+    cmd[3 * MAX_PATH - 1] = 0;
+    STARTUPINFOW si = {sizeof si};
+    PROCESS_INFORMATION pi;
+    if (CreateProcessW(file, cmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+      CloseHandle(pi.hThread);
+      CloseHandle(pi.hProcess);
+    }
+    return 0;
+  }
+#endif
   if (relaunch) { // the same program with the same command line, once this window is gone
     DestroyWindow(dl_hwnd);
     wchar_t exe[MAX_PATH];

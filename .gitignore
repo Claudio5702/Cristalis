@@ -6,7 +6,6 @@
 !/README.md
 !/README.*.md
 !/CHANGELOG.md
-!/version.txt
 !/LICENSE
 !/build.ps1
 !/recompile.ps1

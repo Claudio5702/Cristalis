@@ -300,6 +300,7 @@ static const wchar_t *updates_more(void) {
 static const DlRow net_discord_row = {DL_SWITCH, dl_texts[T_DISCORD], dl_texts[T_H_DISCORD], &dl_cfg.discord, 1, NULL, NULL, dl_discord_changed};
 static const DlRow net_updates_row = {DL_SWITCH, dl_texts[T_UPDATES], dl_texts[T_H_UPDATES], &dl_cfg.updates, 1, NULL, NULL, dl_online_start, 0, updates_more};
 static const DlRow net_open_row = {DL_ACTION, dl_texts[T_UPD_OPEN], dl_texts[T_H_UPD_OPEN], NULL, 0, NULL, NULL, dl_update_open};
+static const DlRow net_install_row = {DL_ACTION, dl_texts[T_UPD_INSTALL], dl_texts[T_H_UPD_INSTALL], NULL, 0, NULL, dl_update_install_show, dl_update_install};
 static const DlRow net_row = {.kind = DL_PAGE, .label = dl_texts[T_NET], .help = dl_texts[T_H_NET], .page = PG_NET};
 
 // ---- Settings: one entry of the bar for the kit's pages and its rarer actions
@@ -376,7 +377,11 @@ void dl_menu_init(void) {
   dl_page(dl_texts[T_TAB_IMAGE], welcome_screen_rows, sizeof welcome_screen_rows / sizeof welcome_screen_rows[0]);
   DlPage *pn = &dl_pages[dl_page(dl_texts[T_TAB_NET], NULL, 0)];
   if (DISCORD_APP_ID[0]) pn->rows[pn->n++] = &net_discord_row;
-  if (UPDATE_URL[0]) { pn->rows[pn->n++] = &net_updates_row; pn->rows[pn->n++] = &net_open_row; }
+  if (DL_UPDATE_ON) {
+    pn->rows[pn->n++] = &net_updates_row;
+    pn->rows[pn->n++] = &net_open_row;
+    if (UPDATE_GITHUB[0] != 0 && UPDATE_ASSET[0] != 0) pn->rows[pn->n++] = &net_install_row; // the release's file, installed
+  }
   if (pn->n) dl_page_insert(PG_CTRL, dl_pages[PG_CTRL].n, &net_row); // the last row of the Controls page
   dl_page(dl_texts[T_TAB_SETTINGS], settings_rows, sizeof settings_rows / sizeof settings_rows[0]);
   if (dl_game->reset) dl_page_insert(PG_SETTINGS, dl_pages[PG_SETTINGS].n, &settings_reset_row); // a game that cannot restart has no such row

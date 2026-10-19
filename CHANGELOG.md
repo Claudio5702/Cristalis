@@ -14,9 +14,12 @@ on DarkLauncher's "What's new" page.
   them); `userdata` goes once empty.
 - The `saves` and `captures` folders are made at the first start, so that they can be seen before the
   first save or screenshot.
-- **New versions**: DarkLauncher can now say when a newer version is out (Settings, Internet; off
-  until the player turns it on). It reads `version.txt` in this repository: the version on its first
-  line, the Releases page on the second; nothing else is sent.
+- **Updates (DarkLauncher 2.1)**: once the player turns on the look for new versions (Settings,
+  Internet; off at first), DarkLauncher reads the newest release of this repository at each start,
+  says when one is out, and its "Update" downloads the release's file, checks its size and SHA-256
+  against GitHub's, and installs it: the installer on Windows (it now accepts `/WAIT=<pid>` and
+  `/RUN`, and gives the Windows list entry the new version), the archive's files on Linux. Saves,
+  screenshots, settings and the game's data are left as they are; the game starts again.
 - **DarkLauncher 2.07**: its version is no longer written at the bottom right of the menus (it is
   still in `--version` and in the crash report).
 
