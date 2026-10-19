@@ -1,6 +1,6 @@
 // Achievements, kept locally. The game reports every achievement whose
 // condition is met (XUserWriteAchievements); the console would store them in the
-// profile and show a notification. Here they go to userdata\achievements.txt,
+// profile and show a notification. Here they go to saves\achievements.txt,
 // with a small pop-up over the game window for each new one. Names and
 // descriptions come from the title's own resource data inside the executable.
 #include "achievements.h"
@@ -148,7 +148,7 @@ static const std::vector<Achievement>& Achievements()
 
 static std::filesystem::path StoragePath()
 {
-    return ContentDirectory().parent_path() / "achievements.txt";
+    return ContentDirectory() / "achievements.txt";
 }
 
 static void LoadUnlocked()

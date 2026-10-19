@@ -1,5 +1,5 @@
 // xam.xex content imports: storage device selection and save game packages.
-// A package is a host directory under userdata\content\<file name>.
+// A package is a host directory under saves\<file name>.
 #include "config.h"
 #include "content.h"
 #include "kernel_objects.h"
@@ -42,7 +42,7 @@ static std::string ContentFileName(uint32_t contentData)
 
 GUEST_IMPORT(XamShowDeviceSelectorUI)
 {
-    // No dialog: the only device is the "hard drive" backed by userdata\content.
+    // No dialog: the only device is the "hard drive" backed by the saves folder.
     if (ctx.r7.u32 != 0)
         Store32(ctx.r7.u32, kHardDriveDeviceId);
     ctx.r3.u64 = Complete(ctx.r8.u32, X_ERROR_SUCCESS);
@@ -163,7 +163,8 @@ GUEST_IMPORT(XamContentCreateEnumerator)
     std::error_code error;
     for (auto& entry : std::filesystem::directory_iterator(ContentDirectory(), error))
     {
-        if (entry.is_directory())
+        // DarkLauncher keeps its copies of written-over files in saves\backup.
+        if (entry.is_directory() && entry.path().filename() != "backup")
             names.push_back(entry.path().filename().string());
     }
 

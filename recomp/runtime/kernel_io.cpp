@@ -1,5 +1,6 @@
 // File I/O imports. Guest paths on game:\ and d:\ map to the directory holding
-// default.xex; every other device maps under .\userdata\<device>\.
+// default.xex; save packages are in .\saves\ (content.h); every other device maps under
+// .\userdata\<device>\.
 #include "kernel_objects.h"
 #include "game_state.h"
 #include "xex_header.h"
@@ -11,6 +12,7 @@
 #include <map>
 #include <mutex>
 #include <string>
+#include <vector>
 
 constexpr uint32_t STATUS_END_OF_FILE = 0xC0000011;
 constexpr uint32_t X_STATUS_INVALID_HANDLE = 0xC0000008;
@@ -50,7 +52,32 @@ std::filesystem::path GameRoot()
 
 std::filesystem::path ContentDirectory()
 {
-    return std::filesystem::current_path() / "userdata" / "content";
+    return std::filesystem::current_path() / "saves";
+}
+
+void PrepareSaveFolders()
+{
+    std::error_code error;
+    std::filesystem::path saves = ContentDirectory();
+    std::filesystem::create_directories(saves, error);
+    std::filesystem::create_directories(std::filesystem::current_path() / "captures", error);
+
+    // Before 1.07 the saves were in userdata\content, a name no player looks in.
+    std::filesystem::path old = std::filesystem::current_path() / "userdata";
+    std::vector<std::pair<std::filesystem::path, std::filesystem::path>> moves;
+    for (auto& entry : std::filesystem::directory_iterator(old / "content", error))
+        moves.push_back({ entry.path(), saves / entry.path().filename() });
+    moves.push_back({ old / "achievements.txt", saves / "achievements.txt" });
+    for (auto& [from, to] : moves)
+    {
+        if (!std::filesystem::exists(from, error) || std::filesystem::exists(to, error))
+            continue;
+        std::filesystem::rename(from, to, error);
+        Log("Saves: %s moved to %s%s", from.string().c_str(), to.string().c_str(), error ? " (failed)" : "");
+    }
+    // Only empty folders go.
+    std::filesystem::remove(old / "content", error);
+    std::filesystem::remove(old, error);
 }
 
 void MountContentRoot(const std::string& root, const std::filesystem::path& directory)

@@ -411,8 +411,9 @@ HostPad RendererPad()
 {
     HostPad pad;
 #ifdef CD_DARKLAUNCHER
-    // DarkLauncher reads the keyboard and the controllers.
-    pad.buttons = DlBridgeButtons();
+    // DarkLauncher reads the keyboard and the controllers (CD_AUTOPAD still taps by itself).
+    static const bool autoPad = getenv("CD_AUTOPAD") != nullptr;
+    pad.buttons = autoPad ? KeyboardButtons() : DlBridgeButtons();
     return pad;
 #endif
     pad.buttons = KeyboardButtons();

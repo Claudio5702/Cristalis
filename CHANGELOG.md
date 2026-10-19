@@ -6,6 +6,15 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## 1.07
+
+- **The saves are in the `saves` folder**, where a player looks for them: before, the game's saves
+  were in `userdata\content`, and `saves` held only DarkLauncher's list of achievements. The game
+  moves the old ones there at its first start (and the game's own record of achievements with
+  them); `userdata` goes once empty.
+- The `saves` and `captures` folders are made at the first start, so that they can be seen before the
+  first save or screenshot.
+
 ## 1.06
 
 - **DarkLauncher 2.06**: its fast forward is no longer offered (`DL_HIDE_TURBO`): it could not really

@@ -90,7 +90,7 @@ Keys (QWERTY positions; all can be changed on the Controls page):
   Enter / Right Shift  Start / Back
 Xbox controllers, and PlayStation 4 and 5 ones, work as they are.
 
-Saves: the userdata folder; achievements: userdata and saves. Settings:
+Saves and achievements: the saves folder. Settings:
 crystal_defenders.ini. Log: crystal_defenders.log.
 
 Audio decoding uses FFmpeg (https://ffmpeg.org), LGPL 2.1 or later, built in

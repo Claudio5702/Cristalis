@@ -27,7 +27,7 @@ LANGUAGES
   screen.
 
 FILES
-  userdata\ ................ saves and achievements
+  saves\     ................ saves and achievements
   captures\ ................ screenshots
   crystal_defenders.ini .... settings
   crystal_defenders.log .... log (the previous session: crystal_defenders.prev.log)

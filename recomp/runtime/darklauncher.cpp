@@ -147,12 +147,12 @@ const DlText t_hLive = { L"起動時に「Xbox LIVE に接続されていませ�
     L"Mostra no início “Não conectado à Xbox LIVE”, como um console offline. A partir do próximo início.",
     L"Zeigt beim Start „Nicht mit Xbox LIVE verbunden“, wie eine Konsole ohne Verbindung. Ab dem nächsten Start.", L"Mostra all'avvio «Non connesso a Xbox LIVE», come una console non connessa. Dal prossimo avvio." };
 const DlText t_storage = { L"保存先の選択", L"Choix du stockage", L"Storage choice", L"Elegir almacenamiento", L"Escolha do armazenamento", L"Speicherauswahl", L"Scelta archiviazione" };
-const DlText t_hStorage = { L"本体と同じように保存先を尋ねます。オフなら userdata に直接保存します。次の起動から有効です。",
-    L"Le jeu demande où enregistrer, comme sur la console ; sinon il utilise le dossier userdata. Au prochain lancement.",
-    L"The game asks where to save, as on the console; otherwise it uses the userdata folder. From the next start.",
-    L"El juego pregunta dónde guardar, como en la consola; si no, usa la carpeta userdata. Desde el próximo inicio.",
-    L"O jogo pergunta onde salvar, como no console; senão usa a pasta userdata. A partir do próximo início.",
-    L"Das Spiel fragt wie auf der Konsole nach dem Speicherort, sonst nutzt es den Ordner userdata. Ab dem nächsten Start.", L"Il gioco chiede dove salvare, come sulla console; altrimenti usa la cartella userdata. Dal prossimo avvio." };
+const DlText t_hStorage = { L"本体と同じように保存先を尋ねます。オフなら saves フォルダーに直接保存します。次の起動から有効です。",
+    L"Le jeu demande où enregistrer, comme sur la console ; sinon il utilise le dossier saves. Au prochain lancement.",
+    L"The game asks where to save, as on the console; otherwise it uses the saves folder. From the next start.",
+    L"El juego pregunta dónde guardar, como en la consola; si no, usa la carpeta saves. Desde el próximo inicio.",
+    L"O jogo pergunta onde salvar, como no console; senão usa a pasta saves. A partir do próximo início.",
+    L"Das Spiel fragt wie auf der Konsole nach dem Speicherort, sonst nutzt es den Ordner saves. Ab dem nächsten Start.", L"Il gioco chiede dove salvare, come sulla console; altrimenti usa la cartella saves. Dal prossimo avvio." };
 
 
 // ---- The game's language: a page of actions, one per language ----
@@ -345,13 +345,13 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"早送りを整理|DarkLauncher の早送りはなくなりました（このゲームでは正しく動きませんでした）。ゲーム自体の早送りはそのまま使えます。",
-    L"Avance rapide simplifiée|L'avance rapide de DarkLauncher n'est plus proposée : elle marchait mal avec ce jeu. Celle du jeu lui-même reste.",
-    L"Simpler fast forward|DarkLauncher's fast forward is no longer offered: it worked badly with this game. The game's own stays.",
-    L"Avance rápido simplificado|El avance rápido de DarkLauncher ya no se ofrece: funcionaba mal con este juego. El del propio juego sigue.",
-    L"Avanço rápido simplificado|O avanço rápido do DarkLauncher não é mais oferecido: funcionava mal com este jogo. O do próprio jogo continua.",
-    L"Schnellvorlauf vereinfacht|Der Schnellvorlauf von DarkLauncher wird nicht mehr angeboten: Er lief mit diesem Spiel schlecht. Der des Spiels bleibt.",
-    L"Avanti veloce semplificato|L'avanti veloce di DarkLauncher non è più proposto: funzionava male con questo gioco. Quello del gioco resta." };
+    L"セーブデータは saves に|セーブデータはゲームフォルダーの saves フォルダーに入りました（以前は userdata）。前のセーブデータは自動で移されています。",
+    L"Sauvegardes dans saves|Vos sauvegardes sont maintenant dans le dossier saves du jeu (avant : userdata). Les anciennes y ont été déplacées toutes seules.",
+    L"Saves in saves|Your saves are now in the game's saves folder (before: userdata). The old ones were moved there by themselves.",
+    L"Partidas en saves|Sus partidas están ahora en la carpeta saves del juego (antes: userdata). Las anteriores se movieron allí solas.",
+    L"Jogos salvos em saves|Seus jogos salvos agora ficam na pasta saves do jogo (antes: userdata). Os antigos foram movidos para lá sozinhos.",
+    L"Spielstände in saves|Ihre Spielstände liegen jetzt im Ordner saves des Spiels (vorher: userdata). Die alten wurden von selbst dorthin verschoben.",
+    L"Salvataggi in saves|I salvataggi sono ora nella cartella saves del gioco (prima: userdata). Quelli vecchi sono stati spostati lì da soli." };
 
 // ---- The game ----
 

@@ -16,7 +16,7 @@ experimentell.
 Bilder, Töne, Musik und Texte werden aus Ihrer eigenen Kopie des Spiels gelesen. Das Repository
 enthält auch keinen Code des Spiels: Der übersetzte Code wird beim Bauen des Programms aus einer
 `default.xex` erzeugt, und die Programme auf der [Release-Seite](https://github.com/Claudio5702/Cristalis/releases/latest) werden so gebaut.
-**Version 1.06, eine Beta**: bisher von wenigen gespielt.
+**Version 1.07, eine Beta**: bisher von wenigen gespielt.
 
 **Sie brauchen Ihre eigene Kopie von Crystal Defenders (Xbox 360).** Crystal Defenders gehört Square
 Enix; dieses Projekt steht in keiner Verbindung zu Square Enix und wird von Square Enix nicht
@@ -134,8 +134,7 @@ Alles bleibt im Ordner des Programms:
 | | |
 | --- | --- |
 | `game\` | die Daten des Spiels, beim ersten Start aus Ihrer Kopie entnommen |
-| `userdata\` | die Spielstände und die Liste der erreichten Erfolge des Spiels |
-| `saves\` | die Erfolgsliste von DarkLauncher, mit ihren Daten |
+| `saves\` | Ihre Spielstände (`crystaldefendersW123\gamedata.bin`) und die erreichten Erfolge, mit ihren Daten |
 | `captures\` | Screenshots |
 | `crystal_defenders.ini` | Einstellungen |
 | `crystal_defenders.log` | Protokoll der letzten Sitzung (`.prev.log`: der davor) |
@@ -181,7 +180,7 @@ zu erzwingen. Die Windows-Version läuft auch über Proton.
 Wie das Projekt funktioniert, wie man es baut, den Code des Spiels neu übersetzt, prüft und das
 Installationsprogramm erstellt: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (auf Englisch).
 
-Was sich in jeder Version geändert hat (jetzt 1.06): [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
+Was sich in jeder Version geändert hat (jetzt 1.07): [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
 
 ## Häufige Fragen
 
@@ -193,7 +192,7 @@ Systemfunktionen), ist für Windows neu geschrieben.
 Töne, Musik oder Texte des Spiels: Das Programm liest sie aus Ihrer Kopie, nachdem es geprüft hat,
 dass sie die erwartete ist.
 
-**Kann ich meine Spielstände von der Konsole verwenden?** Die Spielstände liegen in `userdata\`, im
+**Kann ich meine Spielstände von der Konsole verwenden?** Die Spielstände liegen in `saves\`, im
 eigenen Format des Spiels; Spielstände zwischen Konsole und PC zu kopieren wurde nicht ausprobiert.
 
 **Wird etwas ins Internet gesendet?** Nein. Das Programm benutzt das Netzwerk überhaupt nicht.

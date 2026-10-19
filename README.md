@@ -14,7 +14,7 @@ one game. A Linux build is experimental.
 **No game assets are included**, in this repository or in the releases: the pictures, sounds, music
 and texts are read from your own copy of the game. The repository holds none of the game's code
 either: the translated code is generated from a `default.xex` when the program is built, and the
-programs on the [Releases page](https://github.com/Claudio5702/Cristalis/releases/latest) are built that way. **Version 1.06, a beta**: played by few
+programs on the [Releases page](https://github.com/Claudio5702/Cristalis/releases/latest) are built that way. **Version 1.07, a beta**: played by few
 people so far.
 
 **You must supply your own copy of Crystal Defenders (Xbox 360).** Crystal Defenders belongs to
@@ -123,8 +123,7 @@ Everything stays in the program's folder:
 | | |
 | --- | --- |
 | `game\` | the game's data, taken out of your copy on the first start |
-| `userdata\` | the game's saves and its record of the achievements earned |
-| `saves\` | DarkLauncher's list of the achievements, with their dates |
+| `saves\` | your saves (`crystaldefendersW123\gamedata.bin`) and the achievements earned, with their dates |
 | `captures\` | screenshots |
 | `crystal_defenders.ini` | settings |
 | `crystal_defenders.log` | log of the last session (`.prev.log`: the one before) |
@@ -166,7 +165,7 @@ Proton.
 How the project works, how to build it, translate the game's code again, check it and make the
 installer: [docs/DEVELOPERS.md](docs/DEVELOPERS.md).
 
-What changed in each version (now 1.06): [CHANGELOG.md](CHANGELOG.md).
+What changed in each version (now 1.07): [CHANGELOG.md](CHANGELOG.md).
 
 ## FAQ
 
@@ -177,7 +176,7 @@ functions) is written again for Windows.
 **Why do I need my own copy?** Neither the repository nor the releases hold the game's pictures,
 sounds, music or texts: the program reads them from your copy, after checking it is the expected one.
 
-**Can I use my saves from the console?** The saves are in `userdata\`, in the game's own format;
+**Can I use my saves from the console?** The saves are in `saves\`, in the game's own format;
 copying saves between the console and the PC has not been tried.
 
 **Is anything sent over the Internet?** No. The program does not use the network at all.

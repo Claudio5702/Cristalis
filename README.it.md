@@ -14,7 +14,7 @@ per questo gioco. Una versione per Linux è sperimentale.
 **Non è inclusa alcuna risorsa del gioco**, né in questo repository né nelle release: immagini,
 suoni, musica e testi vengono letti dalla tua copia del gioco. Il repository non contiene nemmeno
 codice del gioco: il codice tradotto viene generato da un `default.xex` quando si compila il
-programma, e i programmi della [pagina delle release](https://github.com/Claudio5702/Cristalis/releases/latest) sono compilati così. **Versione 1.06,
+programma, e i programmi della [pagina delle release](https://github.com/Claudio5702/Cristalis/releases/latest) sono compilati così. **Versione 1.07,
 una beta**: finora giocata da poche persone.
 
 **Ti serve la tua copia di Crystal Defenders (Xbox 360).** Crystal Defenders appartiene a Square
@@ -131,8 +131,7 @@ Tutto resta nella cartella del programma:
 | | |
 | --- | --- |
 | `game\` | i dati del gioco, estratti dalla tua copia al primo avvio |
-| `userdata\` | i salvataggi del gioco e il suo registro degli obiettivi ottenuti |
-| `saves\` | l'elenco degli obiettivi di DarkLauncher, con le loro date |
+| `saves\` | i vostri salvataggi (`crystaldefendersW123\gamedata.bin`) e gli obiettivi ottenuti, con le loro date |
 | `captures\` | screenshot |
 | `crystal_defenders.ini` | impostazioni |
 | `crystal_defenders.log` | registro dell'ultima sessione (`.prev.log`: quella precedente) |
@@ -177,7 +176,7 @@ compatibilità. La versione per Windows gira anche con Proton.
 Come funziona il progetto, come compilarlo, tradurre di nuovo il codice del gioco, verificarlo e
 creare il programma di installazione: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (in inglese).
 
-Cosa è cambiato in ogni versione (ora 1.06): [CHANGELOG.md](CHANGELOG.md) (in inglese).
+Cosa è cambiato in ogni versione (ora 1.07): [CHANGELOG.md](CHANGELOG.md) (in inglese).
 
 ## Domande frequenti
 
@@ -188,7 +187,7 @@ del sistema) è riscritto per Windows.
 **Perché mi serve la mia copia?** Né il repository né le release contengono immagini, suoni, musica
 o testi del gioco: il programma li legge dalla tua copia, dopo aver verificato che sia quella attesa.
 
-**Posso usare i miei salvataggi della console?** I salvataggi sono in `userdata\`, nel formato
+**Posso usare i miei salvataggi della console?** I salvataggi sono in `saves\`, nel formato
 proprio del gioco; copiare salvataggi tra la console e il PC non è stato provato.
 
 **Viene inviato qualcosa su Internet?** No. Il programma non usa affatto la rete.

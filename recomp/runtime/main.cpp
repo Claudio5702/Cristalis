@@ -1,5 +1,6 @@
 // Host entry point: maps the guest address space, loads the XEX image, wires the
 // recompiled function table and starts the game's entry point on a guest thread.
+#include "content.h"
 #include "gpu.h"
 #include "guest.h"
 #include "launcher.h"
@@ -765,6 +766,7 @@ int main(int argc, char* argv[])
     // Keep the previous session's log: a crash is usually followed by a relaunch.
     MoveFileExW(L"crystal_defenders.log", L"crystal_defenders.prev.log", MOVEFILE_REPLACE_EXISTING);
     g_logFile = fopen("crystal_defenders.log", "w");
+    PrepareSaveFolders();
 
     const auto file = LoadFile(xexPath);
     if (file.size() < 0x18 || memcmp(file.data(), "XEX2", 4) != 0)

@@ -45,7 +45,7 @@ static const char kDefaultFile[] =
     "; d'avertissement, et l'ecran Classement reste vide.\n"
     "avertissement_live = 0\n"
     "; 1 = le jeu demande au demarrage ou enregistrer, comme sur la console.\n"
-    "; 0 = il utilise directement le dossier userdata.\n"
+    "; 0 = il utilise directement le dossier saves.\n"
     "choix_stockage = 0\n"
     "; 1 = ecran de lancement avant le jeu (reglages, succes, captures).\n"
     "; 0 = le jeu demarre directement.\n"

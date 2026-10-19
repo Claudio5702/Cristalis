@@ -27,7 +27,7 @@ LANGUES
   reglages.
 
 FICHIERS
-  userdata\ ................ sauvegardes et succes
+  saves\     ................ sauvegardes et succes
   captures\ ................ captures d'ecran
   crystal_defenders.ini .... reglages
   crystal_defenders.log .... journal (la session precedente : crystal_defenders.prev.log)
