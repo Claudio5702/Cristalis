@@ -8,6 +8,10 @@ on DarkLauncher's "What's new" page.
 
 ## Next version (not numbered yet)
 
+- **CRT filter**: the game now tells DarkLauncher its picture is drawn 2 or 3 times larger than the
+  console's 720 lines (internal 2560 x 1440 or 3840 x 2160), so that the tube's lines follow the
+  console's lines; before, at 3840 x 2160 they were drawn at 2160 lines, too fine to be seen, and
+  only the glow and the darker corners were left.
 - **DarkLauncher 2.02**: the game says when it gives the last picture again (`dl_picture_same`), so
   that `--bench` and `--gpu-check` count the new pictures apart; a game that stops making them, as on
   Linux before 1.03, now shows at once ("new pictures 1187" of 1194 under WSL).

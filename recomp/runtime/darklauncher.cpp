@@ -414,6 +414,9 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
         {
             memcpy(pixels, g_picture.data(), g_picture.size() * 4);
             dl_picture_size(int(g_pictureWidth), int(g_pictureHeight), 16.0 / 9.0);
+            // the picture is drawn larger than the console's 720 lines: the scanlines and the CRT filter
+            // follow the console's lines, not the picture's (1920 x 1080, 1.5 times, cannot be said)
+            dl_picture_scale(g_pictureHeight % kHeight == 0 ? int(g_pictureHeight / kHeight) : 1);
         }
     }
 
