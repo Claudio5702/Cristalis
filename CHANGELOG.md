@@ -11,6 +11,8 @@ on DarkLauncher's "What's new" page.
 The first public version: ready-made programs on the Releases page, as Unleashed Recompiled
 does (no game asset in them; the player's own copy is still needed).
 
+- **DarkLauncher 2.05**: the safe-mode page names only what the player sees (no CRT here, no HDR on
+  Linux).
 - **DarkLauncher 2.04**: on Linux its help texts no longer name Windows (the system's language, the
   image viewer, the trash, the file manager); the game's own "Automatic (Windows)" became "Automatic
   (system)" there, and the Linux subtitle says "(experimental)".

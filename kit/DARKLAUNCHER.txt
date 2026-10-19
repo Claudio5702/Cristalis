@@ -1,16 +1,16 @@
-DarkLauncher 2.04 (commit d98b6ef), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h 9A71E2F33305D63A
+DarkLauncher 2.05 (commit b455aaf), copied from W:\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h C61A9CFC68FDF3B3
 file dl_achieve.c 34CF06C12DBD8312
 file dl_app.c 14DB04A7E21FEA1A
 file dl_draw.c 2387B68EBDFEF8AB
 file dl_gpu.c 1DAFB9D7C7462500
 file dl_input.c 19EDC10485F9795D
-file dl_int.h 4D8E46B53D70E8BD
-file dl_menu.c 26D66A5BA677B6C7
+file dl_int.h 7DC9A65DAF4479C6
+file dl_menu.c CAE606AEF4348451
 file dl_packs.c 10AE1C0391C7EF4F
 file dl_saves.c 59E4098A14674210
 file dl_sony.c AD231D89B5ECF6E7
-file dl_text.c ED6F5C9095B6ED9D
+file dl_text.c 1DDEFFEC734931A7
 file linux/dl_gdi.c 51ED378B11D7CDF3
 file linux/dl_gl.c C5F71EC000380903
 file linux/dl_icons.c E4F2AC1F462F8241

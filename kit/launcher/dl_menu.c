@@ -382,7 +382,7 @@ static const wchar_t *report_where(void) { // under the help of "Copy the crash 
   out[MAX_PATH + 7] = 0;
   return out;
 }
-static const DlRow safe_rows[] = {
+static DlRow safe_rows[] = { // not const: its help names only what is offered (dl_menu_init)
     {DL_ACTION, dl_texts[T_SAFE_KEEP], dl_texts[T_H_SAFE_KEEP], NULL, 0, NULL, NULL, safe_keep},
     {DL_ACTION, dl_texts[T_SAFE_RESTART], dl_texts[T_H_SAFE_RESTART], NULL, 0, NULL, NULL, dl_safe_restart},
     {DL_ACTION, dl_texts[T_SAFE_REPORT], dl_texts[T_H_SAFE_REPORT], NULL, 0, NULL, NULL, dl_report_copy, 0, report_where},
@@ -401,6 +401,14 @@ void dl_menu_finish(void) {
   dl_sec_top = dl_sec_n;
   add_section(SEC_QUIT, -1, 0xE7E8, dl_texts[T_QUIT], dl_texts[T_H_QUIT]);
   // the safe mode page, reached only after a crash (made always, so that --ui-audit sees it)
+  // safe mode turns off HDR and the CRT filter: its help names them only where the player is offered them
+#ifdef _WIN32
+  bool hdr_row = true;
+#else
+  bool hdr_row = false; // no HDR row on Linux
+#endif
+  bool crt_row = !(dl_game->hide & DL_HIDE_CRT);
+  safe_rows[0].help = dl_texts[hdr_row ? (crt_row ? T_H_SAFE_KEEP : T_H_SAFE_KEEP_HDR) : (crt_row ? T_H_SAFE_KEEP_CRT : T_H_SAFE_KEEP_SOFT)];
   safe_page = dl_page(dl_texts[T_SAFE_TAB], safe_rows, sizeof safe_rows / sizeof safe_rows[0]);
   if (dl_audit_dir) dl_page_insert(safe_page, 1, &safe_load_row);
 }
