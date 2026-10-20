@@ -345,13 +345,13 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"インターネットページを整理|「アップデート」と新しいバージョンのページは、新しいバージョンが見つかったときだけ表示されます。",
-    L"Page Internet allégée|« Mettre à jour » et la page de la nouvelle version n'apparaissent plus que lorsqu'une nouvelle version existe.",
-    L"A lighter Internet page|\"Update\" and the new version's page now appear only when a new version is out.",
-    L"Página Internet más simple|«Actualizar» y la página de la versión nueva solo aparecen cuando hay una versión nueva.",
-    L"Página Internet mais simples|\"Atualizar\" e a página da nova versão só aparecem quando há uma versão nova.",
-    L"Schlankere Internet-Seite|„Aktualisieren“ und die Seite der neuen Version erscheinen nur noch, wenn es eine neue Version gibt.",
-    L"Pagina Internet più semplice|«Aggiorna» e la pagina della nuova versione compaiono solo quando c'è una nuova versione." };
+    L"メニューの音楽を修正|メニューを動かすたびに音楽が途切れることはなくなりました。プレビューも滑らかになりました。",
+    L"Musique des menus corrigée|La musique ne se coupe plus à chaque déplacement dans les menus, et l'aperçu reste fluide.",
+    L"Menu music fixed|The music no longer cuts out at every move in the menus, and the preview stays smooth.",
+    L"Música de los menús corregida|La música ya no se corta con cada movimiento en los menús, y la vista previa sigue fluida.",
+    L"Música dos menus corrigida|A música não corta mais a cada movimento nos menus, e a prévia continua fluida.",
+    L"Menümusik korrigiert|Die Musik bricht nicht mehr bei jeder Bewegung in den Menüs ab, und die Vorschau bleibt flüssig.",
+    L"Musica dei menu corretta|La musica non si interrompe più a ogni spostamento nei menu, e l'anteprima resta fluida." };
 
 // ---- The game ----
 

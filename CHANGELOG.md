@@ -6,6 +6,11 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## 1.09
+
+- **DarkLauncher 2.15**: the music behind the menus no longer cuts out at every move, and the
+  preview keeps its pace (seen full screen at 4K, before the game is started).
+
 ## 1.08
 
 - **DarkLauncher 2.14**: on the Internet page, "The new version's page" and "Update" appear only once

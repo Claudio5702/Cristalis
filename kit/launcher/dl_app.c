@@ -611,7 +611,7 @@ void dl_beep(int kind) {
 
 // ---------------------------------------------------------------- sound: the game's samples go into a
 // ring, from which waveOut buffers are filled
-#define ABUF_COUNT 6
+#define ABUF_COUNT 24 // up to about 0.4 s handed to the sound device (in the menus, see menu_cushion)
 #define ABUF_FRAMES 512
 #define RING 32768 // sample frames
 static HWAVEOUT wave_out;
@@ -658,6 +658,15 @@ static int audio_queued(void) {
   for (int k = 0; k < ABUF_COUNT; k++)
     if (!(wave_hdr[k].dwFlags & WHDR_DONE)) n++;
   return n;
+}
+
+// In the menus (the game runs behind them before it is started), the sound is kept further ahead than
+// in play: drawing the setup screen again takes tens of milliseconds on a large screen (50 to 80 at 4K),
+// more than the 50 ms waiting in play, and the music behind the menus ran dry at every move. About
+// 0.2 s, in buffers.
+static int menu_cushion(void) {
+  int n = (int)(dl_game->audio_rate * 0.2 / ABUF_FRAMES) + 1;
+  return n < ABUF_COUNT - 2 ? n : ABUF_COUNT - 2;
 }
 
 static void audio_pump(void) {
@@ -1780,11 +1789,21 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     // fast forward: several pictures of the game for one, without their sound
     bool turbo = dl_mode == M_GAME && !(game->hide & DL_HIDE_TURBO) && (dl_turbo_held() || (dl_started && game->turbo && game->turbo()));
     int speed = !turbo ? 1 : dl_cfg.turbo == 2 ? 2 : dl_cfg.turbo == 4 ? 4 : 12;
+    // the menus' cushion of sound (menu_cushion) is dropped once the game is played: it would be heard
+    // late otherwise
+    static bool cushioned;
+    bool menus = dl_mode != M_GAME;
+    if (!menus && cushioned) {
+      waveOutReset(wave_out);
+      cushioned = false;
+    }
     // the wait for the screen refresh is skipped whenever the sound is running short: sound first
     int queued = wave_out ? audio_queued() : 0;
     bool sound_ok = !wave_out || queued >= 3;
-    // paced by the sound: a picture whenever fewer than three buffers (about 50 ms) wait to be played
+    // paced by the sound: a picture whenever fewer than three buffers (about 50 ms) wait to be played,
+    // in the menus fewer than their cushion
     bool pace = game->pace_by_sound && wave_out && !turbo;
+    int ahead = menus ? menu_cushion() : 3;
     // smooth motion: each picture takes several screen refreshes, so the screen sets the pace; the
     // sound, a little short then, is stretched by a few samples, which cannot be heard
     int steps = dl_mode == M_GAME && !turbo && !hidden && dl_gpu_ready() ? dl_gpu_steps() : 1;
@@ -1792,7 +1811,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     audio_stretch = steps > 1 && wave_out && queued < 3 ? 8 : 0;
     if (bench_frames > 120 && wave_out && queued == 0 && run) bench_gaps++; // the sound card ran dry
     QueryPerformanceCounter(&now);
-    if (run && (steps > 1 || (pace ? queued < 3 : now.QuadPart >= next.QuadPart))) {
+    if (run && (steps > 1 || (pace ? queued < ahead : now.QuadPart >= next.QuadPart))) {
       DlInput in = {dl_mode == M_GAME ? dl_game_buttons() : 0};
       for (int k = 0; k < speed; k++) {
         // run-ahead only in play, at the normal speed
@@ -1805,6 +1824,19 @@ int dl_run(const DlGame *game, int argc, char **argv) {
       }
       next.QuadPart += (LONGLONG)period;
       if (now.QuadPart - next.QuadPart > (LONGLONG)(period * 4)) next = now; // far behind: no catching up
+      // in the menus, more pictures of the game until the sound has its cushion again (after a turn
+      // spent drawing the setup screen): the music and the preview keep their pace however long the
+      // drawing takes; the game stays that much ahead of the clock
+      for (int k = 0; menus && wave_out && k < 12; k++) {
+        audio_pump();
+        if (audio_queued() >= ahead) break;
+        int n = play_frame(&in, audio, audio_max, 0);
+        if (n > 0 && audio) audio_add(audio, n);
+        cushioned = true;
+        fps_frames++;
+        bench_frames++;
+        if (!pic_same) bench_new++;
+      }
       if (now.QuadPart - fps_t0.QuadPart >= fq.QuadPart) { dl_fps_shown = fps_frames; fps_frames = 0; fps_t0 = now; }
       bool vsync = dl_cfg.vsync && dl_mode == M_GAME && sound_ok && !turbo;
       if (hidden) { // minimized: nothing drawn

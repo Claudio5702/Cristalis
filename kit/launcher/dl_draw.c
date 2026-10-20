@@ -300,7 +300,59 @@ void ui_rect(HDC dc, double x0, double y0, double x1, double y1, COLORREF c) {
   DeleteObject(b);
 }
 
+#ifdef _WIN32
+// The colour blended straight into the DC's bitmap, through its clipping. Used for the setup screen
+// drawn as a layer (dl_layer): AlphaBlend took three quarters of the time of each layer at 4K (12 of
+// 17 ms), and where nothing is drawn yet (the black or the white under the layer) the result is known
+// at once. False: not the setup screen's bitmap (dl_menu_bits, 32-bit, top down; GetObject does not
+// tell which way up a bitmap is), AlphaBlend does it.
+static bool rect_alpha_bits(HDC dc, int X0, int Y0, int X1, int Y1, COLORREF c, int alpha) {
+  DIBSECTION ds;
+  HGDIOBJ bmp = GetCurrentObject(dc, OBJ_BITMAP);
+  if (!bmp || GetObjectW(bmp, sizeof ds, &ds) != sizeof ds || ds.dsBm.bmBitsPixel != 32 || !ds.dsBm.bmBits || ds.dsBm.bmBits != dl_menu_bits) return false;
+  int w = ds.dsBm.bmWidth, h = ds.dsBm.bmHeight;
+  RECT box = {X0 < 0 ? 0 : X0, Y0 < 0 ? 0 : Y0, X1 > w ? w : X1, Y1 > h ? h : Y1}, *rects = &box;
+  int n = 1;
+  RGNDATA *data = NULL;
+  HRGN rg = CreateRectRgn(0, 0, 0, 0);
+  int clipped = rg ? GetClipRgn(dc, rg) : -1;
+  if (clipped == 1) {
+    DWORD size = GetRegionData(rg, 0, NULL);
+    data = size ? malloc(size) : NULL;
+    if (data && GetRegionData(rg, size, data)) {
+      rects = (RECT *)data->Buffer;
+      n = (int)data->rdh.nCount;
+    } else clipped = -1;
+  }
+  if (rg) DeleteObject(rg);
+  if (clipped < 0) { free(data); return false; }
+  GdiFlush(); // what GDI has drawn so far, in the bitmap
+  u32 cr = GetRValue(c), cg = GetGValue(c), cb = GetBValue(c), a = (u32)alpha, na = 255 - a;
+  u32 over_black = (((cr * a + 127) / 255) << 16) | (((cg * a + 127) / 255) << 8) | ((cb * a + 127) / 255);
+  u32 over_white = (((cr * a + 255 * na + 127) / 255) << 16) | (((cg * a + 255 * na + 127) / 255) << 8) | ((cb * a + 255 * na + 127) / 255);
+  u8 *bits = ds.dsBm.bmBits;
+  for (int k = 0; k < n; k++) {
+    int rx0 = rects[k].left > box.left ? rects[k].left : box.left, rx1 = rects[k].right < box.right ? rects[k].right : box.right;
+    int ry0 = rects[k].top > box.top ? rects[k].top : box.top, ry1 = rects[k].bottom < box.bottom ? rects[k].bottom : box.bottom;
+    for (int y = ry0; y < ry1; y++) {
+      u32 *row = (u32 *)(bits + (size_t)y * ds.dsBm.bmWidthBytes);
+      for (int x = rx0; x < rx1; x++) {
+        u32 v = row[x] & 0xFFFFFF;
+        if (v == 0) row[x] = over_black;
+        else if (v == 0xFFFFFF) row[x] = over_white;
+        else row[x] = (((cr * a + (v >> 16) * na + 127) / 255) << 16) | (((cg * a + ((v >> 8) & 255) * na + 127) / 255) << 8) | ((cb * a + (v & 255) * na + 127) / 255);
+      }
+    }
+  }
+  free(data);
+  return true;
+}
+#endif
+
 void ui_rect_alpha(HDC dc, double x0, double y0, double x1, double y1, COLORREF c, int alpha) {
+#ifdef _WIN32
+  if (dl_layer && rect_alpha_bits(dc, ui_ox + PX(x0), ui_oy + PX(y0), ui_ox + PX(x1), ui_oy + PX(y1), c, alpha)) return;
+#endif
   static HDC src;
   static u32 *px;
   if (!src) {
