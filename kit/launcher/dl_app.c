@@ -924,7 +924,7 @@ void dl_discord_changed(void) { discord_follow(true); }
 // ---- a newer version: UPDATE_URL, or the newest release on GitHub (UPDATE_GITHUB), read on a thread of
 // its own once at start; with UPDATE_ASSET, "Update" downloads the release's file, checks its size and
 // its SHA-256 (as GitHub gives them) and installs it
-static volatile LONG upd_state; // 0 nothing yet, 1 looking, 2 a newer version, 3 none newer (or no answer)
+static volatile LONG upd_state; // 0 nothing yet, 1 looking, 2 a newer version, 3 none newer, 4 no answer (a private repository, no network)
 static char upd_version[32], upd_page[512];
 static char upd_asset_url[1024];      // the release's file for this system (UPDATE_ASSET), if it may be installed
 static long long upd_asset_size;
@@ -1200,7 +1200,7 @@ static bool asset_ok(const Asset *a) {
 
 static DWORD WINAPI update_thread(void *arg) {
   (void)arg;
-  LONG result = 3;
+  LONG result = 4;
   if (UPDATE_GITHUB[0]) { // GitHub's newest release (not the drafts nor the pre-releases)
     int cap = 1 << 19;
     char *body = malloc((size_t)cap + 1);
@@ -1213,6 +1213,7 @@ static DWORD WINAPI update_thread(void *arg) {
       const char *v = r.tag[0] == 'v' || r.tag[0] == 'V' ? r.tag + 1 : r.tag;
       snprintf(upd_version, sizeof upd_version, "%s", *v >= '0' && *v <= '9' ? v : "");
       snprintf(upd_page, sizeof upd_page, "%s", !strncmp(r.page, "http", 4) ? r.page : "");
+      if (upd_version[0]) result = 3; // an answer, with a version
       if (r.picked && asset_ok(&r.pick)) {
         snprintf(upd_asset_url, sizeof upd_asset_url, "%s", r.pick.url);
         upd_asset_size = r.pick.size;
@@ -1231,6 +1232,7 @@ static DWORD WINAPI update_thread(void *arg) {
       if (page) page[strcspn(page, "\r\n")] = 0;
       snprintf(upd_version, sizeof upd_version, "%s", body[0] >= '0' && body[0] <= '9' ? body : ""); // an error's page is no version
       snprintf(upd_page, sizeof upd_page, "%s", page && !strncmp(page, "http", 4) ? page : "");
+      if (upd_version[0]) result = 3;
       if (upd_version[0] && dl_game->version && version_cmp(upd_version, dl_game->version) > 0) result = 2;
     }
   }
@@ -1255,7 +1257,7 @@ void dl_online_start(void) {
   InterlockedExchange(&upd_state, 1);
   HANDLE t = CreateThread(NULL, 0, update_thread, NULL, 0, NULL);
   if (t) CloseHandle(t);
-  else upd_state = 3;
+  else upd_state = 4;
 }
 
 const wchar_t *dl_update_text(void) {
@@ -1388,7 +1390,7 @@ static DWORD WINAPI install_thread(void *arg) {
 
 void dl_update_install(void) {
   if (upd_get == 1 || upd_get == 2) return;
-  if (upd_state != 2) { dl_note(TX(T_UPD_NONE)); return; }
+  if (upd_state != 2) { if (upd_state == 3) dl_note(TX(T_UPD_NONE)); return; } // no answer (a private repository...): nothing to say
   if (!upd_asset_url[0]) { dl_update_open(); return; } // no file to install: its page
   InterlockedExchange(&upd_pct, 0);
   InterlockedExchange(&upd_get, 1);

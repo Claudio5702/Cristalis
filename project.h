@@ -13,13 +13,11 @@
 #define PROJECT_LOGO_FIRST "C"                    // the setup screen's title: a large initial (also on the icon),
 #define PROJECT_LOGO_REST "RISTALIS"              // then the rest in smaller capitals
 #define GAME_VERSION "1.07"                    // this port's version (CHANGELOG.md): 1.01, 1.02... as DarkLauncher's
-// DarkLauncher's look for a new version (Settings, Internet): the newest release of
-// this repository, and the files its "Update" downloads and installs (the installer is started with
-// /S /D=<folder> /NOSHORTCUTS /WAIT=<pid> /RUN; the Linux archive replaces the program's files).
+// DarkLauncher's look for a new version (Settings, Internet; on at first): the newest release of
+// this repository. Its "Update" downloads and installs the release's Cristalis-Setup.exe (started
+// with /S /D=<folder> /NOSHORTCUTS /WAIT=<pid> /RUN) or Cristalis-linux-x86_64.tar.gz, DarkLauncher's
+// names from PROJECT_NAME.
 #define UPDATE_GITHUB "Claudio5702/Cristalis"
-#define UPDATE_ASSET_WINDOWS "Cristalis-Setup.exe"
-#define UPDATE_ASSET_LINUX "Cristalis-linux-x86_64.tar.gz"
-#define UPDATE_DEFAULT_ON 1 // the look is on at first (the player can turn it off; installing still waits for "Update")
 #define GAME_NAME "Crystal Defenders"             // the program as the user sees it: install folder, shortcuts, Windows list of programs
 #define FILE_STEM "crystal_defenders"             // crystal_defenders.exe, crystal_defenders.ini...
 #define WINDOW_CLASS "CrystalDefendersRecomp"     // window class of the program (the name before Cristalis: kept)

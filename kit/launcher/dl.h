@@ -10,7 +10,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "2.12"
+#define DL_VERSION "2.13"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

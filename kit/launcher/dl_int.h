@@ -13,6 +13,17 @@
 #ifndef DISCORD_APP_ID
 #define DISCORD_APP_ID "" // its Discord application (discord.com/developers), for the player's status
 #endif
+// Where the project's versions are published, when project.h says nothing of it: its GitHub repository,
+// as tools\sync_to_project.ps1 read it from the project's git remote (dl_source.inc, beside this file in
+// the project's copy). A private repository answers nothing: no newer version is told until it is public.
+#if !defined(UPDATE_URL) && !defined(UPDATE_GITHUB) && defined(__has_include)
+#if __has_include("dl_source.inc")
+#include "dl_source.inc"
+#endif
+#ifdef DL_GIT_GITHUB
+#define UPDATE_GITHUB DL_GIT_GITHUB
+#endif
+#endif
 #ifndef UPDATE_URL
 #define UPDATE_URL "" // a text file (http or https): the newest version on its first line, its page on the second
 #endif
@@ -20,7 +31,8 @@
 // ("v1.07": 1.07), its page the release's. UPDATE_GITHUB_API: where GitHub's API answers (the demo: a
 // local server, for tests). UPDATE_ASSET_*: the file of the release that updates the game (an installer
 // that takes /S /D=<folder> /NOSHORTCUTS /WAIT=<pid> /RUN on Windows, an archive of the program's
-// folder on Linux); "": the release's page only.
+// folder on Linux); by default the names tools\make_installer.ps1 and tools/linux_package.sh give them;
+// "": the release's page only. #define UPDATE_GITHUB "" turns the look off for a project on GitHub.
 #ifndef UPDATE_GITHUB
 #define UPDATE_GITHUB ""
 #endif
@@ -28,10 +40,10 @@
 #define UPDATE_GITHUB_API "https://api.github.com"
 #endif
 #ifndef UPDATE_ASSET_WINDOWS
-#define UPDATE_ASSET_WINDOWS ""
+#define UPDATE_ASSET_WINDOWS PROJECT_NAME "-Setup.exe"
 #endif
 #ifndef UPDATE_ASSET_LINUX
-#define UPDATE_ASSET_LINUX ""
+#define UPDATE_ASSET_LINUX PROJECT_NAME "-linux-x86_64.tar.gz"
 #endif
 #ifdef _WIN32
 #define UPDATE_ASSET UPDATE_ASSET_WINDOWS
@@ -39,10 +51,10 @@
 #define UPDATE_ASSET UPDATE_ASSET_LINUX
 #endif
 #define DL_UPDATE_ON (UPDATE_URL[0] != 0 || UPDATE_GITHUB[0] != 0) // the project looks for a newer version
-// 1: the look for a newer version is on at first (the player may turn it off; an update is still
-// installed only when the player chooses "Update"); 0: off at first
+// 1 (since 2.13): the look for a newer version is on at first (the player may turn it off; an update
+// is still installed only when the player chooses "Update"); 0: off at first
 #ifndef UPDATE_DEFAULT_ON
-#define UPDATE_DEFAULT_ON 0
+#define UPDATE_DEFAULT_ON 1
 #endif
 // The player's own folders and files, never written over by an update on Linux (project.h, as the
 // uninstaller keeps them)

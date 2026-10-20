@@ -21,9 +21,9 @@ on DarkLauncher's "What's new" page.
   screenshots, settings and the game's data are left as they are; the game starts again.
 - **DarkLauncher 2.07**: its version is no longer written at the bottom right of the menus (it is
   still in `--version` and in the crash report).
-- **DarkLauncher 2.12**: Internet is a row of the Settings page (it was the last row of Controls);
+- **DarkLauncher 2.12, 2.13**: Internet is a row of the Settings page (it was the last row of Controls);
   the help texts name only what is offered (the Picture help no longer names the CRT filter and the
-  scanlines).
+  scanlines); when GitHub cannot be reached, it no longer says the version is the latest.
 - The READMEs say what goes over the Internet: only the look for new versions, one request to
   GitHub at each start.
 
