@@ -1660,6 +1660,16 @@ static void ShowFrame()
 static void DarkLauncherPresent()
 {
     FlushBatch();
+    // CD_AUTOPAD_SHOTS (tests): the picture just before each CD_AUTOPAD tap, at the internal size.
+    static const bool autoPadShots = getenv("CD_AUTOPAD_SHOTS") != nullptr;
+    static uint32_t shotStep;
+    if (autoPadShots && g_autoPadStep != shotStep)
+    {
+        shotStep = g_autoPadStep;
+        char path[64];
+        snprintf(path, sizeof(path), "frame_%u.bmp", shotStep - 1);
+        SaveFrame(path);
+    }
     static ID3D11Texture2D* staging;
     static uint32_t stagingHalves;
     if (staging == nullptr || stagingHalves != g_halves)
