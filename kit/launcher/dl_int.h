@@ -251,6 +251,7 @@ void dl_online_follow(void);     // from the main loop: Discord's status, the re
 const wchar_t *dl_update_text(void); // "Version 1.4 is out." when a newer version was found, else NULL
 void dl_update_open(void);       // its page in the browser
 void dl_update_install(void);    // "Update": downloads the release's file, checks it, installs it and starts again
+void dl_net_newer(void);         // dl_menu.c: a newer version found, its rows join the Internet page
 const wchar_t *dl_update_install_show(int v); // beside that row: the progress, "ready", "failed"...
 void dl_discord_changed(void);   // the Discord switch moved
 bool dl_news_open(void);       // the game's news, the first time its version starts; false: none to show

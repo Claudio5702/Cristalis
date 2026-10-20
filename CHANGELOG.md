@@ -6,6 +6,12 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## 1.08
+
+- **DarkLauncher 2.14**: on the Internet page, "The new version's page" and "Update" appear only once
+  a newer version has been found; until then the page shows only the look for new versions, with
+  "This is the newest version." The first version that a 1.07 can install by itself.
+
 ## 1.07
 
 - **The saves are in the `saves` folder**, where a player looks for them: before, the game's saves

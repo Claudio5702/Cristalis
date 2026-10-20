@@ -1433,6 +1433,7 @@ static void update_follow(void) {
 
 void dl_online_follow(void) {
   static LONG told;
+  if (upd_state == 2 && dl_cfg.updates) dl_net_newer(); // "the new version's page" and "Update" only now
   update_follow();
   static bool test_once; // DL_TEST_UPDATE (tests): "Update" chosen by itself once a file to install is found
   if (!test_once && upd_state == 2 && upd_asset_url[0] && getenv("DL_TEST_UPDATE")) {

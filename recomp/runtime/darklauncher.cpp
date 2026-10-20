@@ -345,13 +345,13 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"セーブデータと自動更新|セーブデータは saves フォルダーに入りました（前のものは自動で移されています）。新しいバージョンが出ると起動時に知らせ、「アップデート」でインストールします（設定 → インターネットでオフ）。",
-    L"Sauvegardes et mises à jour|Vos sauvegardes sont maintenant dans le dossier saves (les anciennes y ont été déplacées). Une nouvelle version est annoncée au lancement et s'installe avec « Mettre à jour » (Paramètres → Internet pour couper).",
-    L"Saves and updates|Your saves are now in the saves folder (the old ones were moved there). A new version is announced at start and installed with \"Update\" (Settings → Internet to turn it off).",
-    L"Partidas y actualizaciones|Sus partidas están ahora en la carpeta saves (las anteriores se movieron allí). Una versión nueva se anuncia al iniciar y se instala con «Actualizar» (Ajustes → Internet para desactivarlo).",
-    L"Jogos salvos e atualizações|Seus jogos salvos agora ficam na pasta saves (os antigos foram movidos). Uma versão nova é anunciada ao iniciar e instalada com \"Atualizar\" (Configurações → Internet para desligar).",
-    L"Spielstände und Updates|Ihre Spielstände liegen jetzt im Ordner saves (die alten wurden verschoben). Eine neue Version wird beim Start gemeldet und mit „Aktualisieren“ installiert (Einstellungen → Internet zum Abschalten).",
-    L"Salvataggi e aggiornamenti|I salvataggi sono ora nella cartella saves (quelli vecchi sono stati spostati). Una nuova versione viene annunciata all'avvio e installata con «Aggiorna» (Impostazioni → Internet per disattivarlo)." };
+    L"インターネットページを整理|「アップデート」と新しいバージョンのページは、新しいバージョンが見つかったときだけ表示されます。",
+    L"Page Internet allégée|« Mettre à jour » et la page de la nouvelle version n'apparaissent plus que lorsqu'une nouvelle version existe.",
+    L"A lighter Internet page|\"Update\" and the new version's page now appear only when a new version is out.",
+    L"Página Internet más simple|«Actualizar» y la página de la versión nueva solo aparecen cuando hay una versión nueva.",
+    L"Página Internet mais simples|\"Atualizar\" e a página da nova versão só aparecem quando há uma versão nova.",
+    L"Schlankere Internet-Seite|„Aktualisieren“ und die Seite der neuen Version erscheinen nur noch, wenn es eine neue Version gibt.",
+    L"Pagina Internet più semplice|«Aggiorna» e la pagina della nuova versione compaiono solo quando c'è una nuova versione." };
 
 // ---- The game ----
 

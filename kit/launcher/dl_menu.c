@@ -403,6 +403,16 @@ static void page_drop(int page, const int *value) {
     }
 }
 
+// A newer version found (dl_app.c): its page and "Update" join the Internet page, once (even while it is shown)
+void dl_net_newer(void) {
+  static bool done;
+  if (done || !DL_UPDATE_ON) return;
+  done = true;
+  dl_page_insert(PG_NET, dl_pages[PG_NET].n, &net_open_row);
+  if (UPDATE_GITHUB[0] != 0 && UPDATE_ASSET[0] != 0) dl_page_insert(PG_NET, dl_pages[PG_NET].n, &net_install_row); // the release's file, installed
+  dl_dirty = true;
+}
+
 void dl_menu_init(void) {
   bool saves = dl_game->save_state && dl_game->load_state;
   if (dl_game->pad_layout || dl_game->pad_menu) pad_rows[sizeof pad_rows / sizeof pad_rows[0] - 1].help = dl_texts[T_PH_DEFAULTS_GAME];
@@ -454,9 +464,7 @@ void dl_menu_init(void) {
   DlPage *pn = &dl_pages[dl_page(dl_texts[T_TAB_NET], NULL, 0)];
   if (DISCORD_APP_ID[0]) pn->rows[pn->n++] = &net_discord_row;
   if (DL_UPDATE_ON) {
-    pn->rows[pn->n++] = &net_updates_row;
-    pn->rows[pn->n++] = &net_open_row;
-    if (UPDATE_GITHUB[0] != 0 && UPDATE_ASSET[0] != 0) pn->rows[pn->n++] = &net_install_row; // the release's file, installed
+    pn->rows[pn->n++] = &net_updates_row; // the new version's page and "Update" come once one is found (dl_net_newer)
   }
   bool net = pn->n > 0; // a row of the Settings page (made below), after Controls
   bool discord = DISCORD_APP_ID[0] != 0;
