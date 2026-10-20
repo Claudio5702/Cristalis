@@ -301,7 +301,83 @@ static const DlRow net_discord_row = {DL_SWITCH, dl_texts[T_DISCORD], dl_texts[T
 static const DlRow net_updates_row = {DL_SWITCH, dl_texts[T_UPDATES], dl_texts[T_H_UPDATES], &dl_cfg.updates, 1, NULL, NULL, dl_online_start, 0, updates_more};
 static const DlRow net_open_row = {DL_ACTION, dl_texts[T_UPD_OPEN], dl_texts[T_H_UPD_OPEN], NULL, 0, NULL, NULL, dl_update_open};
 static const DlRow net_install_row = {DL_ACTION, dl_texts[T_UPD_INSTALL], dl_texts[T_H_UPD_INSTALL], NULL, 0, NULL, dl_update_install_show, dl_update_install};
-static const DlRow net_row = {.kind = DL_PAGE, .label = dl_texts[T_NET], .help = dl_texts[T_H_NET], .page = PG_NET};
+static DlRow net_row = {.kind = DL_PAGE, .label = dl_texts[T_NET], .help = dl_texts[T_H_NET], .page = PG_NET}; // not const: its help says what is there
+
+// ---- helps that name only what is offered (the game's hide, the system, the project), made at start:
+// the words of each language joined as it joins them ("A, B et C")
+typedef const wchar_t *Words[DL_LANGS];
+static const wchar_t *const words_sep[DL_LANGS] = {L"、", L", ", L", ", L", ", L", ", L", ", L", "};
+static const wchar_t *const words_last[DL_LANGS] = {L"、", L" et ", L" and ", L" y ", L" e ", L" und ", L" e "};
+static void words_join(wchar_t *out, size_t cap, const Words *const *items, int n, int lang, bool last_word) {
+  out[0] = 0;
+  for (int k = 0; k < n; k++) {
+    if (k) wcsncat(out, k == n - 1 && last_word ? words_last[lang] : words_sep[lang], cap - wcslen(out) - 1);
+    wcsncat(out, (*items[k])[lang], cap - wcslen(out) - 1);
+  }
+}
+// "Picture" in Settings: the rows of the Picture page (without the CRT filter, the scanlines or HDR when
+// they are not there)
+static const Words image_words[] = {
+    {L"フルスクリーン", L"Plein écran", L"Fullscreen", L"Pantalla completa", L"Tela cheia", L"Vollbild", L"Schermo intero"},
+    {L"整数倍表示", L"échelle entière", L"integer scaling", L"escala entera", L"escala inteira", L"Ganzzahl-Skalierung", L"scala intera"},
+    {L"描画方式", L"affichage", L"display", L"visualización", L"exibição", L"Darstellung", L"visualizzazione"},
+    {L"フィルター", L"filtre", L"filter", L"filtro", L"filtro", L"Filter", L"filtro"},
+    {L"スキャンライン", L"scanlines", L"scanlines", L"scanlines", L"scanlines", L"Scanlines", L"scanline"},
+    {L"ブラウン管フィルター", L"filtre CRT", L"CRT filter", L"filtro CRT", L"filtro CRT", L"Röhren-Filter", L"filtro CRT"},
+    {L"HDR", L"HDR", L"HDR", L"HDR", L"HDR", L"HDR", L"HDR"},
+    {L"垂直同期", L"synchro verticale", L"vertical sync", L"sincronización vertical", L"sincronização vertical", L"vertikale Synchronisation", L"sincronia verticale"},
+    {L"FPS表示", L"FPS", L"the FPS counter", L"contador de FPS", L"contador de FPS", L"FPS-Anzeige", L"contatore FPS"},
+};
+enum { IW_SCAN = 4, IW_CRT = 5, IW_HDR = 6 };
+static wchar_t image_help_text[DL_LANGS][320];
+static const wchar_t *image_help[DL_LANGS];
+// The entry Settings: its pages (and Internet when there), then its actions (and Restart when there)
+static const Words settings_words[] = {
+    {L"言語", L"Langues", L"Languages", L"Idiomas", L"Idiomas", L"Sprachen", L"Lingue"},
+    {L"画面", L"image", L"picture", L"imagen", L"imagem", L"Bild", L"immagine"},
+    {L"サウンド", L"son", L"sound", L"sonido", L"som", L"Ton", L"suono"},
+    {L"操作", L"commandes", L"controls", L"controles", L"controles", L"Steuerung", L"comandi"},
+    {L"インターネット", L"Internet", L"Internet", L"Internet", L"Internet", L"Internet", L"Internet"},
+}, settings_more_words[] = {
+    {L"ゲームのフォルダー", L"le dossier du jeu", L"the game folder", L"la carpeta del juego", L"a pasta do jogo", L"der Spielordner", L"la cartella del gioco"},
+    {L"初期設定", L"les valeurs par défaut", L"the default values", L"los valores por defecto", L"os valores padrão", L"die Standardwerte", L"i valori predefiniti"},
+    {L"最初から始める", L"le redémarrage", L"restarting", L"el reinicio", L"o reinício", L"der Neustart", L"il riavvio"},
+};
+static const wchar_t *const settings_mid[DL_LANGS] = {L"。", L" ; et aussi ", L"; and ", L"; y también ", L"; e também ", L"; dazu ", L"; e anche "};
+static const wchar_t *const settings_end[DL_LANGS] = {L"、もここにあります。", L".", L".", L".", L".", L".", L"."};
+static wchar_t settings_help_text[DL_LANGS][320];
+static const wchar_t *settings_help[DL_LANGS];
+static void helps_make(bool net) {
+#ifdef _WIN32
+  bool hdr = true;
+#else
+  bool hdr = false; // no HDR row on Linux
+#endif
+  const Words *pick[16];
+  for (int lang = 0; lang < DL_LANGS; lang++) {
+    int n = 0;
+    for (int k = 0; k < (int)(sizeof image_words / sizeof image_words[0]); k++) {
+      if ((k == IW_SCAN && (dl_game->hide & DL_HIDE_SCANLINES)) || (k == IW_CRT && (dl_game->hide & DL_HIDE_CRT)) || (k == IW_HDR && !hdr)) continue;
+      pick[n++] = &image_words[k];
+    }
+    words_join(image_help_text[lang], 316, pick, n, lang, true);
+    wcsncat(image_help_text[lang], lang == DL_LANG_JP ? L"。" : L".", 2);
+    image_help[lang] = image_help_text[lang];
+    wchar_t more[200];
+    n = 0;
+    for (int k = 0; k < 5; k++)
+      if (k != 4 || net) pick[n++] = &settings_words[k];
+    words_join(settings_help_text[lang], 120, pick, n, lang, false);
+    n = 0;
+    for (int k = 0; k < 3; k++)
+      if (k != 2 || dl_game->reset) pick[n++] = &settings_more_words[k];
+    words_join(more, 200, pick, n, lang, true);
+    _snwprintf(settings_help_text[lang] + wcslen(settings_help_text[lang]), 319 - wcslen(settings_help_text[lang]), L"%ls%ls%ls", settings_mid[lang],
+               more, settings_end[lang]);
+    settings_help_text[lang][319] = 0;
+    settings_help[lang] = settings_help_text[lang];
+  }
+}
 
 // ---- Settings: one entry of the bar for the kit's pages and its rarer actions
 static void settings_folder(void) { ShellExecuteA(NULL, "open", dl_base_dir, NULL, NULL, SW_SHOWNORMAL); }
@@ -382,8 +458,14 @@ void dl_menu_init(void) {
     pn->rows[pn->n++] = &net_open_row;
     if (UPDATE_GITHUB[0] != 0 && UPDATE_ASSET[0] != 0) pn->rows[pn->n++] = &net_install_row; // the release's file, installed
   }
-  if (pn->n) dl_page_insert(PG_CTRL, dl_pages[PG_CTRL].n, &net_row); // the last row of the Controls page
+  bool net = pn->n > 0; // a row of the Settings page (made below), after Controls
+  bool discord = DISCORD_APP_ID[0] != 0;
+  net_row.help = dl_texts[discord && DL_UPDATE_ON ? (UPDATE_DEFAULT_ON ? T_H_NET_ON : T_H_NET)
+                          : discord ? T_H_NET_DISCORD : UPDATE_DEFAULT_ON ? T_H_NET_UPD_ON : T_H_NET_UPD_OFF];
+  helps_make(net);
+  settings_rows[1].help = image_help; // "Picture": the rows offered
   dl_page(dl_texts[T_TAB_SETTINGS], settings_rows, sizeof settings_rows / sizeof settings_rows[0]);
+  if (net) dl_page_insert(PG_SETTINGS, 4, &net_row); // Internet, after Controls
   if (dl_game->reset) dl_page_insert(PG_SETTINGS, dl_pages[PG_SETTINGS].n, &settings_reset_row); // a game that cannot restart has no such row
   add_section(SEC_PLAY, -1, 0xE768, dl_texts[T_PLAY], dl_texts[T_H_PLAY]);
   if (saves) add_section(SEC_PAGE, PG_SAVES, 0xE74E, dl_texts[T_SAVES], dl_texts[T_H_SAVES]);
@@ -419,7 +501,7 @@ void dl_safe_page_open(void) {
 
 void dl_menu_finish(void) {
   // the kit's pages and rarer actions behind one entry (Settings), then Quit alone at the bottom
-  add_section(SEC_PAGE, PG_SETTINGS, 0xE713, dl_texts[T_PA_SETTINGS], dl_texts[T_H_SETTINGS]);
+  add_section(SEC_PAGE, PG_SETTINGS, 0xE713, dl_texts[T_PA_SETTINGS], settings_help);
   dl_sec_top = dl_sec_n;
   add_section(SEC_QUIT, -1, 0xE7E8, dl_texts[T_QUIT], dl_texts[T_H_QUIT]);
   // the safe mode page, reached only after a crash (made always, so that --ui-audit sees it)

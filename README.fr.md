@@ -80,6 +80,9 @@ n'est pas le cas.
   PlayStation 3 a besoin du pilote DsHidMini.
 - **Un rapport de plantage** qui dit où en était la partie (« W1, Stage 2, Wave 5 »), écrit au démarrage suivant.
 - **Un installeur et un désinstalleur**, en six langues.
+- **Mises à jour** : à chaque lancement, le lanceur regarde si une nouvelle version existe et
+  propose de l'installer ; rien n'est installé avant que vous choisissiez « Mettre à jour ». Cela
+  se désactive dans Paramètres, Internet.
 
 ## Écran de réglages
 
@@ -105,6 +108,7 @@ page de l'entrée sélectionnée s'affiche à côté. Entrée ou Droite y entre,
   - **Son** : le volume et les sons du menu.
   - **Commandes** : les touches du clavier et les boutons de manette du jeu, la vibration et les
     raccourcis.
+  - **Internet** : la recherche de nouvelles versions (activée au départ) et la mise à jour.
   - Le dossier du jeu, et les réglages par défaut.
 
 ![La page Image](docs/screenshots/picture-en.png)
@@ -196,7 +200,10 @@ c'est la bonne.
 **Puis-je utiliser mes sauvegardes de la console ?** Les sauvegardes sont dans `saves\`, au
 format du jeu lui-même ; copier des sauvegardes entre la console et le PC n'a pas été essayé.
 
-**Quelque chose est-il envoyé sur Internet ?** Non. Le programme n'utilise pas du tout le réseau.
+**Quelque chose est-il envoyé sur Internet ?** Seulement la recherche de nouvelles versions : à
+chaque lancement, une demande à GitHub pour la dernière version de ce dépôt (GitHub voit votre
+adresse IP, comme pour n'importe quelle page). Rien sur vous ni sur votre partie n'est envoyé.
+Désactivez-la dans Paramètres, Internet, et le programme n'utilise plus du tout le réseau.
 
 ## Feuille de route
 

@@ -79,6 +79,9 @@ segnala se non lo è.
   richiede il driver DsHidMini.
 - **Un rapporto di crash** che dice dov'era la partita («W1, Stage 2, Wave 5»), scritto all'avvio successivo.
 - **Un programma di installazione e uno di disinstallazione**, in sei lingue.
+- **Aggiornamenti**: a ogni avvio il launcher controlla se c'è una nuova versione e propone di
+  installarla; nulla viene installato finché non scegliete «Aggiorna». Si disattiva in
+  Impostazioni, Internet.
 
 ## Schermata delle impostazioni
 
@@ -105,6 +108,7 @@ la pagina della voce selezionata appare accanto. Invio o Destra vi entra, Esc to
   - **Audio**: il volume e i suoni del menu.
   - **Comandi**: i tasti della tastiera e i pulsanti del controller del gioco, la vibrazione e le
     scorciatoie.
+  - **Internet**: la ricerca di nuove versioni (attiva all'inizio) e l'aggiornamento.
   - La cartella del gioco e le impostazioni predefinite.
 
 ![La pagina Immagine](docs/screenshots/picture-en.png)
@@ -190,7 +194,10 @@ o testi del gioco: il programma li legge dalla tua copia, dopo aver verificato c
 **Posso usare i miei salvataggi della console?** I salvataggi sono in `saves\`, nel formato
 proprio del gioco; copiare salvataggi tra la console e il PC non è stato provato.
 
-**Viene inviato qualcosa su Internet?** No. Il programma non usa affatto la rete.
+**Viene inviato qualcosa su Internet?** Solo la ricerca di nuove versioni: a ogni avvio, una
+richiesta a GitHub per l'ultima versione di questo repository (GitHub vede il vostro indirizzo IP,
+come per qualsiasi pagina). Nulla su di voi o sulla vostra partita viene inviato. Disattivatela in
+Impostazioni, Internet, e il programma non usa affatto la rete.
 
 ## Programmi
 

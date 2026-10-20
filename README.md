@@ -73,6 +73,9 @@ is not.
 - **Controllers**: Xbox (XInput), and PlayStation 4 and 5 read directly (USB or Bluetooth), with vibration on both; keys and buttons chosen on the Controls page. A PlayStation 3 pad needs the DsHidMini driver.
 - **A crash report** that says where the game was ("W1, Stage 2, Wave 5"), written at the next start.
 - **An installer and an uninstaller**, in six languages.
+- **Updates**: at each start the launcher looks whether a newer version is out and offers to
+  install it; nothing is installed until you choose "Update". It can be turned off in Settings,
+  Internet.
 
 ## Settings screen
 
@@ -97,6 +100,7 @@ back.
     (high contrast, colour-blind filter, less motion, large help text).
   - **Sound**: the volume and the sounds of the menu.
   - **Controls**: the keyboard keys and controller buttons of the game, vibration, and the shortcuts.
+  - **Internet**: the look for new versions (on at first), and the update itself.
   - The game folder, and the default settings.
 
 ![The Picture page](docs/screenshots/picture-en.png)
@@ -179,7 +183,10 @@ sounds, music or texts: the program reads them from your copy, after checking it
 **Can I use my saves from the console?** The saves are in `saves\`, in the game's own format;
 copying saves between the console and the PC has not been tried.
 
-**Is anything sent over the Internet?** No. The program does not use the network at all.
+**Is anything sent over the Internet?** Only the look for new versions: at each start, one request
+to GitHub for this repository's latest release (GitHub sees your IP address, as for any page).
+Nothing about you or your game is sent. Turn it off in Settings, Internet, and the program does
+not use the network at all.
 
 ## Roadmap
 

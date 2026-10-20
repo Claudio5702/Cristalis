@@ -82,6 +82,9 @@ wenn nicht.
   Controller braucht den Treiber DsHidMini.
 - **Ein Absturzbericht**, der sagt, wo das Spiel war („W1, Stage 2, Wave 5"), beim nächsten Start geschrieben.
 - **Ein Installations- und ein Deinstallationsprogramm**, in sechs Sprachen.
+- **Updates**: Bei jedem Start schaut der Launcher, ob es eine neue Version gibt, und bietet an,
+  sie zu installieren; nichts wird installiert, bevor Sie „Aktualisieren" wählen. Abschalten
+  lässt es sich unter Einstellungen, Internet.
 
 ## Einstellungsbildschirm
 
@@ -105,6 +108,7 @@ die Seite des gewählten Eintrags erscheint daneben. Enter oder Rechts öffnet s
   - **Ton**: die Lautstärke und die Töne des Menüs.
   - **Steuerung**: die Tastatur-Tasten und Controller-Knöpfe des Spiels, die Vibration und die
     Tastenkürzel.
+  - **Internet**: die Suche nach neuen Versionen (anfangs eingeschaltet) und das Update selbst.
   - Der Spielordner und die Standardeinstellungen.
 
 ![Die Seite Bild](docs/screenshots/picture-en.png)
@@ -195,7 +199,10 @@ dass sie die erwartete ist.
 **Kann ich meine Spielstände von der Konsole verwenden?** Die Spielstände liegen in `saves\`, im
 eigenen Format des Spiels; Spielstände zwischen Konsole und PC zu kopieren wurde nicht ausprobiert.
 
-**Wird etwas ins Internet gesendet?** Nein. Das Programm benutzt das Netzwerk überhaupt nicht.
+**Wird etwas ins Internet gesendet?** Nur die Suche nach neuen Versionen: bei jedem Start eine
+Anfrage an GitHub nach der neuesten Version dieses Repositorys (GitHub sieht Ihre IP-Adresse, wie
+bei jeder Seite). Nichts über Sie oder Ihr Spiel wird gesendet. Schalten Sie sie unter
+Einstellungen, Internet ab, dann benutzt das Programm das Netzwerk überhaupt nicht.
 
 ## Pläne
 

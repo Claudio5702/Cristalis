@@ -39,6 +39,11 @@
 #define UPDATE_ASSET UPDATE_ASSET_LINUX
 #endif
 #define DL_UPDATE_ON (UPDATE_URL[0] != 0 || UPDATE_GITHUB[0] != 0) // the project looks for a newer version
+// 1: the look for a newer version is on at first (the player may turn it off; an update is still
+// installed only when the player chooses "Update"); 0: off at first
+#ifndef UPDATE_DEFAULT_ON
+#define UPDATE_DEFAULT_ON 0
+#endif
 // The player's own folders and files, never written over by an update on Linux (project.h, as the
 // uninstaller keeps them)
 #ifndef SETUP_PERSONAL_FOLDERS
@@ -299,7 +304,7 @@ enum {
   T_SAFE_REPORT, T_H_SAFE_REPORT, T_M_REPORT,
   T_SVH_X, T_SVH_OSK,
   T_H_SETTINGS, T_TAB_SETTINGS,
-  T_NET, T_H_NET, T_TAB_NET, T_DISCORD, T_H_DISCORD, T_DS_PLAYING, T_DS_MENUS, T_UPDATES, T_H_UPDATES, T_UPD_NEW, T_UPD_NONE, T_UPD_OPEN, T_H_UPD_OPEN,
+  T_NET, T_H_NET, T_H_NET_ON, T_H_NET_DISCORD, T_H_NET_UPD_OFF, T_H_NET_UPD_ON, T_TAB_NET, T_DISCORD, T_H_DISCORD, T_DS_PLAYING, T_DS_MENUS, T_UPDATES, T_H_UPDATES, T_UPD_NEW, T_UPD_NONE, T_UPD_OPEN, T_H_UPD_OPEN,
   T_UPD_INSTALL, T_H_UPD_INSTALL, T_UPD_ST_NONE, T_UPD_ST_PAGE, T_UPD_ST_READY, T_UPD_ST_FAIL, T_UPD_FAIL_NOTE, T_UPD_RESTART,
   T_TAB_NEWS, T_H_NEWS, T_TAB_WELCOME, T_W_NEXT, T_H_W_LANG, T_H_W_CTRL, T_W_PLAY, T_H_W_PLAY,
   T_H_CTRL_NT, T_H_KEYS_NT, T_PH_FN_NT, T_KH_DEFAULTS_NT, // without fast forward (DL_HIDE_TURBO)

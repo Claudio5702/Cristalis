@@ -77,6 +77,8 @@ es.
   necesita el controlador DsHidMini.
 - **Un informe de fallo** que dice dónde estaba la partida («W1, Stage 2, Wave 5»), escrito en el siguiente arranque.
 - **Un instalador y un desinstalador**, en seis idiomas.
+- **Actualizaciones**: en cada inicio, el lanzador mira si hay una versión nueva y ofrece
+  instalarla; no se instala nada hasta que elija «Actualizar». Se desactiva en Ajustes, Internet.
 
 ## Pantalla de ajustes
 
@@ -102,6 +104,7 @@ página de la entrada seleccionada se muestra a su lado. Intro o Derecha entra e
   - **Sonido**: el volumen y los sonidos del menú.
   - **Controles**: las teclas del teclado y los botones del mando del juego, la vibración y los
     atajos.
+  - **Internet**: la búsqueda de versiones nuevas (activada al principio) y la actualización.
   - La carpeta del juego y los ajustes por defecto.
 
 ![La página Imagen](docs/screenshots/picture-en.png)
@@ -188,7 +191,10 @@ esperada.
 **¿Puedo usar mis partidas de la consola?** Las partidas están en `saves\`, en el formato propio
 del juego; copiar partidas entre la consola y el PC no se ha probado.
 
-**¿Se envía algo por Internet?** No. El programa no usa la red en absoluto.
+**¿Se envía algo por Internet?** Solo la búsqueda de versiones nuevas: en cada inicio, una
+petición a GitHub por la última versión de este repositorio (GitHub ve su dirección IP, como en
+cualquier página). No se envía nada sobre usted ni sobre su partida. Desactívela en Ajustes,
+Internet, y el programa no usa la red en absoluto.
 
 ## Planes
 

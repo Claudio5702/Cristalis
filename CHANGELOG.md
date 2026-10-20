@@ -14,14 +14,18 @@ on DarkLauncher's "What's new" page.
   them); `userdata` goes once empty.
 - The `saves` and `captures` folders are made at the first start, so that they can be seen before the
   first save or screenshot.
-- **Updates (DarkLauncher 2.11)**: once the player turns on the look for new versions (Settings,
-  Internet; off at first), DarkLauncher reads the newest release of this repository at each start,
-  says when one is out, and its "Update" downloads the release's file, checks its size and SHA-256
+- **Updates (DarkLauncher 2.11, 2.12)**: at each start DarkLauncher reads the newest release of this
+  repository (on at first; it can be turned off in Settings, Internet), says when one is out, and its "Update" downloads the release's file, checks its size and SHA-256
   against GitHub's, and installs it: the installer on Windows (it now accepts `/WAIT=<pid>` and
   `/RUN`, and gives the Windows list entry the new version), the archive's files on Linux. Saves,
   screenshots, settings and the game's data are left as they are; the game starts again.
 - **DarkLauncher 2.07**: its version is no longer written at the bottom right of the menus (it is
   still in `--version` and in the crash report).
+- **DarkLauncher 2.12**: Internet is a row of the Settings page (it was the last row of Controls);
+  the help texts name only what is offered (the Picture help no longer names the CRT filter and the
+  scanlines).
+- The READMEs say what goes over the Internet: only the look for new versions, one request to
+  GitHub at each start.
 
 ## 1.06
 

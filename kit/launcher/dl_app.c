@@ -1635,6 +1635,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   if (game->rumble) add_setting("rumble", &dl_cfg.rumble, 0, 1, 2);
   if (dl_ahead_ok()) add_setting("run_ahead", &dl_cfg.ahead, 0, 2, 2);
   if (DISCORD_APP_ID[0]) add_setting("discord", &dl_cfg.discord, 0, 1, 0); // kept by "Defaults": the player's choice
+  dl_cfg.updates = UPDATE_DEFAULT_ON ? 1 : 0; // its value at first, which "Defaults" keeps as the player's choice
   if (DL_UPDATE_ON) add_setting("update_check", &dl_cfg.updates, 0, 1, 0);
   add_setting("state_slot", &dl_slot, 0, DL_SLOTS - 1, 0);
   add_setting("a11y_contrast", &dl_cfg.contrast, 0, 1, 0); // kept by "Defaults": a player who needs them keeps them

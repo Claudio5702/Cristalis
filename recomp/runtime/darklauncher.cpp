@@ -345,13 +345,13 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"セーブデータと更新|セーブデータはゲームフォルダーの saves フォルダーに入りました（以前は userdata、自動で移されています）。設定 → インターネットで新しいバージョンの確認をオンにすると、ゲームを自動で更新できます。",
-    L"Sauvegardes et mises à jour|Vos sauvegardes sont maintenant dans le dossier saves du jeu (avant : userdata ; elles y ont été déplacées toutes seules). Activez Paramètres → Internet → Nouvelles versions pour que le jeu se mette à jour lui-même.",
-    L"Saves and updates|Your saves are now in the game's saves folder (before: userdata; they were moved there by themselves). Turn on Settings → Internet → New versions and the game updates itself.",
-    L"Partidas y actualizaciones|Sus partidas están ahora en la carpeta saves del juego (antes: userdata; se movieron allí solas). Active Ajustes → Internet → Nuevas versiones y el juego se actualizará solo.",
-    L"Jogos salvos e atualizações|Seus jogos salvos agora ficam na pasta saves do jogo (antes: userdata; foram movidos sozinhos). Ative Configurações → Internet → Novas versões e o jogo se atualiza sozinho.",
-    L"Spielstände und Updates|Ihre Spielstände liegen jetzt im Ordner saves des Spiels (vorher: userdata; sie wurden von selbst verschoben). Schalten Sie Einstellungen → Internet → Neue Versionen ein, dann aktualisiert sich das Spiel selbst.",
-    L"Salvataggi e aggiornamenti|I salvataggi sono ora nella cartella saves del gioco (prima: userdata; sono stati spostati da soli). Attivate Impostazioni → Internet → Nuove versioni e il gioco si aggiornerà da solo." };
+    L"セーブデータと自動更新|セーブデータは saves フォルダーに入りました（前のものは自動で移されています）。新しいバージョンが出ると起動時に知らせ、「アップデート」でインストールします（設定 → インターネットでオフ）。",
+    L"Sauvegardes et mises à jour|Vos sauvegardes sont maintenant dans le dossier saves (les anciennes y ont été déplacées). Une nouvelle version est annoncée au lancement et s'installe avec « Mettre à jour » (Paramètres → Internet pour couper).",
+    L"Saves and updates|Your saves are now in the saves folder (the old ones were moved there). A new version is announced at start and installed with \"Update\" (Settings → Internet to turn it off).",
+    L"Partidas y actualizaciones|Sus partidas están ahora en la carpeta saves (las anteriores se movieron allí). Una versión nueva se anuncia al iniciar y se instala con «Actualizar» (Ajustes → Internet para desactivarlo).",
+    L"Jogos salvos e atualizações|Seus jogos salvos agora ficam na pasta saves (os antigos foram movidos). Uma versão nova é anunciada ao iniciar e instalada com \"Atualizar\" (Configurações → Internet para desligar).",
+    L"Spielstände und Updates|Ihre Spielstände liegen jetzt im Ordner saves (die alten wurden verschoben). Eine neue Version wird beim Start gemeldet und mit „Aktualisieren“ installiert (Einstellungen → Internet zum Abschalten).",
+    L"Salvataggi e aggiornamenti|I salvataggi sono ora nella cartella saves (quelli vecchi sono stati spostati). Una nuova versione viene annunciata all'avvio e installata con «Aggiorna» (Impostazioni → Internet per disattivarlo)." };
 
 // ---- The game ----
 
