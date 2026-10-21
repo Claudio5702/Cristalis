@@ -1879,10 +1879,38 @@ int dl_run(const DlGame *game, int argc, char **argv) {
         if (!pic_same) bench_new++;
       }
       if (now.QuadPart - fps_t0.QuadPart >= fq.QuadPart) { dl_fps_shown = fps_frames; fps_frames = 0; fps_t0 = now; }
-      bool vsync = dl_cfg.vsync && dl_mode == M_GAME && sound_ok && !turbo;
+      // whether the sound can wait for the screen's refresh (16 ms at most), counted with this picture's
+      // sound: counted before it, a game paced by the sound (a picture made whenever fewer than three
+      // buffers wait) never had the sync, and on Linux, where the sound is read in larger packets, its
+      // pictures came unevenly and the screen showed some of them only (40 of 60 under Steam's gamescope)
+      if (wave_out) {
+        audio_pump();
+        sound_ok = audio_queued() >= 2;
+      }
+      // a refresh the screen does not give (a window it does not show: on Linux the wait for the sync can
+      // then last a second): without the sync for two seconds, so that neither the sound nor the game waits
+      // In the menus (the game running behind them) always, as over a paused game: unsynced, the pictures
+      // went out in bursts while the sound took its cushion, and Steam's gamescope showed 40 of them.
+      static DWORD sync_back;
+      bool vsync = (dl_mode == M_GAME ? dl_cfg.vsync : 1) && sound_ok && !turbo && (int)(GetTickCount() - sync_back) >= 0;
+      LARGE_INTEGER shown_at;
+      QueryPerformanceCounter(&shown_at);
       if (hidden) { // minimized: nothing drawn
-      } else if (dl_gpu_ready() && dl_gpu_show(dl_dirty, vsync)) dl_dirty = false;
-      else {
+      } else if (menus && dl_gpu_ready()) {
+        // the menus over the game running behind them: at the screen's pace (60 at most), the game's last
+        // picture in the preview, not once for each of its pictures (they come in bursts while the sound
+        // takes its cushion: with the sky's between them Steam's gamescope counted 80 to 90, its sync not
+        // holding them back); a change shows at once
+        if (dl_dirty || shown_at.QuadPart >= menu_next.QuadPart) {
+          menu_next.QuadPart = shown_at.QuadPart + (LONGLONG)(fq.QuadPart / 60.0) - fq.QuadPart / 1000;
+          if (dl_gpu_show(dl_dirty, vsync)) dl_dirty = false;
+        }
+      } else if (dl_gpu_ready() && dl_gpu_show(dl_dirty, vsync)) {
+        dl_dirty = false;
+        LARGE_INTEGER t;
+        QueryPerformanceCounter(&t);
+        if (vsync && t.QuadPart - shown_at.QuadPart > fq.QuadPart / 10) sync_back = GetTickCount() + 2000;
+      } else {
         HDC dc = GetDC(dl_hwnd);
         if (dl_mode == M_GAME) present(dc);
         else if (dl_dirty) { dl_draw_menu(dc); dl_dirty = false; }
@@ -1891,9 +1919,10 @@ int dl_run(const DlGame *game, int argc, char **argv) {
         if (vsync) DwmFlush();
       }
     } else if (hidden) { // minimized: nothing drawn
-    } else if (!run && dl_gpu_ready()) {
+    } else if ((!run || menus) && dl_gpu_ready()) {
       // the setup screen over a paused game: the sky moves at 60 pictures a second at most, however
-      // fast the screen; a change shows at once
+      // fast the screen; a change shows at once. Over the game running behind it too, between its
+      // pictures (its sound has its cushion: the game waits, the screen does not)
       QueryPerformanceCounter(&now);
       if (dl_dirty || now.QuadPart >= menu_next.QuadPart) {
         menu_next.QuadPart = now.QuadPart + (LONGLONG)(fq.QuadPart / 60.0) - fq.QuadPart / 1000; // a little early: the refresh after it
@@ -1907,13 +1936,20 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     }
     audio_pump();
     QueryPerformanceCounter(&now);
-    if (run && pace && audio_event) { // paced by the sound: until a buffer has been played (one lasts 10 to 16 ms)
+    if (run && pace && audio_event && !menus) { // paced by the sound: until a buffer has been played (one lasts 10 to 16 ms)
+      // (not while the sound is short already: on Linux it is read in packets of several buffers, whose
+      // one signal left the game a picture behind each time)
+      if (audio_queued() < ahead) continue;
       MsgWaitForMultipleObjects(1, &audio_event, FALSE, (DWORD)(ABUF_FRAMES * 1000 / dl_game->audio_rate + 2), QS_ALLINPUT);
       continue;
     }
-    double left_ms = run ? (steps > 1 ? 0 : pace ? 2 : (next.QuadPart - now.QuadPart) * 1000.0 / fq.QuadPart)
+    // in the menus the screen's next picture sets the wait (the sound's signals come every 43 ms on
+    // Linux with large packets: the menus were shown 40 times a second), the game's next one if sooner
+    double to_frame = pace ? 2 : (next.QuadPart - now.QuadPart) * 1000.0 / fq.QuadPart, to_sky = (menu_next.QuadPart - now.QuadPart) * 1000.0 / fq.QuadPart;
+    double left_ms = run && !menus ? (steps > 1 ? 0 : to_frame)
                    : hidden ? 100
-                   : dl_gpu_ready() ? (menu_next.QuadPart - now.QuadPart) * 1000.0 / fq.QuadPart
+                   : dl_gpu_ready() ? (run && !pace && to_frame < to_sky ? to_frame : to_sky)
+                   : run ? to_frame
                    : 10;
     wait_ms(left_ms, run);
   }

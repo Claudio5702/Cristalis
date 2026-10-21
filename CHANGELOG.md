@@ -13,6 +13,9 @@ on DarkLauncher's "What's new" page.
   the processor at every picture. At 3840 x 2160 the game takes about 17 % less processor time, as
   little as at 1280 x 720 (30 s of play: 39.6 s, now 32.9 s). While DarkLauncher cannot show it (the
   first seconds, a display without the graphics card), the pixels go as before. Linux is unchanged.
+- **DarkLauncher 2.41**: on Linux, the display without the graphics card is about ten times faster at
+  4K, and Steam's virtual keyboard no longer opens at start (Steam's Game Mode); the menus before play
+  keep their own pace, and a very slow synced picture turns vsync off for two seconds.
 - DarkLauncher 2.20 and 2.30 come with it, with nothing visible in this game.
 
 ## 1.09

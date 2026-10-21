@@ -477,26 +477,18 @@ static void layer_merge(const u32 *on_black, const u32 *on_white, u32 *out, size
   }
 }
 
+// The setup screen as a layer, drawn once: dl_gdi.c keeps each pixel's opacity as it draws (dl_gdi_alpha),
+// where Windows draws it on black, then on white, and merges the two (at 4K that took most of a menu
+// move). (cw and ch: the window's size, which dl_draw_menu draws at.)
+extern bool dl_gdi_alpha;
 static u32 *menu_layer(HDC wdc, int cw, int ch) {
-  static u32 *layer, *on_black;
-  static size_t cap;
-  size_t n = (size_t)cw * (size_t)ch;
-  if (n > cap) {
-    u32 *a = realloc(layer, n * 4), *b = a ? realloc(on_black, n * 4) : NULL;
-    if (a) layer = a;
-    if (b) on_black = b;
-    if (!a || !b) return NULL;
-    cap = n;
-  }
+  (void)cw, (void)ch;
   dl_layer = 1;
+  dl_gdi_alpha = true;
   dl_draw_menu(wdc);
-  if (dl_menu_bits) memcpy(on_black, dl_menu_bits, n * 4);
-  dl_layer = 2;
-  dl_draw_menu(wdc);
+  dl_gdi_alpha = false;
   dl_layer = 0;
-  if (!dl_menu_bits) return NULL;
-  layer_merge(on_black, dl_menu_bits, layer, n);
-  return layer;
+  return dl_menu_bits;
 }
 
 static bool small_layer(HDC wdc, int which, int w, int bh, int h, void (*draw)(HDC dc, int h)) {

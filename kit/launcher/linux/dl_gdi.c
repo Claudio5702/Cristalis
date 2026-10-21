@@ -38,6 +38,7 @@ struct GdiObj {
   double sx;                     // horizontal scale (a width asked for), 1 otherwise
   bool bold, italic, fake_bold, fake_italic, icons;
   wchar_t name[64];
+  struct Glyph *glyphs;          // font: the glyphs rendered so far (glyph_of)
 };
 
 struct GdiDc {
@@ -45,7 +46,10 @@ struct GdiDc {
   COLORREF text;
   int bk, align, extra, stretch;
   POINT pos;
-  uint8_t *clip;    // coverage of each pixel of the bitmap (0-255), NULL: no clipping
+  uint8_t *clip;    // coverage of each pixel of the bitmap (0-255), NULL: no clipping (clip_mem, or a path's)
+  uint8_t *clip_mem; // the regions' coverage, kept from one region to the next (8 MB at 4K, made once)
+  size_t clip_cap;
+  int clip_w, cx0, cy0, cx1, cy1; // the bitmap's width it was made for, and the box the last region wrote
   uint8_t *path;    // the path being made (BeginPath ... EndPath), as coverage
   bool in_path;
   int px0, py0, px1, py1;
@@ -80,14 +84,38 @@ HDC CreateCompatibleDC(HDC dc) {
   return d;
 }
 
+// The clipping taken off (a path's freed; the regions' kept for the next one).
+static void clip_drop(HDC dc) {
+  if (dc->clip && dc->clip != dc->clip_mem) free(dc->clip);
+  dc->clip = NULL;
+}
+
 BOOL DeleteDC(HDC dc) {
   if (!dc) return FALSE;
-  free(dc->clip);
+  clip_drop(dc);
+  free(dc->clip_mem);
   free(dc->path);
   free(dc);
   return TRUE;
 }
 
+
+// A glyph as FreeType rendered it, kept by its font: the menus draw the same letters at every move, and
+// rendering them again each time (with their widths measured first) was most of the text's time at 4K.
+typedef struct Glyph {
+  unsigned code;     // the character + 1 (0: a free place)
+  bool ok;           // FreeType could render it
+  int left, top, w, rows;
+  double dx, adv;    // proportional adjustment of its place, and its advance
+  uint8_t *bits;     // w x rows coverage
+} Glyph;
+#define GLYPHS 1024 // places of a font's table (it starts again when full)
+static void glyphs_free(HGDIOBJ f) {
+  if (!f->glyphs) return;
+  for (int k = 0; k < GLYPHS; k++) free(f->glyphs[k].bits);
+  free(f->glyphs);
+  f->glyphs = NULL;
+}
 
 static HGDIOBJ obj_new(int kind) {
   HGDIOBJ o = calloc(1, sizeof *o);
@@ -105,8 +133,7 @@ HGDIOBJ SelectObject(HDC dc, HGDIOBJ o) {
     case OBJ_BITMAP:
       old = dc->bitmap;
       dc->bitmap = o;
-      free(dc->clip); // the clipping was for the other picture's size
-      dc->clip = NULL;
+      clip_drop(dc); // the clipping was for the other picture's size
       break;
   }
   return old;
@@ -119,6 +146,7 @@ BOOL DeleteObject(HGDIOBJ o) {
     if (o->face) FT_Done_Face(o->face);
     for (int k = 0; k < FALLBACKS; k++)
       if (o->fall[k]) FT_Done_Face(o->fall[k]);
+    glyphs_free(o);
   }
   free(o);
   return TRUE;
@@ -191,24 +219,71 @@ static inline uint32_t *target(HDC dc, int *w, int *h) {
   return dc->bitmap->bits;
 }
 
-// Colour c over pixel x, y with coverage a (0-255), through the clipping.
-static inline void put(HDC dc, int x, int y, COLORREF c, int a) {
-  int w, h;
-  uint32_t *px = target(dc, &w, &h);
+// The setup screen drawn as a layer for the graphics card in one pass (dl_gl.c's menu_layer): while
+// dl_gdi_alpha is set, the drawing into the setup screen's bitmap (dl_menu_bits) keeps each pixel's
+// opacity in its top byte, its colours premultiplied, from the stock black brush that clears it to nothing
+// on. Windows draws the layer twice, on black and on white, and works the opacity out from the difference;
+// here the drawing is DarkLauncher's own, so it can tell, and the second pass is not needed (at 4K each
+// pass of the menus took tens of milliseconds). Elsewhere the top byte stays 0, as before.
+bool dl_gdi_alpha;
+extern uint32_t *dl_menu_bits __attribute__((weak)); // (dl_menu.c's; NULL in a program without it: canvas_test)
+static inline bool alpha_on(HDC dc) { return dl_gdi_alpha && &dl_menu_bits && dc->bitmap->bits == dl_menu_bits; }
+static inline uint32_t alpha_over(uint32_t d, int a) { // d's opacity once covered at a (0-255)
+  int o = (int)(d >> 24);
+  return (uint32_t)(o + (255 - o) * a / 255) << 24;
+}
+
+// Colour cr, cg, cb over pixel x, y of a w x h picture with coverage a (0-255), through the clipping;
+// alpha: its opacity kept too (dl_gdi_alpha).
+static inline void put_px(uint32_t *px, int w, int h, const uint8_t *clip, bool alpha, int x, int y, int cr, int cg, int cb, int a) {
   if (x < 0 || y < 0 || x >= w || y >= h || a <= 0) return;
   size_t i = (size_t)y * w + x;
-  if (dc->clip) a = a * dc->clip[i] / 255;
+  if (clip) a = a * clip[i] / 255;
   if (a <= 0) return;
   if (a > 255) a = 255;
   uint32_t d = px[i];
   int r = d >> 16 & 255, g = d >> 8 & 255, b = d & 255;
-  r += (GetRValue(c) - r) * a / 255;
-  g += (GetGValue(c) - g) * a / 255;
-  b += (GetBValue(c) - b) * a / 255;
-  px[i] = (uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b;
+  r += (cr - r) * a / 255;
+  g += (cg - g) * a / 255;
+  b += (cb - b) * a / 255;
+  px[i] = (uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b | (alpha ? alpha_over(d, a) : 0);
+}
+
+// Colour c over pixel x, y with coverage a (0-255), through the clipping.
+static inline void put(HDC dc, int x, int y, COLORREF c, int a) {
+  int w, h;
+  uint32_t *px = target(dc, &w, &h);
+  put_px(px, w, h, dc->clip, alpha_on(dc), x, y, GetRValue(c), GetGValue(c), GetBValue(c), a);
 }
 
 static inline int cover(double v) { return v <= 0 ? 0 : v >= 1 ? 255 : (int)(v * 255 + 0.5); }
+
+// Colour c (0xRRGGBB) over the pixels x0..x1-1 of row y at coverage a, through the clipping: what put()
+// does, a row at once (the menus at 4K are millions of pixels: put() for each was most of their time).
+static void span(HDC dc, int y, int x0, int x1, uint32_t c, int a) {
+  int w, h;
+  uint32_t *px = target(dc, &w, &h);
+  if (y < 0 || y >= h || a <= 0) return;
+  if (x0 < 0) x0 = 0;
+  if (x1 > w) x1 = w;
+  uint32_t *row = px + (size_t)y * w;
+  const uint8_t *clip = dc->clip ? dc->clip + (size_t)y * w : NULL;
+  int cr = c >> 16 & 255, cg = c >> 8 & 255, cb = c & 255;
+  bool alpha = alpha_on(dc);
+  uint32_t opaque = alpha ? 0xFF000000u : 0;
+  for (int x = x0; x < x1; x++) {
+    int k = clip ? a * clip[x] / 255 : a;
+    if (k <= 0) continue;
+    if (k >= 255) { row[x] = c | opaque; continue; }
+    uint32_t d = row[x];
+    int r = d >> 16 & 255, g = d >> 8 & 255, b = d & 255;
+    r += (cr - r) * k / 255;
+    g += (cg - g) * k / 255;
+    b += (cb - b) * k / 255;
+    row[x] = (uint32_t)r << 16 | (uint32_t)g << 8 | (uint32_t)b | (alpha ? alpha_over(d, k) : 0);
+  }
+}
+static inline uint32_t rgb_of(COLORREF c) { return (uint32_t)GetRValue(c) << 16 | (uint32_t)GetGValue(c) << 8 | GetBValue(c); }
 
 // Distance from p to a rectangle of half sizes hx, hy with round corners r, centred on 0 (negative inside).
 static double round_box(double px, double py, double hx, double hy, double r) {
@@ -248,7 +323,46 @@ static double ellipse_dist(double x, double y, const void *s) {
 
 BOOL RoundRect(HDC dc, int x0, int y0, int x1, int y1, int w, int h) {
   BoxShape s = {(x0 + x1) / 2.0, (y0 + y1) / 2.0, (x1 - x0) / 2.0, (y1 - y0) / 2.0, (w < h ? w : h) / 2.0};
-  shape(dc, x0, y0, x1, y1, box_dist, &s);
+  // as shape(), but the pixels further than the corners and the pen from every edge are known at once:
+  // inside by more than the pen and a pixel, so the brush covers them wholly and the pen not at all
+  HGDIOBJ b = dc->brush, p = dc->pen;
+  double pw = p && !p->none ? p->width : 0;
+  int m = (int)ceil((s.r < s.hx && s.r < s.hy ? s.r : (s.hx < s.hy ? s.hx : s.hy)) + pw) + 2;
+  bool brush = b && !b->none;
+  // Away from the corners the distance follows one edge only: in a row's middle (x0 + m to x1 - m) it is
+  // the same for every pixel of the row, and in a column's middle the same for every row; where it would
+  // differ, the pixel is deep inside (brush wholly, pen not at all). So each is worked out once, as box_dist
+  // gives it, and only the corners pixel by pixel. The pixels are the same as shape()'s.
+  int band = m + 1;
+  double side[2 * 160 + 4];                 // the distance of the columns near the left and right edges, in the middle rows
+  bool sides = band <= 160 && x1 - m > x0 + m && y1 - m > y0 + m;
+  if (sides)
+    for (int i = 0; i < band; i++) {
+      side[i] = box_dist(x0 - 1 + i + 0.5, (y0 + y1) / 2 + 0.5, &s);      // x0 - 1 ... x0 + m - 1
+      side[band + i] = box_dist(x1 - m + i + 0.5, (y0 + y1) / 2 + 0.5, &s); // x1 - m ... x1
+    }
+  for (int y = y0 - 1; y <= y1; y++) {
+    bool mid = y >= y0 + m && y < y1 - m;
+    for (int x = x0 - 1; x <= x1; x++) {
+      if (x == x0 + m && x1 - m > x) { // the middle of this row at once
+        if (mid) {
+          if (brush) span(dc, y, x, x1 - m, rgb_of(b->color), 255);
+        } else {
+          double d = box_dist(x + 0.5, y + 0.5, &s);
+          if (d <= 1) {
+            if (brush) span(dc, y, x, x1 - m, rgb_of(b->color), cover(0.5 - d));
+            if (pw > 0) span(dc, y, x, x1 - m, rgb_of(p->color), cover(0.5 - d) - cover(0.5 - d - pw));
+          }
+        }
+        x = x1 - m - 1;
+        continue;
+      }
+      double d = mid && sides ? side[x < x0 + m ? x - (x0 - 1) : band + x - (x1 - m)] : box_dist(x + 0.5, y + 0.5, &s);
+      if (d > 1) continue;
+      if (brush) put(dc, x, y, b->color, cover(0.5 - d));
+      if (pw > 0) put(dc, x, y, p->color, cover(0.5 - d) - cover(0.5 - d - pw));
+    }
+  }
   return TRUE;
 }
 
@@ -263,8 +377,14 @@ BOOL Ellipse(HDC dc, int x0, int y0, int x1, int y1) {
 
 int FillRect(HDC dc, const RECT *r, HBRUSH b) {
   if (!b || b->none) return 1;
-  for (int y = r->top; y < r->bottom; y++)
-    for (int x = r->left; x < r->right; x++) put(dc, x, y, b->color, 255);
+  if (b == &stock_black && alpha_on(dc)) { // the layer's ground: nothing (see dl_gdi_alpha)
+    int w, h;
+    uint32_t *px = target(dc, &w, &h);
+    int x0 = r->left < 0 ? 0 : r->left, x1 = r->right > w ? w : r->right;
+    for (int y = r->top < 0 ? 0 : r->top; y < r->bottom && y < h && x1 > x0; y++) memset(px + (size_t)y * w + x0, 0, (size_t)(x1 - x0) * 4);
+    return 1;
+  }
+  for (int y = r->top; y < r->bottom; y++) span(dc, y, r->left, r->right, rgb_of(b->color), 255);
   return 1;
 }
 
@@ -342,15 +462,37 @@ HRGN CreateRoundRectRgn(int x0, int y0, int x1, int y1, int w, int h) {
 }
 
 int SelectClipRgn(HDC dc, HRGN r) {
-  free(dc->clip);
-  dc->clip = NULL;
+  clip_drop(dc);
   if (!r) return 1;
   int w, h;
   target(dc, &w, &h);
-  dc->clip = calloc((size_t)w * h, 1);
+  size_t need = (size_t)w * h;
+  if (need > dc->clip_cap) { // made once for this size, all 0
+    free(dc->clip_mem);
+    dc->clip_mem = calloc(need, 1);
+    dc->clip_cap = dc->clip_mem ? need : 0;
+    dc->clip_w = w, dc->cx1 = dc->cx0, dc->cy1 = dc->cy0;
+    if (!dc->clip_mem) return 0;
+  } else if (dc->clip_w != w) { // another width: the rows are elsewhere
+    memset(dc->clip_mem, 0, dc->clip_cap);
+    dc->clip_w = w, dc->cx1 = dc->cx0, dc->cy1 = dc->cy0;
+  } else // only what the last region wrote goes back to 0
+    for (int y = dc->cy0; y < dc->cy1; y++) memset(dc->clip_mem + (size_t)y * w + dc->cx0, 0, (size_t)(dc->cx1 - dc->cx0));
+  dc->clip = dc->clip_mem;
+  dc->cx0 = r->x0 < 0 ? 0 : r->x0 > w ? w : r->x0, dc->cx1 = r->x1 < dc->cx0 ? dc->cx0 : r->x1 > w ? w : r->x1;
+  dc->cy0 = r->y0 < 0 ? 0 : r->y0 > h ? h : r->y0, dc->cy1 = r->y1 < dc->cy0 ? dc->cy0 : r->y1 > h ? h : r->y1;
   BoxShape s = {(r->x0 + r->x1) / 2.0, (r->y0 + r->y1) / 2.0, (r->x1 - r->x0) / 2.0, (r->y1 - r->y0) / 2.0, r->corner / 2.0};
-  for (int y = r->y0 < 0 ? 0 : r->y0; y < r->y1 && y < h; y++)
-    for (int x = r->x0 < 0 ? 0 : r->x0; x < r->x1 && x < w; x++) dc->clip[(size_t)y * w + x] = (uint8_t)cover(0.5 - box_dist(x + 0.5, y + 0.5, &s));
+  // the distance only near the corners: elsewhere a pixel of the box is inside by half a pixel at least,
+  // so wholly covered
+  int m = (int)ceil(r->corner / 2.0) + 1;
+  for (int y = r->y0 < 0 ? 0 : r->y0; y < r->y1 && y < h; y++) {
+    bool corner_row = y < r->y0 + m || y >= r->y1 - m;
+    uint8_t *row = dc->clip + (size_t)y * w;
+    for (int x = r->x0 < 0 ? 0 : r->x0; x < r->x1 && x < w; x++) {
+      if (!corner_row || (x >= r->x0 + m && x < r->x1 - m)) row[x] = 255;
+      else row[x] = (uint8_t)cover(0.5 - box_dist(x + 0.5, y + 0.5, &s));
+    }
+  }
   return 1;
 }
 
@@ -379,6 +521,7 @@ static void blit(HDC dc, int x, int y, int w, int h, const Src *s, int sx, int s
   if (w <= 0 || h <= 0 || sw <= 0 || sh <= 0) return;
   int tw, th;
   uint32_t *px = target(dc, &tw, &th);
+  bool layer = alpha_on(dc); // (the opacity kept in the top byte: see dl_gdi_alpha)
   if (!alpha && konst == 255 && !dc->clip && (!smooth || (sw == w && sh == h))) { // opaque, pixel for pixel: rows copied
     static int *cols, cols_n;
     if (w > cols_n) { free(cols); cols = malloc(sizeof *cols * (size_t)w); cols_n = w; }
@@ -393,7 +536,43 @@ static void blit(HDC dc, int x, int y, int w, int h, const Src *s, int sx, int s
       r = r < 0 ? 0 : r >= s->h ? s->h - 1 : r;
       const uint32_t *row = s->px + (size_t)(s->bottom_up ? s->h - 1 - r : r) * s->w;
       uint32_t *out = px + (size_t)ty * tw + x;
-      for (int i = i0; i < i1; i++) out[i] = row[cols[i]] & 0xFFFFFF;
+      uint32_t opaque = layer ? 0xFF000000u : 0;
+      for (int i = i0; i < i1; i++) out[i] = (row[cols[i]] & 0xFFFFFF) | opaque;
+    }
+    return;
+  }
+  if (s->w == 1 && s->h == 1 && !alpha) { // one colour over the area (a panel letting the sky show through): the same
+    uint32_t c = s->px[0];                // sums as below, without reading the source again for each pixel
+    int sv[3] = {c & 255, c >> 8 & 255, c >> 16 & 255};
+    uint8_t lut[3][256]; // each channel's result for each value under it (the same sums: one colour, one opacity)
+    for (int k = 0; k < 3; k++)
+      for (int dv = 0; dv < 256; dv++) lut[k][dv] = (uint8_t)(dv + (sv[k] - dv) * konst / 255);
+    // over nothing yet (a layer's ground, see dl_gdi_alpha), wholly within the clipping: always the same
+    uint32_t fresh = (uint32_t)lut[0][0] | (uint32_t)lut[1][0] << 8 | (uint32_t)lut[2][0] << 16 | (layer ? (uint32_t)(255 * konst / 255) << 24 : 0);
+    for (int j = 0; j < h; j++) {
+      int ty = y + j;
+      if (ty < 0 || ty >= th) continue;
+      int i0 = x < 0 ? -x : 0, i1 = x + w > tw ? tw - x : w;
+      uint32_t *row = px + (size_t)ty * tw + x;
+      const uint8_t *cl = dc->clip ? dc->clip + (size_t)ty * tw + x : NULL;
+      for (int i = i0; i < i1; i++) {
+        int clip = cl ? cl[i] : 255;
+        if (!clip) continue;
+        uint32_t o = row[i], out = 0;
+        if (o == 0 && clip == 255) { row[i] = fresh; continue; }
+        if (clip == 255) out = (uint32_t)lut[0][o & 255] | (uint32_t)lut[1][o >> 8 & 255] << 8 | (uint32_t)lut[2][o >> 16 & 255] << 16;
+        else
+          for (int k = 0; k < 3; k++) {
+            int dv = o >> (k * 8) & 255, v = lut[k][dv];
+            v = dv + (v - dv) * clip / 255;
+            out |= (uint32_t)v << (k * 8);
+          }
+        if (layer) {
+          int o_a = (int)(o >> 24), a1 = o_a + (255 - o_a) * konst / 255;
+          out |= (uint32_t)(clip == 255 ? a1 : o_a + (a1 - o_a) * clip / 255) << 24;
+        }
+        row[i] = out;
+      }
     }
     return;
   }
@@ -439,6 +618,10 @@ static void blit(HDC dc, int x, int y, int w, int h, const Src *s, int sx, int s
         else v = dv + (sv - dv) * sa / 255;
         v = dv + (v - dv) * clip / 255;
         out |= (uint32_t)(v < 0 ? 0 : v > 255 ? 255 : v) << k;
+      }
+      if (layer) { // the opacity, as the colours: the source's over what is there, then through the clipping
+        int o_a = (int)(o >> 24), a1 = o_a + (255 - o_a) * sa / 255;
+        out |= (uint32_t)(o_a + (a1 - o_a) * clip / 255) << 24;
       }
       px[at] = out;
     }
@@ -749,9 +932,45 @@ static FT_GlyphSlot glyph(HGDIOBJ f, wchar_t ch, double *dx, double *dadv) {
   return face->glyph;
 }
 
+static double advance_loaded(HGDIOBJ f, wchar_t ch);
+
+// The glyph of ch in f, rendered once and kept (NULL: no room, which does not happen: the table starts
+// again when full).
+static const Glyph *glyph_of(HGDIOBJ f, wchar_t ch) {
+  if (!f->glyphs && !(f->glyphs = calloc(GLYPHS, sizeof *f->glyphs))) return NULL;
+  unsigned code = (unsigned)ch + 1;
+  for (int turn = 0; turn < 2; turn++) {
+    for (unsigned i = code * 2654435761u % GLYPHS, n = 0; n < GLYPHS; i = (i + 1) % GLYPHS, n++) {
+      Glyph *g = &f->glyphs[i];
+      if (g->code == code) return g;
+      if (g->code) continue;
+      double dx = 0, dadv = 0;
+      FT_GlyphSlot s = glyph(f, ch, &dx, &dadv);
+      g->code = code;
+      g->ok = s != NULL;
+      if (!s) { g->adv = advance_loaded(f, ch); return g; } // (rendering failed: its advance as before)
+      g->left = s->bitmap_left, g->top = s->bitmap_top, g->w = (int)s->bitmap.width, g->rows = (int)s->bitmap.rows;
+      g->dx = dx, g->adv = s->advance.x / 64.0 + dadv;
+      g->bits = g->w * g->rows ? malloc((size_t)g->w * g->rows) : NULL;
+      for (int r = 0; g->bits && r < g->rows; r++) memcpy(g->bits + (size_t)r * g->w, s->bitmap.buffer + (ptrdiff_t)r * s->bitmap.pitch, (size_t)g->w);
+      if (!g->bits && g->w * g->rows) g->ok = false;
+      return g;
+    }
+    glyphs_free(f); // full: started again
+    if (!(f->glyphs = calloc(GLYPHS, sizeof *f->glyphs))) return NULL;
+  }
+  return NULL;
+}
+
 static double advance(HGDIOBJ f, wchar_t ch) {
+  if (f->icons) return dl_icon_known((unsigned)ch) ? f->em : 0;
+  const Glyph *g = glyph_of(f, ch);
+  return g ? g->adv : advance_loaded(f, ch);
+}
+
+// The advance of ch loaded from its face (without the table).
+static double advance_loaded(HGDIOBJ f, wchar_t ch) {
   unsigned c = (unsigned)ch;
-  if (f->icons) return dl_icon_known(c) ? f->em : 0;
   FT_Face face = face_with(f, c);
   if (!face) return 0;
   FT_Matrix m = {(FT_Fixed)(f->sx * 65536), f->fake_italic ? (FT_Fixed)(0.2 * 65536) : 0, 0, 65536};
@@ -808,20 +1027,21 @@ static void icon_plot(int px, int py, int a, void *ctx) {
 static void text_draw(HDC dc, double x, int base, const wchar_t *s, int n, const RECT *b) {
   HGDIOBJ f = font_of(dc);
   int tw, th;
-  target(dc, &tw, &th);
+  uint32_t *pic = target(dc, &tw, &th);
+  bool alpha = alpha_on(dc); // (as put() does it, worked out once for the text)
+  int cr = GetRValue(dc->text), cg = GetGValue(dc->text), cb = GetBValue(dc->text);
   for (int k = 0; k < n; k++) {
     if (f->icons) { // an icon: its square from the top of the line
       IconTo to = {dc, b};
       if (dl_icon_draw((unsigned)s[k], (int)floor(x + 0.5), base - f->em + f->em / 12, f->em, icon_plot, &to)) x += f->em + dc->extra; // a little low, as the font's own
       continue;
     }
-    double dx, dadv;
-    FT_GlyphSlot g = glyph(f, s[k], &dx, &dadv);
-    if (!g) continue;
-    int gx = (int)floor(x + dx + 0.5) + g->bitmap_left, gy = base - g->bitmap_top;
-    for (unsigned r = 0; r < g->bitmap.rows; r++)
-      for (unsigned c = 0; c < g->bitmap.width; c++) {
-        int a = g->bitmap.buffer[r * g->bitmap.pitch + c], px = gx + (int)c, py = gy + (int)r;
+    const Glyph *g = glyph_of(f, s[k]);
+    if (!g || !g->ok) continue;
+    int gx = (int)floor(x + g->dx + 0.5) + g->left, gy = base - g->top;
+    for (int r = 0; r < g->rows; r++)
+      for (int c = 0; c < g->w; c++) {
+        int a = g->bits[(size_t)r * g->w + c], px = gx + c, py = gy + r;
         if (!a || (b && (px < b->left || px >= b->right || py < b->top || py >= b->bottom))) continue;
         if (dc->in_path) {
           if (px < 0 || py < 0 || px >= tw || py >= th) continue;
@@ -831,9 +1051,9 @@ static void text_draw(HDC dc, double x, int base, const wchar_t *s, int n, const
           if (px > dc->px1) dc->px1 = px;
           if (py < dc->py0) dc->py0 = py;
           if (py > dc->py1) dc->py1 = py;
-        } else put(dc, px, py, dc->text, a);
+        } else put_px(pic, tw, th, dc->clip, alpha, px, py, cr, cg, cb, a);
       }
-    x += g->advance.x / 64.0 + dadv + dc->extra;
+    x += g->adv + dc->extra;
   }
 }
 
@@ -937,6 +1157,48 @@ static void path_done(HDC dc) {
 static void path_fill(HDC dc, COLORREF c, const uint8_t *mask, int grow) {
   int w, h;
   target(dc, &w, &h);
+  int X0 = dc->px0 - grow, X1 = dc->px1 + grow, Y0 = dc->py0 - grow, Y1 = dc->py1 + grow;
+  X0 = X0 < 0 ? 0 : X0, X1 = X1 > w - 1 ? w - 1 : X1, Y0 = Y0 < 0 ? 0 : Y0, Y1 = Y1 > h - 1 ? h - 1 : Y1;
+  int cols = X1 - X0 + 1, rows = Y1 - Y0 + 1;
+  uint8_t *H = grow > 0 && cols > 0 && rows > 0 ? malloc((size_t)(grow + 1) * rows * cols) : NULL;
+  if (H) {
+    // the outline (the path widened by a disc of radius grow) in two steps, the same values as below:
+    // H[r], each row's largest value within r pixels left and right (the mask is 0 beyond the path's
+    // bounds), then for each pixel the largest of the disc's rows, row v reaching r = sqrt(grow^2 - v^2)
+    size_t plane = (size_t)rows * cols;
+    for (int y = 0; y < rows; y++) memcpy(H + (size_t)y * cols, mask + (size_t)(Y0 + y) * w + X0, (size_t)cols);
+    for (int r = 1; r <= grow; r++) {
+      const uint8_t *prev = H + (r - 1) * plane;
+      uint8_t *cur = H + r * plane;
+      for (int y = 0; y < rows; y++)
+        for (int x = 0; x < cols; x++) {
+          const uint8_t *p = prev + (size_t)y * cols + x;
+          uint8_t m = p[0];
+          if (x > 0 && p[-1] > m) m = p[-1];
+          if (x < cols - 1 && p[1] > m) m = p[1];
+          cur[(size_t)y * cols + x] = m;
+        }
+    }
+    int reach[512];
+    for (int v = -grow; v <= grow && grow < 256; v++) {
+      int u = 0;
+      while ((u + 1) * (u + 1) + v * v <= grow * grow) u++;
+      reach[v + grow] = u;
+    }
+    for (int y = 0; y < rows && grow < 256; y++)
+      for (int x = 0; x < cols; x++) {
+        int a = 0;
+        for (int v = -grow; v <= grow; v++) {
+          int yy = y + v;
+          if (yy < 0 || yy >= rows) continue;
+          int m = H[reach[v + grow] * plane + (size_t)yy * cols + x];
+          if (m > a) a = m;
+        }
+        put(dc, X0 + x, Y0 + y, c, a);
+      }
+    free(H);
+    if (grow < 256) return;
+  }
   for (int y = dc->py0 - grow; y <= dc->py1 + grow; y++)
     for (int x = dc->px0 - grow; x <= dc->px1 + grow; x++) {
       if (x < 0 || y < 0 || x >= w || y >= h) continue;
@@ -971,7 +1233,7 @@ BOOL StrokeAndFillPath(HDC dc) {
 BOOL SelectClipPath(HDC dc, int mode) {
   (void)mode;
   if (!dc->path) return FALSE;
-  free(dc->clip);
+  clip_drop(dc);
   dc->clip = dc->path; // the path itself becomes the clipping
   dc->path = NULL;
   return TRUE;

@@ -1,7 +1,7 @@
-DarkLauncher 2.40 (commit f5444ae), copied from W:\project\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h C43E1B241A924D40
+DarkLauncher 2.41 (commit 4661d3a), copied from W:\project\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h 3ABF68A19BA986FD
 file dl_achieve.c 7717926FD2027AF9
-file dl_app.c 0AE2F7F1DAEEC7FD
+file dl_app.c 08292268429B2516
 file dl_draw.c F459B52D9FE25DEC
 file dl_gpu.c A277D3430176098A
 file dl_input.c 39B7D7BA83A0F11F
@@ -11,11 +11,11 @@ file dl_packs.c D33C2C3DAD33859C
 file dl_saves.c E50955967902F444
 file dl_sony.c 0672F70CEF3B93BE
 file dl_text.c D24DDD5922195E6A
-file linux/dl_gdi.c 51ED378B11D7CDF3
-file linux/dl_gl.c 50C68E74E7C2B19F
-file linux/dl_icons.c BC3C188249860EA0
+file linux/dl_gdi.c 4445316EB68C2965
+file linux/dl_gl.c AA52249E48B36A1E
+file linux/dl_icons.c FE251828245398E6
 file linux/dl_pads.c DC8A7361AA75E3F0
-file linux/dl_win32.c EFCAC443C076DDC3
+file linux/dl_win32.c F30C4B0B33F9B0A9
 file linux/include/d3d11.h EF0A93442CA98BBA
 file linux/include/dwmapi.h EF0A93442CA98BBA
 file linux/include/dxgi1_6.h EF0A93442CA98BBA

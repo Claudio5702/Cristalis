@@ -33,7 +33,12 @@ void dl_pads_removed(SDL_JoystickID id);
 
 static bool sdl_up(void) {
   static int state = -1;
-  if (state < 0) state = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
+  if (state < 0) {
+    // the typed text of a keyboard (a slot's name) without SDL's screen keyboard: in Steam's Game Mode it
+    // opened Steam's own as soon as the window was there; DarkLauncher has its own (X on a slot)
+    SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
+    state = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
+  }
   return state;
 }
 

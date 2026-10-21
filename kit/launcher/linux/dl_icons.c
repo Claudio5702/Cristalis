@@ -4,6 +4,8 @@
 #include <math.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <stdlib.h>
 
 typedef struct {
   char kind;      // 'L' a line, 'A' an arc, 'R' a rounded rectangle's edge, 'O' a circle's edge, 'C' a disc,
@@ -181,9 +183,17 @@ static double dist(const Shape *s, double u, double v, bool *fill) {
   return 1e9;
 }
 
-// The icon on the size x size square at x, y: plot(px, py, coverage 0-255) for each pixel it touches.
-bool dl_icon_draw(unsigned code, int x, int y, int size, void (*plot)(int px, int py, int a, void *ctx), void *ctx) {
-  if (!icon_shapes(code) || size <= 0) return false;
+// The coverage of an icon at a size, worked out once and kept (the bar draws the same ones at every move:
+// at 4K each one is thousands of pixels, each the distance to every one of its shapes).
+#define ICON_KEPT 48
+static struct { unsigned code; int size; uint8_t *a; } kept[ICON_KEPT];
+static int kept_next;
+
+static const uint8_t *icon_coverage(unsigned code, int size) {
+  for (int k = 0; k < ICON_KEPT; k++)
+    if (kept[k].a && kept[k].code == code && kept[k].size == size) return kept[k].a;
+  uint8_t *a = malloc((size_t)size * size);
+  if (!a) return NULL;
   double stroke = 0.085;
   for (int j = 0; j < size; j++)
     for (int i = 0; i < size; i++) {
@@ -195,7 +205,21 @@ bool dl_icon_draw(unsigned code, int x, int y, int size, void (*plot)(int px, in
         else c = (shapes[k].width > 0 ? shapes[k].width : stroke) * size / 2 + 0.5 - d;
         if (c > best) best = c;
       }
-      if (best > 0) plot(x + i, y + j, best >= 1 ? 255 : (int)(best * 255 + 0.5), ctx);
+      a[(size_t)j * size + i] = best <= 0 ? 0 : best >= 1 ? 255 : (uint8_t)(int)(best * 255 + 0.5);
     }
+  int k = kept_next++ % ICON_KEPT; // the oldest makes room
+  free(kept[k].a);
+  kept[k].code = code, kept[k].size = size, kept[k].a = a;
+  return a;
+}
+
+// The icon on the size x size square at x, y: plot(px, py, coverage 0-255) for each pixel it touches.
+bool dl_icon_draw(unsigned code, int x, int y, int size, void (*plot)(int px, int py, int a, void *ctx), void *ctx) {
+  if (!icon_shapes(code) || size <= 0) return false;
+  const uint8_t *a = icon_coverage(code, size);
+  if (!a) return false;
+  for (int j = 0; j < size; j++)
+    for (int i = 0; i < size; i++)
+      if (a[(size_t)j * size + i]) plot(x + i, y + j, a[(size_t)j * size + i], ctx);
   return true;
 }
