@@ -24,10 +24,10 @@ static int lang = 1;
 static const wchar_t *const texts[6][T_COUNT] = {
     // ------------------------------------------------------------------ Français
     {
-        [T_TITLE_INSTALL] = L"Installation de Crystal Defenders", [T_TITLE_UNINSTALL] = L"Désinstallation de Crystal Defenders",
+        [T_TITLE_INSTALL] = L"Installation de Cristalis (Crystal Defenders)", [T_TITLE_UNINSTALL] = L"Désinstallation de Cristalis (Crystal Defenders)",
         [T_INTRO] = L"Ce programme installe Cristalis (portage natif non officiel de Crystal Defenders pour Windows) sur cet ordinateur.",
         [T_DIR_LABEL] = L"Dossier d'installation :", [T_BROWSE_BTN] = L"Parcourir…",
-        [T_BROWSE] = L"Dossier où installer Crystal Defenders (un sous-dossier « Crystal Defenders » y sera créé)",
+        [T_BROWSE] = L"Dossier où installer Crystal Defenders (un sous-dossier « Cristalis » y sera créé)",
         [T_CHK_DESKTOP] = L"Créer un raccourci sur le Bureau", [T_CHK_MENU] = L"Créer un raccourci dans le menu Démarrer",
         [T_GAME_FOUND] = L"Votre copie du jeu a été trouvée à côté de l'installeur (%hs) : le jeu sera installé depuis celle-ci.",
         [T_GAME_MISSING] = L"Les données du jeu ne sont pas fournies. À la fin de l'installation, vous indiquerez votre copie : le dossier CRYSTAL DEFENDERS (ou 58410989) tel qu'il se trouve sur le stockage de la console.",
@@ -52,10 +52,10 @@ static const wchar_t *const texts[6][T_COUNT] = {
     },
     // ------------------------------------------------------------------ English
     {
-        [T_TITLE_INSTALL] = L"Crystal Defenders Setup", [T_TITLE_UNINSTALL] = L"Uninstall Crystal Defenders",
+        [T_TITLE_INSTALL] = L"Cristalis (Crystal Defenders) Setup", [T_TITLE_UNINSTALL] = L"Uninstall Cristalis (Crystal Defenders)",
         [T_INTRO] = L"This program installs Cristalis (an unofficial native port of Crystal Defenders for Windows) on this computer.",
         [T_DIR_LABEL] = L"Installation folder:", [T_BROWSE_BTN] = L"Browse…",
-        [T_BROWSE] = L"Folder to install Crystal Defenders in (a \"Crystal Defenders\" folder is created inside it)",
+        [T_BROWSE] = L"Folder to install Crystal Defenders in (a \"Cristalis\" folder is created inside it)",
         [T_CHK_DESKTOP] = L"Create a shortcut on the desktop", [T_CHK_MENU] = L"Create a shortcut in the Start menu",
         [T_GAME_FOUND] = L"Your copy of the game was found next to the installer (%hs): the game will be installed from it.",
         [T_GAME_MISSING] = L"The game's data is not included. At the end of the installation you will point to your copy: the CRYSTAL DEFENDERS (or 58410989) folder as found on the console's storage.",
@@ -80,10 +80,10 @@ static const wchar_t *const texts[6][T_COUNT] = {
     },
     // ------------------------------------------------------------------ Deutsch
     {
-        [T_TITLE_INSTALL] = L"Installation von Crystal Defenders", [T_TITLE_UNINSTALL] = L"Deinstallation von Crystal Defenders",
+        [T_TITLE_INSTALL] = L"Installation von Cristalis (Crystal Defenders)", [T_TITLE_UNINSTALL] = L"Deinstallation von Cristalis (Crystal Defenders)",
         [T_INTRO] = L"Dieses Programm installiert Cristalis (eine inoffizielle native Portierung von Crystal Defenders für Windows) auf diesem Computer.",
         [T_DIR_LABEL] = L"Installationsordner:", [T_BROWSE_BTN] = L"Durchsuchen…",
-        [T_BROWSE] = L"Ordner für Crystal Defenders (darin wird ein Ordner „Crystal Defenders“ angelegt)",
+        [T_BROWSE] = L"Ordner für Crystal Defenders (darin wird ein Ordner „Cristalis“ angelegt)",
         [T_CHK_DESKTOP] = L"Verknüpfung auf dem Desktop erstellen", [T_CHK_MENU] = L"Verknüpfung im Startmenü erstellen",
         [T_GAME_FOUND] = L"Ihre Kopie des Spiels wurde neben dem Installationsprogramm gefunden (%hs): Das Spiel wird daraus installiert.",
         [T_GAME_MISSING] = L"Die Spieldaten sind nicht enthalten. Am Ende der Installation geben Sie Ihre Kopie an: den Ordner CRYSTAL DEFENDERS (oder 58410989), wie er auf dem Speicher der Konsole liegt.",
@@ -108,10 +108,10 @@ static const wchar_t *const texts[6][T_COUNT] = {
     },
     // ------------------------------------------------------------------ Español
     {
-        [T_TITLE_INSTALL] = L"Instalación de Crystal Defenders", [T_TITLE_UNINSTALL] = L"Desinstalación de Crystal Defenders",
+        [T_TITLE_INSTALL] = L"Instalación de Cristalis (Crystal Defenders)", [T_TITLE_UNINSTALL] = L"Desinstalación de Cristalis (Crystal Defenders)",
         [T_INTRO] = L"Este programa instala Cristalis (una adaptación nativa no oficial de Crystal Defenders para Windows) en este ordenador.",
         [T_DIR_LABEL] = L"Carpeta de instalación:", [T_BROWSE_BTN] = L"Examinar…",
-        [T_BROWSE] = L"Carpeta donde instalar Crystal Defenders (se creará dentro una carpeta «Crystal Defenders»)",
+        [T_BROWSE] = L"Carpeta donde instalar Crystal Defenders (se creará dentro una carpeta «Cristalis»)",
         [T_CHK_DESKTOP] = L"Crear un acceso directo en el escritorio", [T_CHK_MENU] = L"Crear un acceso directo en el menú Inicio",
         [T_GAME_FOUND] = L"Se ha encontrado tu copia del juego junto al instalador (%hs): el juego se instalará desde ella.",
         [T_GAME_MISSING] = L"Los datos del juego no están incluidos. Al final de la instalación indicarás tu copia: la carpeta CRYSTAL DEFENDERS (o 58410989) tal como está en el almacenamiento de la consola.",
@@ -136,10 +136,10 @@ static const wchar_t *const texts[6][T_COUNT] = {
     },
     // ------------------------------------------------------------------ Italiano
     {
-        [T_TITLE_INSTALL] = L"Installazione di Crystal Defenders", [T_TITLE_UNINSTALL] = L"Disinstallazione di Crystal Defenders",
+        [T_TITLE_INSTALL] = L"Installazione di Cristalis (Crystal Defenders)", [T_TITLE_UNINSTALL] = L"Disinstallazione di Cristalis (Crystal Defenders)",
         [T_INTRO] = L"Questo programma installa Cristalis (una conversione nativa non ufficiale di Crystal Defenders per Windows) su questo computer.",
         [T_DIR_LABEL] = L"Cartella di installazione:", [T_BROWSE_BTN] = L"Sfoglia…",
-        [T_BROWSE] = L"Cartella in cui installare Crystal Defenders (al suo interno verrà creata una cartella «Crystal Defenders»)",
+        [T_BROWSE] = L"Cartella in cui installare Crystal Defenders (al suo interno verrà creata una cartella «Cristalis»)",
         [T_CHK_DESKTOP] = L"Crea un collegamento sul desktop", [T_CHK_MENU] = L"Crea un collegamento nel menu Start",
         [T_GAME_FOUND] = L"La tua copia del gioco è stata trovata accanto al programma di installazione (%hs): il gioco verrà installato da lì.",
         [T_GAME_MISSING] = L"I dati del gioco non sono inclusi. Alla fine dell'installazione indicherai la tua copia: la cartella CRYSTAL DEFENDERS (o 58410989) così come si trova nella memoria della console.",
@@ -164,10 +164,10 @@ static const wchar_t *const texts[6][T_COUNT] = {
     },
     // ------------------------------------------------------------------ 日本語
     {
-        [T_TITLE_INSTALL] = L"Crystal Defenders のインストール", [T_TITLE_UNINSTALL] = L"Crystal Defenders のアンインストール",
+        [T_TITLE_INSTALL] = L"Cristalis（Crystal Defenders）のインストール", [T_TITLE_UNINSTALL] = L"Cristalis（Crystal Defenders）のアンインストール",
         [T_INTRO] = L"Cristalis（クリスタルディフェンダーズの Windows 向け非公式ネイティブ移植版）をこのパソコンにインストールします。",
         [T_DIR_LABEL] = L"インストール先のフォルダー：", [T_BROWSE_BTN] = L"参照…",
-        [T_BROWSE] = L"Crystal Defenders のインストール先（中に「Crystal Defenders」フォルダーが作られます）",
+        [T_BROWSE] = L"Crystal Defenders のインストール先（中に「Cristalis」フォルダーが作られます）",
         [T_CHK_DESKTOP] = L"デスクトップにショートカットを作る", [T_CHK_MENU] = L"スタートメニューにショートカットを作る",
         [T_GAME_FOUND] = L"インストーラーの横にゲームのコピーが見つかりました（%hs）。ここからゲームをインストールします。",
         [T_GAME_MISSING] = L"ゲームのデータは含まれていません。インストールの最後に、お持ちのコピー（本体のストレージにある CRYSTAL DEFENDERS または 58410989 フォルダー）を指定してください。",

@@ -24,7 +24,9 @@
 #include <string.h>
 #include <stdbool.h>
 
-#define APP "Crystal Defenders"
+#define APP "Cristalis" // the folder made for it (an installed copy keeps its own, found in the Windows list)
+#define OLD_APP "Crystal Defenders" // the folder and shortcuts before 1.10
+#define LINK L"Cristalis \u2013 Crystal Defenders" // the shortcuts' name (the game's name too, to be found)
 #define EXE "crystal_defenders.exe"
 
 typedef struct { char name[260]; uint64_t size, offset; } Entry;
@@ -49,6 +51,7 @@ static bool unpack(const char *in, size_t in_size, char *out, size_t out_size) {
 }
 
 static bool silent, no_system; // no_system: leave shortcuts and the Windows entry alone
+static bool test_links; // CD_SETUP_LINK_DIR (tests): shortcuts in that folder, the Windows entry never touched
 
 #include "setup_text.h"
 #include "../../../project.h" // GAME_VERSION
@@ -133,7 +136,7 @@ static void browse(HWND owner) {
   while (n > 3 && picked[n - 1] == '\\') picked[--n] = 0;
   // the game gets its own folder inside the chosen one, unless that folder is already named after it
   const char *leaf = strrchr(picked, '\\');
-  if (!leaf || _stricmp(leaf + 1, APP)) snprintf(picked + n, sizeof picked - n, "%s" APP, picked[n - 1] == '\\' ? "" : "\\");
+  if (!leaf || (_stricmp(leaf + 1, APP) && _stricmp(leaf + 1, OLD_APP))) snprintf(picked + n, sizeof picked - n, "%s" APP, picked[n - 1] == '\\' ? "" : "\\");
   SetWindowTextA(dlg_edit, picked);
 }
 
@@ -308,18 +311,16 @@ static void make_dirs(const char *path) { // creates every folder of a file path
     if (*p == '\\') { *p = 0; CreateDirectoryA(tmp, NULL); *p = '\\'; }
 }
 
-static bool shortcut(const char *lnk, const char *target, const char *workdir) {
+static bool shortcut(const wchar_t *lnk, const char *target, const char *workdir) {
   IShellLinkA *sl = NULL;
   IPersistFile *pf = NULL;
   bool ok = false;
   if (CoCreateInstance(&CLSID_ShellLink, NULL, CLSCTX_INPROC_SERVER, &IID_IShellLinkA, (void **)&sl) != S_OK) return false;
   IShellLinkA_SetPath(sl, target);
   IShellLinkA_SetWorkingDirectory(sl, workdir);
-  IShellLinkA_SetDescription(sl, APP);
+  IShellLinkA_SetDescription(sl, "Cristalis - Crystal Defenders");
   if (IShellLinkA_QueryInterface(sl, &IID_IPersistFile, (void **)&pf) == S_OK) {
-    wchar_t w[MAX_PATH];
-    MultiByteToWideChar(CP_ACP, 0, lnk, -1, w, MAX_PATH);
-    ok = IPersistFile_Save(pf, w, TRUE) == S_OK;
+    ok = IPersistFile_Save(pf, lnk, TRUE) == S_OK;
     IPersistFile_Release(pf);
   }
   IShellLinkA_Release(sl);
@@ -435,13 +436,29 @@ static int delete_file(const char *dir, const char *name) {
   return DeleteFileA(path) ? 1 : 0;
 }
 
+// Where the shortcuts go: the desktop or the Start menu; CD_SETUP_LINK_DIR=<folder> (tests): there instead,
+// so that a test never touches the real ones.
+static bool link_folder(int csidl, wchar_t *out) {
+  const wchar_t *test = _wgetenv(L"CD_SETUP_LINK_DIR");
+  if (test && *test) {
+    _snwprintf(out, MAX_PATH, L"%ls\\%ls", test, csidl == CSIDL_PROGRAMS ? L"menu" : L"desktop");
+    out[MAX_PATH - 1] = 0;
+    CreateDirectoryW(out, NULL);
+    return true;
+  }
+  return SHGetFolderPathW(NULL, csidl, NULL, 0, out) == S_OK;
+}
+
+// The shortcuts of the desktop and of the Start menu, under their name and the one before 1.10.
 static void remove_shortcuts(void) {
-  char folder[MAX_PATH], lnk[MAX_PATH];
+  wchar_t folder[MAX_PATH], lnk[MAX_PATH];
   static const int where[] = {CSIDL_DESKTOPDIRECTORY, CSIDL_PROGRAMS};
   for (int k = 0; k < 2; k++)
-    if (SHGetFolderPathA(NULL, where[k], NULL, 0, folder) == S_OK) {
-      snprintf(lnk, sizeof lnk, "%s\\" APP ".lnk", folder);
-      DeleteFileA(lnk);
+    if (link_folder(where[k], folder)) {
+      _snwprintf(lnk, MAX_PATH, L"%ls\\%ls.lnk", folder, LINK);
+      DeleteFileW(lnk);
+      _snwprintf(lnk, MAX_PATH, L"%ls\\" L"" OLD_APP ".lnk", folder);
+      DeleteFileW(lnk);
     }
 }
 
@@ -497,10 +514,8 @@ static int uninstall(const char *self, const char *dir, bool all) {
     snprintf(path, sizeof path, "%s\\%s", d, data[k]);
     RemoveDirectoryA(path);
   }
-  if (!no_system) {
-    remove_shortcuts();
-    RegDeleteKeyA(HKEY_CURRENT_USER, UNINST_KEY);
-  }
+  if (!no_system || test_links) remove_shortcuts();
+  if (!no_system && !test_links) RegDeleteKeyA(HKEY_CURRENT_USER, UNINST_KEY);
   if (silent) {
     wchar_t line[1024];
     _snwprintf(line, 1023, L"uninstalled: %d files removed from %hs (personal data %hs)", removed, d, all ? "removed" : "kept");
@@ -540,6 +555,7 @@ int main(int argc, char **argv) {
     else if (!_strnicmp(argv[k], "/WAIT=", 6)) wait_pid = strtoul(argv[k] + 6, NULL, 10);
     else if (!_stricmp(argv[k], "/RUN")) run_after = true;
   }
+  test_links = _wgetenv(L"CD_SETUP_LINK_DIR") != NULL;
   { // window program: print to the terminal it was started from, if any
     HANDLE ho = GetStdHandle(STD_OUTPUT_HANDLE);
     if (!ho || ho == INVALID_HANDLE_VALUE || GetFileType(ho) == FILE_TYPE_UNKNOWN) AttachConsole(ATTACH_PARENT_PROCESS);
@@ -671,18 +687,20 @@ int main(int argc, char **argv) {
   fclose(f);
 
   // ---- shortcuts
-  char exe[MAX_PATH], lnk[MAX_PATH], folder[MAX_PATH];
+  char exe[MAX_PATH];
+  wchar_t lnk[MAX_PATH], folder[MAX_PATH];
   snprintf(exe, sizeof exe, "%s\\" EXE, dest);
-  if (on_desktop && SHGetFolderPathA(NULL, CSIDL_DESKTOPDIRECTORY, NULL, 0, folder) == S_OK) {
-    snprintf(lnk, sizeof lnk, "%s\\" APP ".lnk", folder);
+  if (on_desktop || in_menu) remove_shortcuts(); // those of an older install, under the name before 1.10
+  if (on_desktop && link_folder(CSIDL_DESKTOPDIRECTORY, folder)) {
+    _snwprintf(lnk, MAX_PATH, L"%ls\\%ls.lnk", folder, LINK);
     shortcut(lnk, exe, dest);
   }
-  if (in_menu && SHGetFolderPathA(NULL, CSIDL_PROGRAMS, NULL, 0, folder) == S_OK) {
-    snprintf(lnk, sizeof lnk, "%s\\" APP ".lnk", folder);
+  if (in_menu && link_folder(CSIDL_PROGRAMS, folder)) {
+    _snwprintf(lnk, MAX_PATH, L"%ls\\%ls.lnk", folder, LINK);
     shortcut(lnk, exe, dest);
   }
 
-  if (!no_system) { // entry in the Windows list of installed applications (current user only)
+  if (!no_system && !test_links) { // entry in the Windows list of installed applications (current user only)
     HKEY key;
     if (RegCreateKeyExA(HKEY_CURRENT_USER, UNINST_KEY, 0, NULL, 0, KEY_WRITE, NULL, &key, NULL) == ERROR_SUCCESS) {
       char un[MAX_PATH + 2];

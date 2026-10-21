@@ -16,6 +16,10 @@ on DarkLauncher's "What's new" page.
 - **DarkLauncher 2.41**: on Linux, the display without the graphics card is about ten times faster at
   4K, and Steam's virtual keyboard no longer opens at start (Steam's Game Mode); the menus before play
   keep their own pace, and a very slow synced picture turns vsync off for two seconds.
+- The installer is titled "Cristalis (Crystal Defenders)", installs into a "Cristalis" folder and names
+  its shortcuts "Cristalis – Crystal Defenders" (taking away those of the name before). An installed
+  copy stays where it is; the program's files keep their names (crystal_defenders.exe, .ini, the
+  saves), so that updates and Steam shortcuts go on working.
 - DarkLauncher 2.20 and 2.30 come with it, with nothing visible in this game.
 
 ## 1.09
