@@ -53,8 +53,9 @@ cat > "$dest/README.txt" <<'EOF'
 Cristalis (Crystal Defenders Recomp) - unofficial native Linux build (experimental)
 
 EXPERIMENTAL: a whole game has been played on a real PC under Bazzite (a Linux
-close to SteamOS) with no problem seen, but few machines have run it so far,
-and never yet a Steam Deck. Reports are welcome.
+close to SteamOS), in Steam's Game Mode with the new Steam Controller, with no
+problem seen, but few machines have run it so far, and never yet a Steam Deck.
+Reports are welcome.
 
 This folder does NOT contain the game, only the program that runs it. You need
 your own copy of Crystal Defenders (Xbox 360, Xbox Live Arcade): the

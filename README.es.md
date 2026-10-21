@@ -157,7 +157,8 @@ SDL3 viene incluido, en `lib/`, y FFmpeg está integrado.
 2. Copia dentro tu carpeta `CRYSTAL DEFENDERS` (o `58410989`).
 3. Ejecuta `crystal_defenders.sh`. El juego se instala en el primer arranque.
 
-Se ha jugado una partida completa en un PC real con Bazzite, un Linux cercano a SteamOS, sin problemas a la vista;
+Se ha jugado una partida completa en un PC real con Bazzite, un Linux cercano a SteamOS, en el modo Juego de Steam
+con el nuevo Steam Controller, sin problemas a la vista;
 aún no se ha probado en una Steam Deck. Sigue marcada como experimental: hasta ahora ha funcionado en pocas máquinas. En una Steam Deck,
 añade `crystal_defenders.sh` a Steam como juego ajeno a Steam, sin forzar una herramienta de
 compatibilidad. La versión de Windows también funciona con Proton.

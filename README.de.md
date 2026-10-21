@@ -164,7 +164,8 @@ fontconfig vom System; SDL3 liegt bei, in `lib/`, und FFmpeg ist eingebaut.
 2. Kopieren Sie Ihren Ordner `CRYSTAL DEFENDERS` (oder `58410989`) hinein.
 3. Starten Sie `crystal_defenders.sh`. Das Spiel wird beim ersten Start installiert.
 
-Ein ganzes Spiel wurde auf einem echten PC unter Bazzite, einem SteamOS-nahen Linux, ohne erkennbare Probleme gespielt;
+Ein ganzes Spiel wurde auf einem echten PC unter Bazzite, einem SteamOS-nahen Linux, im Spielmodus von Steam mit
+dem neuen Steam Controller ohne erkennbare Probleme gespielt;
 auf einem Steam Deck wurde sie noch nicht ausprobiert. Sie bleibt als experimentell markiert: bisher lief sie auf wenigen Rechnern. Auf einem Steam Deck
 fügen Sie `crystal_defenders.sh` als Nicht-Steam-Spiel zu Steam hinzu, ohne ein Kompatibilitätstool
 zu erzwingen. Die Windows-Version läuft auch über Proton.

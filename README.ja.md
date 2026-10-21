@@ -152,7 +152,8 @@ Windows の設定のインストール済みアプリ一覧から「Cristalis (C
 2. その中に `CRYSTAL DEFENDERS`（または `58410989`）フォルダーをコピーします。
 3. `crystal_defenders.sh` を実行します。初回起動時にゲームがインストールされます。
 
-SteamOS に近い Linux である Bazzite を入れた実際の PC で、1 ゲームを最後まで遊び、問題は見つかりませんでした。
+SteamOS に近い Linux である Bazzite を入れた実際の PC で、Steam のゲームモードと新しい Steam コントローラーを使い、
+1 ゲームを最後まで遊び、問題は見つかりませんでした。
 Steam Deck ではまだ試していません。動かしたマシンがまだ少ないため、試験版のままです。Steam Deck では、
 互換性ツールを強制せずに、`crystal_defenders.sh` を「Steam 以外のゲーム」として Steam に追加して
 ください。Windows 版も Proton で動きます。
