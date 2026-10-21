@@ -175,6 +175,8 @@ static const wchar_t *ps_more(void) { // PlayStation pads, under the help of "Co
   return out;
 }
 static const DlRow rumble_row = {DL_SWITCH, dl_texts[T_RUMBLE], dl_texts[T_H_RUMBLE], &dl_cfg.rumble, 1};
+static const wchar_t *const *const p2_names[] = {dl_texts[T_P2_SECOND], dl_texts[T_P2_FIRST]};
+static const DlRow p2_row = {DL_CHOICE, dl_texts[T_P2], dl_texts[T_H_P2], &dl_cfg.p2_pad, 1, p2_names}; // two players (DlGame.players)
 static const wchar_t *const *const ahead_names[] = {dl_texts[T_NO], dl_texts[T_AHEAD_1], dl_texts[T_AHEAD_2]};
 static const DlRow ahead_row = {DL_CHOICE, dl_texts[T_AHEAD], dl_texts[T_H_AHEAD], &dl_cfg.ahead, 2, ahead_names};
 static DlRow ctrl_rows[] = { // not const, as the rows below: their help leaves out fast forward when the game hides it
@@ -188,12 +190,14 @@ static DlRow ctrl_rows[] = { // not const, as the rows below: their help leaves 
 #define KEY_ROW(k) {.kind = DL_KEY, .label = dl_texts[T_BTN_UP + (k)], .help = dl_texts[T_KH_BTN], .value = &dl_key_vk[k]}
 static DlRow keys_rows[] = {
     KEY_ROW(0), KEY_ROW(1), KEY_ROW(2), KEY_ROW(3), KEY_ROW(4), KEY_ROW(5), KEY_ROW(6), KEY_ROW(7), KEY_ROW(8), KEY_ROW(9), KEY_ROW(10), KEY_ROW(11),
+    KEY_ROW(12), KEY_ROW(13), KEY_ROW(14), KEY_ROW(15), // L2 R2 L3 R3: left out unless the game reads them (DlGame.extra_buttons)
     {.kind = DL_KEY, .label = dl_texts[T_BTN_TURBO], .help = dl_texts[T_KH_TURBO], .value = &dl_key_vk[DL_BTNS]},
     {.kind = DL_ACTION, .label = dl_texts[T_GFXDEF], .help = dl_texts[T_KH_DEFAULTS], .run = dl_keys_default},
 };
 #define PAD_ROW(k) {.kind = DL_PADKEY, .label = dl_texts[T_BTN_UP + (k)], .help = dl_texts[T_PH_BTN], .value = &dl_pad_code[k]}
 static DlRow pad_rows[] = { // not const: the help of "Default values" follows the game's choices
     PAD_ROW(0), PAD_ROW(1), PAD_ROW(2), PAD_ROW(3), PAD_ROW(4), PAD_ROW(5), PAD_ROW(6), PAD_ROW(7), PAD_ROW(8), PAD_ROW(9), PAD_ROW(10), PAD_ROW(11),
+    PAD_ROW(12), PAD_ROW(13), PAD_ROW(14), PAD_ROW(15), // as on the keys' page
     {.kind = DL_PAGE, .label = dl_texts[T_PADFN], .help = dl_texts[T_PH_FN], .page = PG_PADFN},
     {.kind = DL_ACTION, .label = dl_texts[T_GFXDEF], .help = dl_texts[T_PH_DEFAULTS], .run = dl_pads_default},
 };
@@ -283,6 +287,11 @@ static DlRow welcome_screen_rows[] = { // not const, as image_rows
     {DL_CHOICE, dl_texts[T_PRESET], dl_texts[T_H_PRESET], &preset_pick, 3, NULL, preset_show, preset_changed},
     {DL_ACTION, dl_texts[T_W_PLAY], dl_texts[T_H_W_PLAY], NULL, 0, NULL, NULL, dl_play},
 };
+// the game outside DarkLauncher (DlGame.play): the language, then the game (its own pages say how it plays)
+static const DlRow welcome_out_rows[] = {
+    {DL_CHOICE, dl_texts[T_UILANG], dl_texts[T_H_UILANG], &dl_cfg.ui_lang, DL_LANGS - 1, NULL, show_lang, lang_changed},
+    {DL_ACTION, dl_texts[T_W_PLAY], dl_texts[T_H_W_PLAY_OUT], NULL, 0, NULL, NULL, dl_play},
+};
 
 void dl_welcome_open(void) {
   if (dl_news_seen == 0 && dl_game->version && dl_game->news) dl_news_seen = news_hash(); // a first start has no news to show
@@ -338,6 +347,7 @@ static const Words settings_words[] = {
     {L"サウンド", L"son", L"sound", L"sonido", L"som", L"Ton", L"suono"},
     {L"操作", L"commandes", L"controls", L"controles", L"controles", L"Steuerung", L"comandi"},
     {L"インターネット", L"Internet", L"Internet", L"Internet", L"Internet", L"Internet", L"Internet"},
+    {L"アクセシビリティ", L"accessibilité", L"accessibility", L"accesibilidad", L"acessibilidade", L"Barrierefreiheit", L"accessibilità"}, // outside DarkLauncher only
 }, settings_more_words[] = {
     {L"ゲームのフォルダー", L"le dossier du jeu", L"the game folder", L"la carpeta del juego", L"a pasta do jogo", L"der Spielordner", L"la cartella del gioco"},
     {L"初期設定", L"les valeurs par défaut", L"the default values", L"los valores por defecto", L"os valores padrão", L"die Standardwerte", L"i valori predefiniti"},
@@ -365,12 +375,12 @@ static void helps_make(bool net) {
     image_help[lang] = image_help_text[lang];
     wchar_t more[200];
     n = 0;
-    for (int k = 0; k < 5; k++)
-      if (k != 4 || net) pick[n++] = &settings_words[k];
+    for (int k = 0; k < 6; k++) // outside DarkLauncher: Languages, Internet and Accessibility only
+      if (DL_OUTSIDE ? k == 0 || (k == 4 && net) || k == 5 : k != 5 && (k != 4 || net)) pick[n++] = &settings_words[k];
     words_join(settings_help_text[lang], 120, pick, n, lang, false);
     n = 0;
     for (int k = 0; k < 3; k++)
-      if (k != 2 || dl_game->reset) pick[n++] = &settings_more_words[k];
+      if (k != 2 || (dl_game->reset && !DL_OUTSIDE)) pick[n++] = &settings_more_words[k];
     words_join(more, 200, pick, n, lang, true);
     _snwprintf(settings_help_text[lang] + wcslen(settings_help_text[lang]), 319 - wcslen(settings_help_text[lang]), L"%ls%ls%ls", settings_mid[lang],
                more, settings_end[lang]);
@@ -391,6 +401,8 @@ static DlRow settings_rows[] = {
     {DL_ACTION, dl_texts[T_DEFAULTS], dl_texts[T_H_DEFAULTS], NULL, 0, NULL, NULL, settings_defaults},
 };
 static const DlRow settings_reset_row = {DL_ACTION, dl_texts[T_RESET], dl_texts[T_H_RESET], NULL, 0, NULL, NULL, dl_restart};
+// outside DarkLauncher (DlGame.play), in the place of Picture: the menus' own accessibility
+static const DlRow settings_a11y_row = {.kind = DL_PAGE, .label = dl_texts[T_A11Y], .help = dl_texts[T_H_A11Y], .page = PG_A11Y};
 
 // Takes out of a page the row that sets this value (a row the game does not offer: DlGame.hide).
 static void page_drop(int page, const int *value) {
@@ -414,7 +426,7 @@ void dl_net_newer(void) {
 }
 
 void dl_menu_init(void) {
-  bool saves = dl_game->save_state && dl_game->load_state;
+  bool saves = dl_game->save_state && dl_game->load_state && !DL_OUTSIDE; // outside DarkLauncher: no state of the game here
   if (dl_game->pad_layout || dl_game->pad_menu) pad_rows[sizeof pad_rows / sizeof pad_rows[0] - 1].help = dl_texts[T_PH_DEFAULTS_GAME];
   if (dl_game->pad_menu == DL_MENU_HOLD) padfn_rows[4].help = dl_texts[T_PH_MENU_HOLD]; // FN_MENU's row
   dl_page(dl_texts[T_TAB_LANGS], langs_rows, 1);
@@ -438,10 +450,19 @@ void dl_menu_init(void) {
   if (dl_game->hide & DL_HIDE_SCANLINES) page_drop(DL_PAGE_IMAGE, &dl_cfg.scanlines);
   dl_page(dl_texts[T_TAB_SOUND], sound_rows, sizeof sound_rows / sizeof sound_rows[0]);
   dl_page(dl_texts[T_TAB_CTRL], ctrl_rows, sizeof ctrl_rows / sizeof ctrl_rows[0]);
-  if (dl_game->rumble) dl_page_insert(PG_CTRL, 3, &rumble_row); // after the three pages of assignments
-  if (dl_ahead_ok()) dl_page_insert(PG_CTRL, 3 + (dl_game->rumble ? 1 : 0), &ahead_row);
+  int at = 3; // after the three pages of assignments: player 2's controller, the vibration, run-ahead
+  if (dl_game->players >= 2) dl_page_insert(PG_CTRL, at++, &p2_row);
+  if (dl_game->rumble) dl_page_insert(PG_CTRL, at++, &rumble_row);
+  if (dl_ahead_ok()) dl_page_insert(PG_CTRL, at, &ahead_row);
   dl_page(dl_texts[T_TAB_KEYS], keys_rows, sizeof keys_rows / sizeof keys_rows[0]);
   dl_page(dl_texts[T_TAB_PAD], pad_rows, sizeof pad_rows / sizeof pad_rows[0]);
+  if (dl_game->analog) // the sticks go to the game: the help no longer says the left one is the directional pad
+    for (int k = 0; k < DL_BTNS; k++) pad_rows[k].help = dl_texts[T_PH_BTN_ANALOG];
+  for (int k = DL_BTNS_CLASSIC; k < DL_BTNS; k++) // L2 R2 L3 R3, only for a game that reads them
+    if (!(dl_game->extra_buttons & (1u << k))) {
+      page_drop(PG_KEYS, &dl_key_vk[k]);
+      page_drop(PG_PAD, &dl_pad_code[k]);
+    }
   DlPage *pf = &dl_pages[dl_page(dl_texts[T_TAB_PADFN], padfn_rows, 1)];
   for (int k = 1; k < (int)(sizeof padfn_rows / sizeof padfn_rows[0]); k++)
     if (saves || (k != 1 && k != 2)) pf->rows[pf->n++] = &padfn_rows[k];
@@ -458,7 +479,8 @@ void dl_menu_init(void) {
   dl_page(dl_texts[T_TAB_A11Y], a11y_rows, sizeof a11y_rows / sizeof a11y_rows[0]);
   dl_list_page(dl_texts[T_TAB_BACKUPS], &dl_backups_list);
   dl_list_page(dl_texts[T_TAB_NEWS], &news_list);
-  dl_page(dl_texts[T_TAB_WELCOME], welcome_rows, sizeof welcome_rows / sizeof welcome_rows[0]);
+  if (DL_OUTSIDE) dl_page(dl_texts[T_TAB_WELCOME], welcome_out_rows, sizeof welcome_out_rows / sizeof welcome_out_rows[0]);
+  else dl_page(dl_texts[T_TAB_WELCOME], welcome_rows, sizeof welcome_rows / sizeof welcome_rows[0]);
   dl_page(dl_texts[T_TAB_CTRL], welcome_ctrl_rows, sizeof welcome_ctrl_rows / sizeof welcome_ctrl_rows[0]);
   dl_page(dl_texts[T_TAB_IMAGE], welcome_screen_rows, sizeof welcome_screen_rows / sizeof welcome_screen_rows[0]);
   DlPage *pn = &dl_pages[dl_page(dl_texts[T_TAB_NET], NULL, 0)];
@@ -472,12 +494,19 @@ void dl_menu_init(void) {
                           : discord ? T_H_NET_DISCORD : UPDATE_DEFAULT_ON ? T_H_NET_UPD_ON : T_H_NET_UPD_OFF];
   helps_make(net);
   settings_rows[1].help = image_help; // "Picture": the rows offered
-  dl_page(dl_texts[T_TAB_SETTINGS], settings_rows, sizeof settings_rows / sizeof settings_rows[0]);
-  if (net) dl_page_insert(PG_SETTINGS, 4, &net_row); // Internet, after Controls
-  if (dl_game->reset) dl_page_insert(PG_SETTINGS, dl_pages[PG_SETTINGS].n, &settings_reset_row); // a game that cannot restart has no such row
-  add_section(SEC_PLAY, -1, 0xE768, dl_texts[T_PLAY], dl_texts[T_H_PLAY]);
+  DlPage *ps = &dl_pages[dl_page(dl_texts[T_TAB_SETTINGS], settings_rows, sizeof settings_rows / sizeof settings_rows[0])];
+  if (DL_OUTSIDE) { // Languages, Internet, Accessibility, Folder, Defaults: Picture, Sound and Controls are the game's
+    memmove(&ps->rows[1], &ps->rows[4], sizeof ps->rows[0] * (size_t)(ps->n - 4));
+    ps->n -= 3;
+    dl_page_insert(PG_SETTINGS, 1, &settings_a11y_row);
+    if (net) dl_page_insert(PG_SETTINGS, 1, &net_row);
+  } else {
+    if (net) dl_page_insert(PG_SETTINGS, 4, &net_row); // Internet, after Controls
+    if (dl_game->reset) dl_page_insert(PG_SETTINGS, dl_pages[PG_SETTINGS].n, &settings_reset_row); // a game that cannot restart has no such row
+  }
+  add_section(SEC_PLAY, -1, 0xE768, dl_texts[T_PLAY], dl_texts[DL_OUTSIDE ? T_H_PLAY_OUT : T_H_PLAY]);
   if (saves) add_section(SEC_PAGE, PG_SAVES, 0xE74E, dl_texts[T_SAVES], dl_texts[T_H_SAVES]);
-  add_section(SEC_PAGE, PG_SHOTS, 0xE722, dl_texts[T_SHOTS], dl_texts[T_H_SHOTS]);
+  if (!DL_OUTSIDE) add_section(SEC_PAGE, PG_SHOTS, 0xE722, dl_texts[T_SHOTS], dl_texts[T_H_SHOTS]); // the game outside takes its own
 }
 
 // ---- safe mode: a page shown at the start of a run after one that did not close normally (dl_app.c)
@@ -520,6 +549,7 @@ void dl_menu_finish(void) {
   bool hdr_row = false; // no HDR row on Linux
 #endif
   bool crt_row = !(dl_game->hide & DL_HIDE_CRT);
+  if (DL_OUTSIDE) hdr_row = crt_row = false; // no Picture page: only the menus' software display
   safe_rows[0].help = dl_texts[hdr_row ? (crt_row ? T_H_SAFE_KEEP : T_H_SAFE_KEEP_HDR) : (crt_row ? T_H_SAFE_KEEP_CRT : T_H_SAFE_KEEP_SOFT)];
   safe_page = dl_page(dl_texts[T_SAFE_TAB], safe_rows, sizeof safe_rows / sizeof safe_rows[0]);
   if (dl_audit_dir) dl_page_insert(safe_page, 1, &safe_load_row);
@@ -1011,17 +1041,22 @@ void dl_draw_menu(HDC wdc) {
 
   // the game's picture: large beside the bar's actions, small beside a page; on a list with
   // pictures, the picture of the selected row instead
+  // (the game outside DarkLauncher, DlGame.play: no live picture; the help takes its place, except on
+  // a list with pictures of its own)
   double vx0 = home ? 164 : 436, vy0 = 60, vx1 = 630, vy1 = home ? 300 : 212;
   double hy0 = home ? 310 : 220;
-  ui_panel(dc, vx0, vy0, vx1, vy1, RGB(0, 0, 0), TX(T_PREVIEW));
-  int pw, ph, aw = PX(vx1 - vx0 - 8), ah = PX(vy1 - vy0 - 12);
-  dl_fit(aw, ah, false, &pw, &ph);
-  dl_prev_x = ui_ox + PX(vx0 + 4) + (aw - pw) / 2;
-  dl_prev_y = ui_oy + PX(vy0 + 8) + (ah - ph) / 2;
-  dl_prev_w = pw;
-  dl_prev_h = ph;
-  if (list && list->preview && sel >= 0 && sel < list->count() && list->preview(dc, sel, vx0 + 4, vy0 + 8, vx1 - 4, vy1 - 4)) dl_prev_w = 0;
-  else if (!dl_layer) dl_blit(dc, dl_prev_x, dl_prev_y, dl_prev_w, dl_prev_h);
+  dl_prev_w = 0;
+  if (!DL_OUTSIDE || (list && list->preview)) {
+    ui_panel(dc, vx0, vy0, vx1, vy1, RGB(0, 0, 0), TX(T_PREVIEW));
+    int pw, ph, aw = PX(vx1 - vx0 - 8), ah = PX(vy1 - vy0 - 12);
+    dl_fit(aw, ah, false, &pw, &ph);
+    dl_prev_x = ui_ox + PX(vx0 + 4) + (aw - pw) / 2;
+    dl_prev_y = ui_oy + PX(vy0 + 8) + (ah - ph) / 2;
+    dl_prev_w = DL_OUTSIDE ? 0 : pw;
+    dl_prev_h = ph;
+    if (list && list->preview && sel >= 0 && sel < list->count() && list->preview(dc, sel, vx0 + 4, vy0 + 8, vx1 - 4, vy1 - 4)) dl_prev_w = 0;
+    else if (!dl_layer && dl_prev_w) dl_blit(dc, dl_prev_x, dl_prev_y, dl_prev_w, dl_prev_h);
+  } else hy0 = vy0;
   draw_help(dc, vx0, hy0, 630, PANEL_BOTTOM, help);
 
   if (dl_input_kind == DL_IN_KEYS) {
@@ -1168,7 +1203,7 @@ int dl_audit(void) {
         }
       }
     }
-    if (dl_game->save_state && dl_game->load_state) { // the keyboard on screen (a slot named with a controller)
+    if (dl_game->save_state && dl_game->load_state && !DL_OUTSIDE) { // the keyboard on screen (a slot named with a controller)
       dl_mode = M_PAGE;
       dl_cur = PG_SAVES;
       list_read = -1;
@@ -1187,9 +1222,9 @@ int dl_audit(void) {
       dl_input_kind = DL_IN_KEYS;
       dl_saves_osk_sample(false);
     }
-    pause_rows(); // the pause menu, each row selected
+    pause_rows(); // the pause menu, each row selected (none outside DarkLauncher: no game here)
     dl_mode = M_PAUSE;
-    for (int r = 0; r < pa_n; r++) {
+    for (int r = 0; r < pa_n && !DL_OUTSIDE; r++) {
       dl_sel = r;
       dl_draw_menu(wdc);
       if (r == 1 && dl_menu_bits) {

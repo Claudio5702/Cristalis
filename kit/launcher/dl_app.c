@@ -547,7 +547,35 @@ void dl_stop(void) {
 }
 bool dl_gpu_on(void) { return dl_gpu_ready(); }
 
+// The game outside DarkLauncher (DlGame.play): the settings written, the window hidden while it is
+// played, then the setup screen again, with the settings file read again (the game may have changed it).
+static bool outside_playing; // for Discord's status, while play() runs
+static void discord_follow(bool now);
+static void play_outside(void) {
+  settings_save();
+  PlaySoundA(NULL, NULL, 0); // a menu sound still playing
+  ShowWindow(dl_hwnd, SW_HIDE);
+  outside_playing = true;
+  discord_follow(true);
+  bool ok = dl_game->play();
+  outside_playing = false;
+  settings_load();
+  for (int k = 0; k < setting_n; k++) saved[k] = *settings[k].value; // as read: nothing to write
+  if (!dl_lang_ok(dl_cfg.ui_lang)) dl_cfg.ui_lang = dl_lang_default();
+  bool full = dl_cfg.fullscreen;
+  dl_cfg.fullscreen = is_fullscreen;
+  if (full != is_fullscreen) dl_toggle_fullscreen();
+  ShowWindow(dl_hwnd, SW_SHOW);
+  SetForegroundWindow(dl_hwnd);
+  discord_follow(true);
+  dl_input_release();
+  dl_menu_reread(); // the lists, as the game left their files
+  if (!ok) dl_note(TX(T_M_PLAY_FAIL));
+  dl_dirty = true;
+}
+
 void dl_play(void) {
+  if (DL_OUTSIDE) { play_outside(); return; }
   // begin: a first start from the game as it runs behind the setup screen, not from a state just
   // loaded (the session, a slot)
   if (!dl_started && !dl_state_taken && dl_game->begin) dl_game->begin();
@@ -919,7 +947,7 @@ static void discord_follow(bool now) {
   char status[256] = "", where[96], a[600], b[256], json[1400];
   if (dl_game->status && dl_start_done) dl_game->status(status, sizeof status - 1);
   status[sizeof status - 1] = 0;
-  utf8_of(TX(dl_mode == M_GAME ? T_DS_PLAYING : T_DS_MENUS), where, sizeof where);
+  utf8_of(TX(dl_mode == M_GAME || outside_playing ? T_DS_PLAYING : T_DS_MENUS), where, sizeof where);
   static unsigned nonce;
   snprintf(json, sizeof json,
            "{\"cmd\":\"SET_ACTIVITY\",\"args\":{\"pid\":%lu,\"activity\":{\"details\":\"%s\",\"state\":\"%s\",\"timestamps\":{\"start\":%lld}}},\"nonce\":\"%u\"}",
@@ -1471,16 +1499,23 @@ static void *ahead_state;
 static size_t ahead_cap;
 
 bool dl_running_ahead(void) { return ahead_now; }
-bool dl_ahead_ok(void) { return dl_game->run_ahead && dl_game->state_size && dl_game->state_to_mem && dl_game->state_from_mem; }
+bool dl_ahead_ok(void) { return dl_game->frame && dl_game->run_ahead && dl_game->state_size && dl_game->state_to_mem && dl_game->state_from_mem; }
 
 // dl_picture_same: the frame taken for good gave the picture of last time again (the frames run ahead
 // do not count)
 static bool pic_same;
 void dl_picture_same(void) { if (!ahead_now) pic_same = true; }
 
+// The game's frame(): its picture is in dl_pic, unless it says the picture is in its shared texture.
+bool dl_pic_shared;
+int dl_frame(const DlInput *in, s16 *audio, int audio_max) {
+  dl_pic_shared = false;
+  return dl_game->frame(in, dl_pic, audio, audio_max);
+}
+
 static int play_frame(const DlInput *in, s16 *audio, int audio_max, int ahead) {
   pic_same = false;
-  int n = dl_game->frame(in, dl_pic, audio, audio_max);
+  int n = dl_frame(in, audio, audio_max);
   if (ahead <= 0 || !dl_ahead_ok()) return n;
   size_t size = dl_game->state_size();
   if (!size) return n;
@@ -1493,7 +1528,7 @@ static int play_frame(const DlInput *in, s16 *audio, int audio_max, int ahead) {
   static s16 silent[8192];
   dl_game->state_to_mem(ahead_state);
   ahead_now = true;
-  for (int k = 0; k < ahead; k++) dl_game->frame(in, dl_pic, silent, audio_max < 4096 ? audio_max : 4096);
+  for (int k = 0; k < ahead; k++) dl_frame(in, silent, audio_max < 4096 ? audio_max : 4096);
   ahead_now = false;
   dl_game->state_from_mem(ahead_state);
   return n;
@@ -1553,12 +1588,13 @@ static int gpu_check(void) {
   }
   if (!dl_gpu_ready()) { printf("gpu check: the graphics card cannot be used\n"); return 3; }
   int fresh = 0;
-  for (int k = 0; k < 90; k++) {
+  for (int k = 0; k < 90 && dl_game->frame; k++) {
     pic_same = false;
-    dl_game->frame(&(DlInput){k > 30 ? DL_LEFT | DL_UP : 0}, dl_pic, tmp, 4096);
+    dl_frame((DlInput[2]){{k > 30 ? DL_LEFT | DL_UP : 0}}, tmp, 4096); // (two players: in[1] too)
     if (!pic_same) fresh++;
   }
-  printf("gpu check: the game gave 90 pictures, %d new%s\n", fresh, fresh ? "" : " (it makes none: the pictures below show its last one)");
+  if (DL_OUTSIDE) printf("gpu check: the game runs outside DarkLauncher: the setup screen only\n");
+  else printf("gpu check: the game gave 90 pictures, %d new%s\n", fresh, fresh ? "" : " (it makes none: the pictures below show its last one)");
   dl_toast_sample(); // over the game's pictures, when it has achievements
   static const struct { const char *name; int mode, page, smooth, scan, crt, fps; } shots[] = {
       {"menu", M_SIDE, -1, 0, 0, 0, 0},     {"image_page", M_PAGE, DL_PAGE_IMAGE, 0, 0, 0, 0}, {"game_sharp", M_GAME, -1, 0, 0, 0, 1},
@@ -1568,6 +1604,7 @@ static int gpu_check(void) {
   };
   int failed = 0;
   for (size_t k = 0; k < sizeof shots / sizeof shots[0]; k++) {
+    if (DL_OUTSIDE && k > 0) break; // no game, no Picture page: the setup screen alone
     dl_cfg.pause_menu = 1;
     if (shots[k].mode == M_PAUSE) dl_pause_open();
     dl_mode = shots[k].mode;
@@ -1619,12 +1656,13 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     return 0;
   }
   SetProcessDPIAware();
-  dl_pic = calloc((size_t)game->width * game->height, 4);
-  dl_pic_w = game->width;
-  dl_pic_h = game->height;
-  dl_pic_aspect = game->aspect > 0 ? game->aspect : (double)game->width / game->height;
-  scan_buf = malloc((size_t)game->width * game->height * 3 * 4);
-  cvd_buf = malloc((size_t)game->width * game->height * 3 * 4);
+  int pw = game->width > 0 ? game->width : 1, ph = game->height > 0 ? game->height : 1; // a game outside DarkLauncher may give 0
+  dl_pic = calloc((size_t)pw * ph, 4);
+  dl_pic_w = pw;
+  dl_pic_h = ph;
+  dl_pic_aspect = game->aspect > 0 ? game->aspect : (double)pw / ph;
+  scan_buf = malloc((size_t)pw * ph * 3 * 4);
+  cvd_buf = malloc((size_t)pw * ph * 3 * 4);
   if (!dl_pic || !scan_buf) return 1;
 
   // settings: the kit's, then the game's
@@ -1692,7 +1730,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (game->start) game->start();
     dl_start_done = true;
     static s16 tmp[8192];
-    game->frame(&(DlInput){0}, dl_pic, tmp, 4096);
+    if (game->frame) dl_frame((DlInput[2]){{0}}, tmp, 4096);
     ShowWindow(dl_hwnd, SW_SHOWNOACTIVATE);
     return dl_audit();
   }
@@ -1701,6 +1739,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     dl_start_done = true;
     return gpu_check();
   }
+  if (bench_secs && DL_OUTSIDE) { printf("bench: the game runs outside DarkLauncher: nothing to measure\n"); return 0; }
   if (!bench_secs) { run_mark_write(); crash_before = SetUnhandledExceptionFilter(crash_filter); } // the marker is removed when the program closes normally
   if (dl_cfg.gpu) dl_gpu_prepare(); // the shaders, on a second thread; GDI shows the first pictures
   ShowWindow(dl_hwnd, SW_SHOW);
@@ -1780,7 +1819,8 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     // the game runs while it is played, and, before it is started, behind the setup screen (its own
     // title or demo shows in the preview); once started, the setup screen pauses it, and so may
     // another window in front (not in a bench: it measures the game played, whatever window is in front)
-    bool run = dl_mode == M_GAME || !dl_started, bg_pause = dl_cfg.bg_pause && !bench_secs;
+    // (outside DarkLauncher, DlGame.play: no game here, only the setup screen)
+    bool run = (dl_mode == M_GAME || !dl_started) && game->frame, bg_pause = dl_cfg.bg_pause && !bench_secs;
     if (dl_mode == M_GAME && bg_pause && GetForegroundWindow() != dl_hwnd) run = false;
     // a window put away in the taskbar: nothing is drawn, and with "Pause in background" the game
     // waits too (its title behind the setup screen as well)
@@ -1812,10 +1852,11 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (bench_frames > 120 && wave_out && queued == 0 && run) bench_gaps++; // the sound card ran dry
     QueryPerformanceCounter(&now);
     if (run && (steps > 1 || (pace ? queued < ahead : now.QuadPart >= next.QuadPart))) {
-      DlInput in = {dl_mode == M_GAME ? dl_game_buttons() : 0};
+      DlInput in[2] = {{0}}; // the players' (in[1]: DlGame.players 2)
+      if (dl_mode == M_GAME) dl_game_input(in);
       for (int k = 0; k < speed; k++) {
         // run-ahead only in play, at the normal speed
-        int n = play_frame(&in, audio, audio_max, dl_mode == M_GAME && dl_started && speed == 1 ? dl_cfg.ahead : 0);
+        int n = play_frame(in, audio, audio_max, dl_mode == M_GAME && dl_started && speed == 1 ? dl_cfg.ahead : 0);
         if (n > 0 && audio && !turbo) audio_add(audio, n);
         if (dl_mode == M_GAME && dl_started) dl_rewind_snap();
         fps_frames++;
@@ -1830,7 +1871,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
       for (int k = 0; menus && wave_out && k < 12; k++) {
         audio_pump();
         if (audio_queued() >= ahead) break;
-        int n = play_frame(&in, audio, audio_max, 0);
+        int n = play_frame(in, audio, audio_max, 0);
         if (n > 0 && audio) audio_add(audio, n);
         cushioned = true;
         fps_frames++;

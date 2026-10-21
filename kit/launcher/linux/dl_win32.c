@@ -953,7 +953,7 @@ BOOL DestroyWindow(HWND h) {
   return TRUE;
 }
 
-BOOL ShowWindow(HWND h, int how) { (void)how; return h && SDL_ShowWindow(((Win *)h)->win); }
+BOOL ShowWindow(HWND h, int how) { return h && (how == SW_HIDE ? SDL_HideWindow(((Win *)h)->win) : SDL_ShowWindow(((Win *)h)->win)); }
 BOOL IsIconic(HWND h) { return h && (SDL_GetWindowFlags(((Win *)h)->win) & SDL_WINDOW_MINIMIZED); }
 LRESULT DefWindowProcW(HWND w, UINT msg, WPARAM wp, LPARAM lp) { (void)w, (void)msg, (void)wp, (void)lp; return 0; }
 void PostQuitMessage(int code) { (void)code; }
@@ -999,6 +999,7 @@ BOOL SetWindowPos(HWND h, HWND after, int x, int y, int cx, int cy, UINT flags) 
 }
 
 HWND GetForegroundWindow(void) { return the && the->focused ? the : NULL; }
+BOOL SetForegroundWindow(HWND h) { return h && SDL_RaiseWindow(((Win *)h)->win); }
 
 // The window's style: without its frame (WS_OVERLAPPEDWINDOW) it is fullscreen (dl_toggle_fullscreen).
 LONG GetWindowLongW(HWND h, int index) { return index == GWL_STYLE && h ? ((Win *)h)->style : 0; }

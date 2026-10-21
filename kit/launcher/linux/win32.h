@@ -273,6 +273,7 @@ BOOL DeleteFileA(const char *path);
 #define FOF_NOERRORUI 0x400
 typedef struct { HWND hwnd; UINT wFunc; const char *pFrom, *pTo; WORD fFlags; BOOL fAnyOperationsAborted; void *hNameMappings; const char *lpszProgressTitle; } SHFILEOPSTRUCTA;
 int SHFileOperationA(SHFILEOPSTRUCTA *op); // FO_DELETE with FOF_ALLOWUNDO: into the desktop's trash
+#define SW_HIDE 0
 #define SW_SHOWNORMAL 1
 #define SW_SHOW 5
 #define SW_SHOWNOACTIVATE 4
@@ -343,6 +344,7 @@ BOOL GetWindowRect(HWND w, RECT *r);
 BOOL AdjustWindowRect(RECT *r, DWORD style, BOOL menu);
 BOOL SetWindowPos(HWND w, HWND after, int x, int y, int cx, int cy, UINT flags);
 HWND GetForegroundWindow(void);
+BOOL SetForegroundWindow(HWND w);
 BOOL IsIconic(HWND w);
 LONG GetWindowLongW(HWND w, int index);
 LONG SetWindowLongW(HWND w, int index, LONG value);
@@ -422,7 +424,9 @@ DWORD WINAPI dl_xinput_set(DWORD slot, XINPUT_VIBRATION *v);
 #define JOYERR_NOERROR 0
 #define JOY_RETURNALL 0xFF
 typedef struct { DWORD dwSize, dwFlags, dwXpos, dwYpos, dwZpos, dwRpos, dwUpos, dwVpos, dwButtons, dwButtonNumber, dwPOV, dwReserved1, dwReserved2; } JOYINFOEX;
-typedef struct { WORD wMid, wPid; wchar_t szPname[32]; } JOYCAPSW;
+typedef struct { WORD wMid, wPid; wchar_t szPname[32]; UINT wCaps; } JOYCAPSW;
+#define JOYCAPS_HASZ 0x0001
+#define JOYCAPS_HASR 0x0002
 UINT joyGetNumDevs(void);
 UINT joyGetPosEx(UINT id, JOYINFOEX *ji);
 UINT joyGetDevCapsW(UINT id, JOYCAPSW *caps, UINT size);

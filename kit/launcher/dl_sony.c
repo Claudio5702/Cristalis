@@ -42,6 +42,7 @@ typedef struct {
   bool reading, writing;
   u8 in[640], out[640];
   u32 raw;           // its XInput codes held
+  s16 lx, ly, rx, ry; // its sticks, as XInput's
   int want_l, want_r; // rumble asked for, and sent (-1: nothing yet)
   int sent_l, sent_r;
   wchar_t path[MAX_PATH];
@@ -150,16 +151,25 @@ static u32 hat_bits(int hat) {
   return hat >= 0 && hat < 8 ? dirs[hat] : 0;
 }
 
-static u32 parse(const Sony *s, const u8 *r, int n) {
-  int lx, ly, l2, r2, b0, b1, b2;
+static s16 axis(int v, bool up) { // 0-255 (128 at rest) as XInput's -32767..32767, up positive
+  int a = (up ? 128 - v : v - 128) * 258;
+  return (s16)(a > 32767 ? 32767 : a < -32767 ? -32767 : a);
+}
+
+static u32 parse(Sony *s, const u8 *r, int n) {
+  int lx, ly, rx, ry, l2, r2, b0, b1, b2;
   if (s->dualsense && ((r[0] == 0x01 && n > 20) || (r[0] == 0x31 && n > 20))) { // DualSense, full report
     const u8 *d = r[0] == 0x31 ? r + 2 : r + 1;
-    lx = d[0], ly = d[1], l2 = d[4], r2 = d[5], b0 = d[7], b1 = d[8], b2 = d[9];
+    lx = d[0], ly = d[1], rx = d[2], ry = d[3], l2 = d[4], r2 = d[5], b0 = d[7], b1 = d[8], b2 = d[9];
   } else if (r[0] == 0x01 && n >= 10) { // DualShock 4 by USB, or the short Bluetooth report of either
-    lx = r[1], ly = r[2], b0 = r[5], b1 = r[6], b2 = r[7], l2 = r[8], r2 = r[9];
+    lx = r[1], ly = r[2], rx = r[3], ry = r[4], b0 = r[5], b1 = r[6], b2 = r[7], l2 = r[8], r2 = r[9];
   } else if (r[0] == 0x11 && n >= 12) { // DualShock 4 by Bluetooth
-    lx = r[3], ly = r[4], b0 = r[7], b1 = r[8], b2 = r[9], l2 = r[10], r2 = r[11];
+    lx = r[3], ly = r[4], rx = r[5], ry = r[6], b0 = r[7], b1 = r[8], b2 = r[9], l2 = r[10], r2 = r[11];
   } else return s->raw;
+  s->lx = axis(lx, false);
+  s->ly = axis(ly, true);
+  s->rx = axis(rx, false);
+  s->ry = axis(ry, true);
   u32 raw = hat_bits(b0 & 15);
   if (b0 & 0x20) raw |= 1u << 12; // cross: A
   if (b0 & 0x40) raw |= 1u << 13; // circle: B
@@ -244,10 +254,11 @@ void dl_sony_rumble(int left, int right) {
   }
 }
 
-// Every report waiting, each pad's codes merged into raw; false when no PlayStation pad is open.
-bool dl_sony_poll(u32 *raw) {
+// Every report waiting; each open pad's codes and sticks in out (at most max), in the order of their
+// slots. Returns how many.
+int dl_sony_poll(DlPadRead *out, int max) {
   if (rescan) scan();
-  *raw = 0;
+  int got_n = 0;
   for (int k = 0; k < SONY_MAX; k++) {
     Sony *s = &pads[k];
     if (!s->h) continue;
@@ -269,7 +280,7 @@ bool dl_sony_poll(u32 *raw) {
     }
     if (gone) { pad_close(k); continue; }
     rumble_send(s); // a change that waited for the last write
-    *raw |= s->raw;
+    if (got_n < max) out[got_n++] = (DlPadRead){s->raw, s->lx, s->ly, s->rx, s->ry};
   }
-  return pad_n > 0;
+  return got_n;
 }

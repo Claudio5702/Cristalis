@@ -2,7 +2,8 @@
 // DlGame (its picture, its sound, one function per frame) and may add its own pages and settings;
 // DarkLauncher does the rest: window, fullscreen, settings file, navigation bar and pages (keyboard,
 // mouse, controller), languages, picture filters, sound output, save states, screenshots, pause menu,
-// --ui-audit.
+// --ui-audit. A game that has its own window, picture and sound gives play() instead of frame():
+// DarkLauncher is then its launcher only (DlGame.play).
 //
 // Every name of the project comes from project.h (found on the include path).
 #ifndef DL_H
@@ -10,7 +11,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "2.15"
+#define DL_VERSION "2.40"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -33,8 +34,17 @@ enum {
   DL_UP = 1 << 0, DL_DOWN = 1 << 1, DL_LEFT = 1 << 2, DL_RIGHT = 1 << 3,
   DL_A = 1 << 4, DL_B = 1 << 5, DL_X = 1 << 6, DL_Y = 1 << 7,
   DL_L = 1 << 8, DL_R = 1 << 9, DL_START = 1 << 10, DL_SELECT = 1 << 11,
+  // only for a game that asks for them (DlGame.extra_buttons): the second shoulder buttons (a
+  // controller's triggers at first) and the sticks' clicks, as on a PlayStation pad
+  DL_L2 = 1 << 12, DL_R2 = 1 << 13, DL_L3 = 1 << 14, DL_R3 = 1 << 15,
 };
-typedef struct { uint32_t buttons; } DlInput;
+// A player's input for one frame: the DL_* buttons held, and the sticks (only with DlGame.analog,
+// otherwise 0) from -32767 to 32767 as XInput gives them: 0 at rest, right and up positive, after a dead
+// zone in the middle (a stick at rest never drifts).
+typedef struct {
+  uint32_t buttons;
+  int16_t lx, ly, rx, ry;
+} DlInput;
 // Where the game's buttons are on a controller at first (DlGame.pad_layout): in the places of a Super
 // Nintendo pad's (DL_A the right face button, DL_B the bottom one), or of an Xbox pad's (DL_A the
 // bottom one, DL_B the right one, DL_X the left one, DL_Y the top one), PlayStation pads alike.
@@ -99,8 +109,9 @@ typedef struct DlGame {
   const wchar_t *const *subtitle;  // DlText under the project's name (what the program is), or NULL
   // Once, before the first frame; false: the program cannot run (the game has said why). May be NULL.
   bool (*start)(void);
-  // One picture: reads the input, writes width x height pixels 0x00RRGGBB and up to audio_max
-  // stereo sample frames; returns how many sample frames it wrote.
+  // One picture: reads the input (in[0]; in[1] too, the second player's, with players 2), writes width
+  // x height pixels 0x00RRGGBB and up to audio_max stereo sample frames; returns how many sample frames
+  // it wrote.
   int (*frame)(const DlInput *in, uint32_t *pixels, int16_t *audio, int audio_max);
   void (*reset)(void);             // back to the beginning ("Restart"); may be NULL
   void (*setup)(void);             // registers the game's pages, sections and settings; may be NULL
@@ -208,6 +219,28 @@ typedef struct DlGame {
   // without it, no fast forward, not even from turbo()), and the presets leave it aside ("CRT" goes with
   // the CRT filter); the settings file keeps the player's values.
   unsigned hide;
+
+  // The game runs outside DarkLauncher (2.20), which is then its launcher only: the setup screen without
+  // the game inside (another program plays it, or this one started again without its launcher). "Play"
+  // writes the settings file, hides DarkLauncher's window and calls play(), which returns once the game
+  // is over; the setup screen comes back, with the settings file read again (the game may have changed
+  // it). false: the game could not start, and a note says so. frame, width, height, fps and audio_rate
+  // may then be 0, and DarkLauncher offers only what concerns its own menus: no preview, no save states,
+  // screenshots, pause menu, Picture, Sound or Controls pages (the game's own pages say how it plays).
+  // NULL: the game runs inside DarkLauncher, as before.
+  bool (*play)(void);
+
+  // ---- a controller with more (2.30, all optional; a PlayStation game's)
+  // DL_L2, DL_R2, DL_L3, DL_R3 that the game reads (0: the twelve buttons only): their rows join the
+  // Controls pages (keyboard and controller), at first on the triggers and the sticks' clicks.
+  unsigned extra_buttons;
+  // true: DlInput's sticks are filled, and the left stick no longer doubles as the directional pad.
+  bool analog;
+  // 2: two players, frame() gets in[0] and in[1]. Player 1 has the keyboard and the first controller,
+  // player 2 the second one; a row of the Controls page gives player 2 the first controller instead,
+  // player 1 keeping the keyboard. Both controllers share the controller assignments. 0 or 1: one
+  // player, with the keyboard and every controller.
+  int players;
 } DlGame;
 
 // ---- pages: lists of rows, drawn and handled by DarkLauncher
@@ -353,6 +386,19 @@ void dl_picture_scale(int s);
 // waits for another thread, it is paused...). Optional: --bench and --gpu-check then count the new
 // pictures apart, so that a game that stops making them shows at once.
 void dl_picture_same(void);
+// From frame(), instead of writing the pixels (2.40): the picture is in a Direct3D 11 texture the game
+// shares with DarkLauncher, which shows it without a copy through the processor (a game that draws with
+// a renderer of its own, on a device of its own: a recompilation's). The texture, made by the game on the
+// default graphics card: DXGI_FORMAT_B8G8R8A8_UNORM or R8G8B8A8_UNORM (or their TYPELESS kinds), with
+// D3D11_BIND_SHADER_RESOURCE and D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
+// handle: from its IDXGIResource1::CreateSharedHandle, kept open while the game gives it (DarkLauncher
+// opens it again when its own graphics card path starts again; a new texture, a new handle). The game
+// writes the texture between AcquireSync(0) and ReleaseSync(0) of its IDXGIKeyedMutex, and DarkLauncher
+// reads it the same way. The picture is the whole texture (at most width x height), aspect as for
+// dl_picture_size. Called for every picture in the texture, the same one again too (dl_picture_same).
+// False: DarkLauncher cannot show it now (no graphics card path, another graphics card, Linux...): the
+// game writes the pixels this time, as usual.
+bool dl_picture_shared(void *handle, double aspect);
 
 // Runs the program: window, setup screen, game. Returns the exit code.
 int dl_run(const DlGame *game, int argc, char **argv);

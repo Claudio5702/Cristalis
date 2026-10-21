@@ -3,10 +3,14 @@
 // screenshot, menu, fullscreen), all of them assignable in the Controls pages; the controller in the
 // setup screen and the pause menu.
 //
-// Controllers: Xbox-type pads through XInput (every connected pad merged into one), others (PlayStation
-// and generic pads) through the WinMM joystick functions, with buttons of their own.
+// Controllers: Xbox-type pads through XInput, PlayStation ones read directly (dl_sony.c), others
+// (generic pads) through the WinMM joystick functions, with buttons of their own. In the menus and for
+// the program's functions every controller counts; in the game, one player has them all, two players
+// (DlGame.players) share them: the first to player 1 (with the keyboard), the second to player 2.
 #include "dl_int.h"
+#include <math.h>
 #include <mmsystem.h>
+#include <stdlib.h>
 #include <xinput.h>
 
 int dl_key_vk[DL_BTNS + 1], dl_pad_code[FN_ALL], dl_joy_code[FN_ALL], dl_hot_vk[HK_COUNT];
@@ -18,21 +22,22 @@ static bool wait_release;  // the game gets no button until every one is release
 
 // ---- defaults
 // keyboard: arrows, then by position (the same on QWERTY and AZERTY keyboards) X A, Z B, S X, A Y,
-// Q L, W R; Enter Start, right Shift Select; Tab fast forward
+// Q L, W R; Enter Start, right Shift Select; E L2, R R2, C L3, V R3 (DlGame.extra_buttons); Tab fast
+// forward
 void dl_keys_default(void) {
-  static const int scancodes[DL_BTNS] = {0, 0, 0, 0, 0x2D, 0x2C, 0x1F, 0x1E, 0x10, 0x11, 0, 0};
-  static const int fixed[DL_BTNS] = {VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, 0, 0, 0, 0, 0, 0, VK_RETURN, VK_RSHIFT};
+  static const int scancodes[DL_BTNS] = {0, 0, 0, 0, 0x2D, 0x2C, 0x1F, 0x1E, 0x10, 0x11, 0, 0, 0x12, 0x13, 0x2E, 0x2F};
+  static const int fixed[DL_BTNS] = {VK_UP, VK_DOWN, VK_LEFT, VK_RIGHT, 0, 0, 0, 0, 0, 0, VK_RETURN, VK_RSHIFT, 0, 0, 0, 0};
   for (int k = 0; k < DL_BTNS; k++) dl_key_vk[k] = scancodes[k] ? (int)MapVirtualKeyW((UINT)scancodes[k], MAPVK_VSC_TO_VK) : fixed[k];
   dl_key_vk[DL_BTNS] = VK_TAB;
   dl_dirty = true;
 }
 
 // controllers: the game's buttons in the places of a Super Nintendo pad's (its A is the right face
-// button, its B the bottom one), LB/RB for L/R; View opens the menu
-// (the game's functions have no controller button at first)
+// button, its B the bottom one), LB/RB for L/R, the triggers for L2/R2, the sticks' clicks for L3/R3;
+// View opens the menu (the game's functions have no controller button at first)
 // (the game may ask for the Xbox places, and for another menu button: see layout_defaults)
-static int pad_def[FN_ALL] = {0, 1, 2, 3, 13, 12, 15, 14, 8, 9, 4, 5, -1, -1, -1, -1, 5, -1, -1, -1, -1, -1, -1, -1, -1};
-static int joy_def[FN_ALL] = {-1, -1, -1, -1, 2, 1, 3, 0, 4, 5, 9, 8, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+static int pad_def[FN_ALL] = {0, 1, 2, 3, 13, 12, 15, 14, 8, 9, 4, 5, 16, 17, 6, 7, -1, -1, -1, -1, 5, -1, -1, -1, -1, -1, -1, -1, -1};
+static int joy_def[FN_ALL] = {-1, -1, -1, -1, 2, 1, 3, 0, 4, 5, 9, 8, 6, 7, 10, 11, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
 
 // DlGame.pad_layout and pad_menu: the game's A B X Y in the Xbox places (XInput A B X Y; on other
 // controllers, DirectInput order square cross circle triangle: cross, circle, square, triangle), and no
@@ -61,24 +66,32 @@ void dl_hot_default(void) {
 
 void dl_input_init(void) {
   layout_defaults();
-  static const char *const key_names[DL_BTNS + 1] = {"key_up", "key_down", "key_left", "key_right", "key_a", "key_b", "key_x",
-                                                     "key_y", "key_l", "key_r", "key_start", "key_select", "key_turbo"};
+  static const char *const key_names[DL_BTNS + 1] = {"key_up", "key_down", "key_left", "key_right", "key_a", "key_b", "key_x", "key_y", "key_l",
+                                                     "key_r", "key_start", "key_select", "key_l2", "key_r2", "key_l3", "key_r3", "key_turbo"};
   // the names of Kahna's settings file, so that a port moving to the kit keeps its players' settings
   static const char *const pad_names[FN_COUNT] = {"pad_up", "pad_down", "pad_left", "pad_right", "pad_a", "pad_b", "pad_x", "pad_y", "pad_l",
-                                                  "pad_r", "pad_start", "pad_select", "pad_turbo", "pad_fnsave", "pad_fnload", "pad_fnshot", "pad_fnmenu"};
+                                                  "pad_r", "pad_start", "pad_select", "pad_l2", "pad_r2", "pad_l3", "pad_r3",
+                                                  "pad_turbo", "pad_fnsave", "pad_fnload", "pad_fnshot", "pad_fnmenu"};
   static const char *const joy_names[FN_COUNT] = {"joy_up", "joy_down", "joy_left", "joy_right", "joy_a", "joy_b", "joy_x", "joy_y", "joy_l",
-                                                  "joy_r", "joy_start", "joy_select", "joy_turbo", "joy_fnsave", "joy_fnload", "joy_fnshot", "joy_fnmenu"};
+                                                  "joy_r", "joy_start", "joy_select", "joy_l2", "joy_r2", "joy_l3", "joy_r3",
+                                                  "joy_turbo", "joy_fnsave", "joy_fnload", "joy_fnshot", "joy_fnmenu"};
   static const char *const hot_names[HK_COUNT] = {"hot_save", "hot_load", "hot_slot_prev", "hot_slot_next", "hot_capture", "hot_fullscreen", "hot_rewind"};
   dl_keys_default();
   memcpy(dl_pad_code, pad_def, sizeof pad_def);
   memcpy(dl_joy_code, joy_def, sizeof joy_def);
   dl_hot_default();
-  // kept by "Defaults" (they have their own "Default values" rows)
-  for (int k = 0; k <= DL_BTNS; k++) dl_setting(key_names[k], &dl_key_vk[k], 0, 255, true);
+  // kept by "Defaults" (they have their own "Default values" rows); L2, R2, L3, R3 only for a game that
+  // reads them (DlGame.extra_buttons): the others' settings files stay as they were
+#define OFFERED(k) ((k) < DL_BTNS_CLASSIC || (k) >= DL_BTNS || (dl_game->extra_buttons & (1u << (k))))
+  for (int k = 0; k <= DL_BTNS; k++)
+    if (OFFERED(k)) dl_setting(key_names[k], &dl_key_vk[k], 0, 255, true);
   for (int k = 0; k < FN_COUNT; k++) {
+    if (!OFFERED(k)) continue;
     dl_setting(pad_names[k], &dl_pad_code[k], -1, 17, true);
     dl_setting(joy_names[k], &dl_joy_code[k], -1, 31, true);
   }
+#undef OFFERED
+  if (dl_game->players >= 2) dl_setting("p2_pad", &dl_cfg.p2_pad, 0, 1, true);
   for (int k = 0; k < HK_COUNT; k++) dl_setting(hot_names[k], &dl_hot_vk[k], 0, 255, true);
 }
 
@@ -115,13 +128,21 @@ static XInputSetStateFn xinput_set;
 static bool xinput_present, joy_present, sony_present;
 static bool xi_connected[4];
 static u32 sony_raw;     // the PlayStation pads read directly, as XInput codes
-static u32 pad_raw;      // XInput codes held (bit n: code n), and the left stick:
+static u32 pad_raw;      // XInput codes held (bit n: code n) by every controller, and the left stick:
 #define STICK_UP (1u << 18)
 #define STICK_DOWN (1u << 19)
 #define STICK_LEFT (1u << 20)
 #define STICK_RIGHT (1u << 21)
+// each controller this turn, for the players: the XInput slots in their order, then the PlayStation
+// pads read directly
+#define PADS_MAX 8
+static DlPadRead pads_now[PADS_MAX];
+static int pads_n;
 static DWORD joy_raw;    // WinMM buttons held
+static DlPadRead joy_sticks; // its sticks (X Y, then Z and R: the right stick of most pads)
+static u32 joy_hat;      // its hat, as DL_UP..DL_RIGHT
 static bool joy_ps;      // that controller is a PlayStation one (by its name)
+static bool joy_zr;      // it has the Z and R axes (a right stick)
 int dl_input_kind;
 
 void dl_input_used(int kind) {
@@ -155,8 +176,9 @@ static void xinput_load(void) {
   }
 }
 
-// Every connected XInput pad merged into one, so it does not matter which slot the real one sits in;
-// empty slots are probed again once a second only (probing them on every picture is slow).
+// Every connected XInput pad merged into one, so it does not matter which slot the real one sits in
+// (each one also in pads_now, for the players); empty slots are probed again once a second only
+// (probing them on every picture is slow).
 static u32 xinput_poll(void) {
   bool *connected = xi_connected;
   static DWORD last_scan;
@@ -171,15 +193,23 @@ static u32 xinput_poll(void) {
     connected[slot] = xinput_get(slot, &st) == ERROR_SUCCESS;
     if (!connected[slot]) continue;
     xinput_present = true;
-    raw |= st.Gamepad.wButtons;
-    if (st.Gamepad.bLeftTrigger > 100) raw |= 1u << 16;
-    if (st.Gamepad.bRightTrigger > 100) raw |= 1u << 17;
-    if (st.Gamepad.sThumbLY > 16000) raw |= STICK_UP;
-    if (st.Gamepad.sThumbLY < -16000) raw |= STICK_DOWN;
-    if (st.Gamepad.sThumbLX < -16000) raw |= STICK_LEFT;
-    if (st.Gamepad.sThumbLX > 16000) raw |= STICK_RIGHT;
+    const XINPUT_GAMEPAD *g = &st.Gamepad;
+    u32 r = g->wButtons;
+    if (g->bLeftTrigger > 100) r |= 1u << 16;
+    if (g->bRightTrigger > 100) r |= 1u << 17;
+    if (g->sThumbLY > 16000) r |= STICK_UP;
+    if (g->sThumbLY < -16000) r |= STICK_DOWN;
+    if (g->sThumbLX < -16000) r |= STICK_LEFT;
+    if (g->sThumbLX > 16000) r |= STICK_RIGHT;
+    raw |= r;
+    if (pads_n < PADS_MAX) pads_now[pads_n++] = (DlPadRead){r, g->sThumbLX, g->sThumbLY, g->sThumbRX, g->sThumbRY};
   }
   return raw;
+}
+
+static s16 joy_axis(DWORD v, bool up) { // WinMM's 0-65535 (32767 in the middle) as XInput's
+  int a = up ? 32767 - (int)v : (int)v - 32767;
+  return (s16)(a > 32767 ? 32767 : a < -32767 ? -32767 : a);
 }
 
 // The first joystick Windows reports (looked for again once a second while there is none).
@@ -197,8 +227,9 @@ static bool joy_poll(void) {
       if (joyGetPosEx(k, &ji) == JOYERR_NOERROR) id = (int)k;
     if (id < 0) return false;
     JOYCAPSW caps;
-    joy_ps = false;
+    joy_ps = joy_zr = false;
     if (joyGetDevCapsW((UINT)id, &caps, sizeof caps) == JOYERR_NOERROR) {
+      joy_zr = (caps.wCaps & JOYCAPS_HASZ) && (caps.wCaps & JOYCAPS_HASR); // a right stick
       static const wchar_t *const ps_names[] = {L"Wireless Controller", L"DualSense", L"DUALSHOCK", L"PLAYSTATION", L"PS4", L"PS5"};
       CharUpperW(caps.szPname);
       for (int k = 0; k < 6 && !joy_ps; k++) {
@@ -214,13 +245,16 @@ static bool joy_poll(void) {
   if (ji.dwXpos > 49000) joy_dirs |= DL_RIGHT;
   if (ji.dwYpos < 16000) joy_dirs |= DL_UP;
   if (ji.dwYpos > 49000) joy_dirs |= DL_DOWN;
+  joy_hat = 0;
   if ((ji.dwPOV & 0xFFFF) != 0xFFFF) {
     DWORD a = ji.dwPOV;
-    if (a >= 29250 || a <= 6750) joy_dirs |= DL_UP;
-    if (a >= 2250 && a <= 15750) joy_dirs |= DL_RIGHT;
-    if (a >= 11250 && a <= 24750) joy_dirs |= DL_DOWN;
-    if (a >= 20250 && a <= 33750) joy_dirs |= DL_LEFT;
+    if (a >= 29250 || a <= 6750) joy_hat |= DL_UP;
+    if (a >= 2250 && a <= 15750) joy_hat |= DL_RIGHT;
+    if (a >= 11250 && a <= 24750) joy_hat |= DL_DOWN;
+    if (a >= 20250 && a <= 33750) joy_hat |= DL_LEFT;
   }
+  joy_dirs |= joy_hat;
+  joy_sticks = (DlPadRead){0, joy_axis(ji.dwXpos, false), joy_axis(ji.dwYpos, true), joy_zr ? joy_axis(ji.dwZpos, false) : 0, joy_zr ? joy_axis(ji.dwRpos, true) : 0};
   joy_present = true;
   joy_raw = ji.dwButtons;
   return true;
@@ -234,24 +268,71 @@ static bool fn_held(int k) {
   return joy_present && dl_joy_code[k] >= 0 && (joy_raw & (1u << dl_joy_code[k]));
 }
 
-u32 dl_game_buttons(void) {
+// The game's buttons a controller holds: XInput codes (raw), or WinMM buttons (joy). Without
+// DlGame.analog, the left stick doubles as the directional pad.
+static u32 pad_buttons(u32 raw, bool joy, u32 joy_stick) {
   u32 b = 0;
-  if (GetForegroundWindow() == dl_hwnd)
-    for (int k = 0; k < DL_BTNS; k++)
-      if (dl_key_vk[k] && GetAsyncKeyState(dl_key_vk[k]) < 0) b |= 1u << k;
-  for (int k = 0; k < DL_BTNS; k++)
-    if (fn_held(k)) b |= 1u << k;
-  // the left stick always doubles as the directional pad
-  if (pad_raw & STICK_UP) b |= DL_UP;
-  if (pad_raw & STICK_DOWN) b |= DL_DOWN;
-  if (pad_raw & STICK_LEFT) b |= DL_LEFT;
-  if (pad_raw & STICK_RIGHT) b |= DL_RIGHT;
-  if (joy_present) b |= joy_dirs;
-  if (wait_release) {
-    if (b) return 0;
-    wait_release = false;
+  for (int k = 0; k < DL_BTNS; k++) {
+    int code = joy ? dl_joy_code[k] : dl_pad_code[k];
+    if (code >= 0 && (raw & (1u << code))) b |= 1u << k;
+  }
+  if (!dl_game->analog) {
+    if (joy) b |= joy_stick;
+    else {
+      if (raw & STICK_UP) b |= DL_UP;
+      if (raw & STICK_DOWN) b |= DL_DOWN;
+      if (raw & STICK_LEFT) b |= DL_LEFT;
+      if (raw & STICK_RIGHT) b |= DL_RIGHT;
+    }
   }
   return b;
+}
+
+// A stick through XInput's dead zone (its own for the left stick and the right one): nothing within it,
+// the rest stretched to the whole range, the same direction.
+static void stick_dead(s16 *x, s16 *y, double dz) {
+  double m = sqrt((double)*x * *x + (double)*y * *y);
+  if (m <= dz) { *x = *y = 0; return; }
+  double s = ((m > 32767 ? 32767 : m) - dz) / (32767 - dz) / m * 32767;
+  *x = (s16)fmax(-32767, fmin(32767, *x * s));
+  *y = (s16)fmax(-32767, fmin(32767, *y * s));
+}
+
+static void sticks_take(DlInput *in, const DlPadRead *p) { // the controller pushed furthest gives the player's sticks
+  DlPadRead v = *p;
+  stick_dead(&v.lx, &v.ly, 7849); // XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE
+  stick_dead(&v.rx, &v.ry, 8689); // XINPUT_GAMEPAD_RIGHT_THUMB_DEADZONE
+  if (abs(v.lx) + abs(v.ly) >= abs(in->lx) + abs(in->ly)) in->lx = v.lx, in->ly = v.ly;
+  if (abs(v.rx) + abs(v.ry) >= abs(in->rx) + abs(in->ry)) in->rx = v.rx, in->ry = v.ry;
+}
+
+void dl_game_input(DlInput in[2]) {
+  memset(in, 0, 2 * sizeof *in);
+  u32 offered = ((1u << DL_BTNS_CLASSIC) - 1) | (dl_game->extra_buttons & ~((1u << DL_BTNS_CLASSIC) - 1));
+  if (GetForegroundWindow() == dl_hwnd)
+    for (int k = 0; k < DL_BTNS; k++)
+      if (dl_key_vk[k] && GetAsyncKeyState(dl_key_vk[k]) < 0) in[0].buttons |= 1u << k;
+  // the controllers in their order (the XInput slots, then the PlayStation pads; a WinMM one alone);
+  // one player has them all, two share them: the first to player 1, the second to player 2, or the first
+  // to player 2 when player 1 keeps the keyboard (p2_pad)
+  bool two = dl_game->players >= 2, joy = pads_n == 0 && joy_present;
+  int n = joy ? 1 : pads_n;
+  for (int i = 0; i < n; i++) {
+    int p = !two ? 0 : dl_cfg.p2_pad ? (i == 0 ? 1 : -1) : (i < 2 ? i : -1);
+    if (p < 0) continue;
+    const DlPadRead *pr = joy ? &joy_sticks : &pads_now[i];
+    in[p].buttons |= joy ? pad_buttons(joy_raw, true, joy_dirs & ~joy_hat) | joy_hat : pad_buttons(pr->raw, false, 0);
+    if (dl_game->analog) sticks_take(&in[p], pr);
+  }
+  in[0].buttons &= offered;
+  in[1].buttons &= offered;
+  if (wait_release) {
+    if (in[0].buttons || in[1].buttons) {
+      in[0].buttons = in[1].buttons = 0;
+      return;
+    }
+    wait_release = false;
+  }
 }
 
 void dl_input_release(void) { wait_release = true; }
@@ -358,8 +439,13 @@ void dl_pad_poll(void) {
   static u32 prev;
   static DWORD prev_joy, repeat_at;
   static bool held;
+  pads_n = 0;
   pad_raw = xinput_poll();
-  sony_present = dl_sony_poll(&sony_raw);
+  int sony_n = dl_sony_poll(pads_now + pads_n, PADS_MAX - pads_n);
+  sony_present = sony_n > 0;
+  sony_raw = 0;
+  for (int k = 0; k < sony_n; k++) sony_raw |= pads_now[pads_n + k].raw;
+  pads_n += sony_n;
   pad_raw |= sony_raw;
   if (!xinput_present && !sony_present) joy_poll(); // a PlayStation pad read directly is not read again by WinMM
   else joy_present = false;

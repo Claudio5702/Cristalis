@@ -174,6 +174,7 @@ bool dl_state_save(int n) {
   make_parent(p);
   dl_backup(p);
   if (!dl_game->save_state || !dl_game->save_state(p)) return false;
+  dl_pic_fetch();
   dl_save_png(pic, dl_pic, dl_pic_w, dl_pic_h);
   return true;
 }
@@ -283,7 +284,7 @@ static int rw_head, rw_count, rw_total, rw_tick;
 static DWORD rw_last;
 static bool rw_used;
 
-bool dl_rewind_ok(void) { return dl_game->state_size && dl_game->state_to_mem && dl_game->state_from_mem; }
+bool dl_rewind_ok(void) { return dl_game->frame && dl_game->state_size && dl_game->state_to_mem && dl_game->state_from_mem; }
 
 void dl_rewind_snap(void) {
   if (!dl_rewind_ok() || ++rw_tick % 6) return;
@@ -310,7 +311,7 @@ bool dl_rewind_step(void) {
   rw_count--;
   const u8 *snap = rw_buf + (size_t)rw_head * rw_size;
   dl_game->state_from_mem(snap);
-  dl_game->frame(&(DlInput){0}, dl_pic, sink, 4096); // the picture of that moment
+  dl_frame((DlInput[2]){{0}}, sink, 4096); // the picture of that moment
   dl_game->state_from_mem(snap);
   dl_notef(TX(T_M_REWIND), (rw_total - rw_count) * 6 / 60);
   rw_last = t;
@@ -344,7 +345,10 @@ void dl_screenshot(void) {
     dl_shot_path[0] = 0;
     dl_shot_game = false;
   }
-  if (!ok) ok = dl_save_png(p, dl_pic, dl_pic_w, dl_pic_h);
+  if (!ok) {
+    dl_pic_fetch();
+    ok = dl_save_png(p, dl_pic, dl_pic_w, dl_pic_h);
+  }
   dl_notef(ok ? TX(T_M_SHOT) : TX(T_M_SHOT_FAIL), 0);
 }
 
@@ -549,10 +553,12 @@ static bool state_picture(int k) {
     double a = dl_pic_aspect;
     char p[MAX_PATH];
     dl_game->state_to_mem(keep);
+    dl_pic_fetch(); // (a picture in the game's shared texture: dl_pic holds it from now on)
     memcpy(keep_px, dl_pic, px_n * 4);
     dl_slot_path(p, k, "");
     if (dl_game->load_state(p)) {
-      dl_game->frame(&(DlInput){0}, dl_pic, sink, 4096);
+      dl_frame((DlInput[2]){{0}}, sink, 4096);
+      dl_pic_fetch();
       state_w = dl_pic_w;
       state_h = dl_pic_h;
       state_aspect = dl_pic_aspect;

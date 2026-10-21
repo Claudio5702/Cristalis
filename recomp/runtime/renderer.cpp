@@ -11,6 +11,7 @@
 
 #include <d3d11.h>
 #include <dxgi.h>
+#include <dxgi1_2.h>
 
 #include <atomic>
 #include <cmath>
@@ -1655,6 +1656,79 @@ static void ShowFrame()
 }
 
 #ifdef CD_DARKLAUNCHER
+// The picture in a texture shared with DarkLauncher (2.40, dl_picture_shared): copied there on the
+// graphics card, with no read-back through the processor. False while that cannot be done (DarkLauncher
+// cannot show it yet, the texture could not be made: the pixels go as before). CD_NO_SHARED=1: never.
+struct SharedPicture
+{
+    ID3D11Texture2D* texture;
+    IDXGIKeyedMutex* mutex;
+    HANDLE handle;
+    uint32_t width, height;
+};
+static SharedPicture g_shared, g_sharedOld; // the texture given now, and the one before until it is let go
+
+static void SharedRelease(SharedPicture& picture)
+{
+    if (picture.mutex != nullptr)
+        picture.mutex->Release();
+    if (picture.texture != nullptr)
+        picture.texture->Release();
+    if (picture.handle != nullptr)
+        CloseHandle(picture.handle);
+    picture = {};
+}
+
+static bool SharedPresent()
+{
+    static const bool off = getenv("CD_NO_SHARED") != nullptr;
+    static bool failed;
+    if (off || failed || !DlBridgeSharedWanted())
+        return false;
+    uint32_t width = FrameWidth(), height = FrameHeight();
+    // the texture before goes once DarkLauncher has been given the new one
+    if (g_sharedOld.texture != nullptr && DlBridgeSharedGiven() == g_shared.handle)
+        SharedRelease(g_sharedOld);
+    if (g_shared.texture == nullptr || g_shared.width != width || g_shared.height != height)
+    {
+        SharedRelease(g_sharedOld); // a second new size before the first was given
+        g_sharedOld = g_shared;
+        g_shared = {};
+        D3D11_TEXTURE2D_DESC desc{};
+        desc.Width = width;
+        desc.Height = height;
+        desc.MipLevels = desc.ArraySize = 1;
+        desc.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+        desc.SampleDesc.Count = 1;
+        desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+        desc.MiscFlags = D3D11_RESOURCE_MISC_SHARED_NTHANDLE | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX;
+        IDXGIResource1* resource = nullptr;
+        bool made = SUCCEEDED(g_device->CreateTexture2D(&desc, nullptr, &g_shared.texture)) &&
+            SUCCEEDED(g_shared.texture->QueryInterface(__uuidof(IDXGIKeyedMutex), (void**)&g_shared.mutex)) &&
+            SUCCEEDED(g_shared.texture->QueryInterface(__uuidof(IDXGIResource1), (void**)&resource)) &&
+            SUCCEEDED(resource->CreateSharedHandle(nullptr, DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE, nullptr,
+                &g_shared.handle));
+        if (resource != nullptr)
+            resource->Release();
+        if (!made)
+        {
+            SharedRelease(g_shared);
+            failed = true;
+            Log("Renderer: no texture shared with DarkLauncher, the pixels go through the processor");
+            return false;
+        }
+        g_shared.width = width;
+        g_shared.height = height;
+        Log("Renderer: picture shared with DarkLauncher at %ux%u", width, height);
+    }
+    if (g_shared.mutex->AcquireSync(0, 100) != S_OK)
+        return false; // DarkLauncher still reads it: the pixels this once
+    g_context->CopyResource(g_shared.texture, g_frameTexture);
+    g_shared.mutex->ReleaseSync(0);
+    DlBridgePresentShared(g_shared.handle, width, height);
+    return true;
+}
+
 // The picture just drawn goes to DarkLauncher (which waits for it); the game is held there until
 // DarkLauncher asks for the next one.
 static void DarkLauncherPresent()
@@ -1672,7 +1746,8 @@ static void DarkLauncherPresent()
     }
     static ID3D11Texture2D* staging;
     static uint32_t stagingHalves;
-    if (staging == nullptr || stagingHalves != g_halves)
+    bool shared = SharedPresent();
+    if (!shared && (staging == nullptr || stagingHalves != g_halves))
     {
         if (staging != nullptr)
             staging->Release();
@@ -1689,7 +1764,7 @@ static void DarkLauncherPresent()
         stagingHalves = g_halves;
     }
     D3D11_MAPPED_SUBRESOURCE mapped{};
-    if (staging != nullptr)
+    if (!shared && staging != nullptr)
     {
         g_context->CopyResource(staging, g_frameTexture);
         if (SUCCEEDED(g_context->Map(staging, 0, D3D11_MAP_READ, 0, &mapped)))

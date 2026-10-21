@@ -8,7 +8,7 @@
 // goes back to GDI for the rest of the session.
 #define COBJMACROS
 #include "dl_int.h"
-#include <d3d11.h>
+#include <d3d11_1.h>
 #include <dxgi1_6.h>
 #include <math.h>
 
@@ -249,7 +249,27 @@ bool dl_shot_ok, dl_shot_game;
 
 #define GPU_RELEASE(p) do { if (p) { (p)->lpVtbl->Release(p); (p) = NULL; } } while (0)
 
+// The game's picture in a texture of its own device that it shares (dl_picture_shared), opened on
+// DarkLauncher's device; read between AcquireSync(0) and ReleaseSync(0), as the game writes it.
+static struct {
+  HANDLE handle;                 // as the game gave it last
+  bool failed;                   // that handle cannot be opened on this device (not tried again)
+  ID3D11Texture2D *tex;          // NULL: not opened yet on this device
+  ID3D11ShaderResourceView *srv;
+  IDXGIKeyedMutex *mutex;
+  int w, h;
+  DXGI_FORMAT format;            // of the view: B8G8R8A8_UNORM or R8G8B8A8_UNORM
+} shared;
+
+static void shared_close(void) {
+  GPU_RELEASE(shared.mutex);
+  GPU_RELEASE(shared.srv);
+  GPU_RELEASE(shared.tex);
+  shared.failed = false;
+}
+
 static void gpu_shutdown(void) {
+  shared_close(); // opened again from its handle by the next device
   if (gpu.ctx) ID3D11DeviceContext_ClearState(gpu.ctx);
   for (int k = 0; k < GT_COUNT; k++) { GPU_RELEASE(gpu.t[k].srv); GPU_RELEASE(gpu.t[k].tex); gpu.t[k].w = 0; }
   GPU_RELEASE(gpu.consts); GPU_RELEASE(gpu.linear); GPU_RELEASE(gpu.ps); GPU_RELEASE(gpu.ps_ui); GPU_RELEASE(gpu.ps_sky);
@@ -486,6 +506,89 @@ bool dl_gpu_texture(int slot, int format, const void *data, int w, int h) {
   return gpu_upload_as(GT_GAME + slot - 1, formats[format], bpp[format], data, w, h);
 }
 
+// The game's shared texture opened on this device (once for each handle and device).
+static bool shared_open(HANDLE handle) {
+  if (shared.handle == handle && (shared.tex || shared.failed)) return shared.tex != NULL;
+  shared_close();
+  shared.handle = handle;
+  shared.failed = true; // until it works
+  ID3D11Device1 *dev1 = NULL;
+  if (!gpu.ok || !handle || FAILED(ID3D11Device_QueryInterface(gpu.dev, &IID_ID3D11Device1, (void **)&dev1))) return false;
+  HRESULT hr = ID3D11Device1_OpenSharedResource1(dev1, handle, &IID_ID3D11Texture2D, (void **)&shared.tex);
+  ID3D11Device1_Release(dev1);
+  if (FAILED(hr)) { shared.tex = NULL; return false; }
+  D3D11_TEXTURE2D_DESC td;
+  ID3D11Texture2D_GetDesc(shared.tex, &td);
+  DXGI_FORMAT view = td.Format == DXGI_FORMAT_B8G8R8A8_UNORM || td.Format == DXGI_FORMAT_B8G8R8A8_TYPELESS   ? DXGI_FORMAT_B8G8R8A8_UNORM
+                     : td.Format == DXGI_FORMAT_R8G8B8A8_UNORM || td.Format == DXGI_FORMAT_R8G8B8A8_TYPELESS ? DXGI_FORMAT_R8G8B8A8_UNORM
+                                                                                                             : DXGI_FORMAT_UNKNOWN;
+  D3D11_SHADER_RESOURCE_VIEW_DESC vd = {0};
+  vd.Format = view;
+  vd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+  vd.Texture2D.MipLevels = 1;
+  bool good = view != DXGI_FORMAT_UNKNOWN && (td.BindFlags & D3D11_BIND_SHADER_RESOURCE) &&
+              SUCCEEDED(ID3D11Texture2D_QueryInterface(shared.tex, &IID_IDXGIKeyedMutex, (void **)&shared.mutex)) &&
+              SUCCEEDED(ID3D11Device_CreateShaderResourceView(gpu.dev, (ID3D11Resource *)shared.tex, &vd, &shared.srv));
+  if (!good) { shared_close(); shared.failed = true; return false; }
+  shared.failed = false;
+  shared.w = (int)td.Width;
+  shared.h = (int)td.Height;
+  shared.format = view;
+  return true;
+}
+
+bool dl_picture_shared(void *handle, double aspect) {
+  if (!gpu.ok || !shared_open(handle) || shared.w > dl_game->width || shared.h > dl_game->height) return false;
+  dl_picture_size(shared.w, shared.h, aspect);
+  dl_pic_shared = true;
+  return true;
+}
+
+// The shared picture for one drawing: true once the game has let go of it, then shared_unlock after
+// the drawing. False: the picture is not there, or the game holds it too long (not drawn this time).
+static bool shared_lock(void) {
+  return dl_pic_shared && shared_open(shared.handle) && IDXGIKeyedMutex_AcquireSync(shared.mutex, 0, 500) == S_OK;
+}
+static void shared_unlock(void) {
+  ID3D11ShaderResourceView *none = NULL; // nothing of the game's texture stays bound
+  ID3D11DeviceContext_PSSetShaderResources(gpu.ctx, 0, 1, &none);
+  IDXGIKeyedMutex_ReleaseSync(shared.mutex, 0);
+}
+
+// The shared picture read back into dl_pic, which holds it from then on (a save state's picture, a
+// screenshot by GDI...): rare moments, so a copy through the processor is fine there.
+void dl_pic_fetch(void) {
+  if (!dl_pic_shared) return;
+  bool locked = shared_lock();
+  dl_pic_shared = false;
+  if (!locked) return;
+  D3D11_TEXTURE2D_DESC td;
+  ID3D11Texture2D_GetDesc(shared.tex, &td);
+  td.Usage = D3D11_USAGE_STAGING;
+  td.BindFlags = 0;
+  td.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+  td.MiscFlags = 0;
+  ID3D11Texture2D *copy = NULL;
+  if (SUCCEEDED(ID3D11Device_CreateTexture2D(gpu.dev, &td, NULL, &copy)))
+    ID3D11DeviceContext_CopyResource(gpu.ctx, (ID3D11Resource *)copy, (ID3D11Resource *)shared.tex);
+  shared_unlock();
+  if (!copy) return;
+  D3D11_MAPPED_SUBRESOURCE m;
+  if (SUCCEEDED(ID3D11DeviceContext_Map(gpu.ctx, (ID3D11Resource *)copy, 0, D3D11_MAP_READ, 0, &m))) {
+    bool rgba = shared.format == DXGI_FORMAT_R8G8B8A8_UNORM;
+    for (int y = 0; y < shared.h; y++) {
+      const u32 *src = (const u32 *)((const u8 *)m.pData + (size_t)y * m.RowPitch);
+      u32 *out = dl_pic + (size_t)y * (size_t)shared.w;
+      for (int x = 0; x < shared.w; x++) {
+        u32 c = src[x];
+        out[x] = rgba ? (c & 0xFF) << 16 | (c & 0xFF00) | (c >> 16 & 0xFF) : c & 0xFFFFFF;
+      }
+    }
+    ID3D11DeviceContext_Unmap(gpu.ctx, (ID3D11Resource *)copy, 0);
+  }
+  ID3D11Texture2D_Release(copy);
+}
+
 static bool gpu_resize(int cw, int ch) {
   if (cw == gpu.bb_w && ch == gpu.bb_h) return true;
   ID3D11DeviceContext_OMSetRenderTargets(gpu.ctx, 0, NULL, NULL);
@@ -516,10 +619,12 @@ static void gpu_game_quad(int x, int y, int w, int h, int step, int steps) {
   c.cvd = (float)dl_cfg.cvd;
   if (dl_game->gpu_frame) dl_game->gpu_frame(c.game, step, steps);
   gpu_consts(&c);
-  ID3D11ShaderResourceView *views[8] = {gpu.t[GT_PICTURE].srv};
+  bool locked = shared_lock(); // the picture in the game's own texture
+  ID3D11ShaderResourceView *views[8] = {locked ? shared.srv : gpu.t[GT_PICTURE].srv};
   for (int k = 0; k < 7; k++) views[k + 1] = gpu.t[GT_GAME + k].srv;
   ID3D11DeviceContext_PSSetShaderResources(gpu.ctx, 0, 8, views);
   gpu_quad(x, y, w, h, gpu.ps, -1, false);
+  if (locked) shared_unlock();
 }
 
 // The states DarkLauncher's quads rely on: at the start of each picture, and again after the game's
@@ -716,7 +821,8 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
     layer_h = ch;
     layer_mode = dl_mode;
   }
-  if (good) good = gpu_upload(GT_PICTURE, dl_pic, dl_pic_w, dl_pic_h);
+  // the picture as pixels; one in the game's shared texture is drawn from there without a copy
+  if (good && !(dl_pic_shared && shared_open(shared.handle))) good = gpu_upload(GT_PICTURE, dl_pic, dl_pic_w, dl_pic_h);
   int x = 0, y = 0, w = 0, h = 0, fw = 0, fhh = 0, nw = 0, nh = 0;
   bool game = dl_mode == M_GAME || dl_mode == M_TRY || dl_mode == M_PAUSE, fps = dl_cfg.show_fps && dl_mode != M_PAUSE && !dl_shot_game;
   bool note = dl_mode == M_GAME && dl_note_now() && !dl_shot_game;

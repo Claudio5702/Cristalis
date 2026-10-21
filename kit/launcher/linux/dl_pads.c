@@ -64,14 +64,13 @@ DWORD WINAPI dl_xinput_set(DWORD slot, XINPUT_VIBRATION *v) {
   return ERROR_SUCCESS;
 }
 
-// ---- PlayStation pads: their codes as dl_sony.c gives them on Windows (XInput's, and the left stick)
-bool dl_sony_poll(u32 *raw) {
-  *raw = 0;
-  bool any = false;
-  for (int n = 0;; n++) {
+// ---- PlayStation pads: each one's codes as dl_sony.c gives them on Windows (XInput's, and the left
+// stick), and its sticks
+int dl_sony_poll(DlPadRead *out, int max) {
+  int got = 0;
+  for (int n = 0; got < max; n++) {
     SDL_Gamepad *g = pad_of(true, n);
     if (!g) break;
-    any = true;
     XINPUT_GAMEPAD x;
     state_of(g, &x);
     u32 r = x.wButtons;
@@ -81,9 +80,9 @@ bool dl_sony_poll(u32 *raw) {
     if (x.sThumbLY < -16000) r |= 1u << 19;
     if (x.sThumbLX < -16000) r |= 1u << 20;
     if (x.sThumbLX > 16000) r |= 1u << 21;
-    *raw |= r;
+    out[got++] = (DlPadRead){r, x.sThumbLX, x.sThumbLY, x.sThumbRX, x.sThumbRY};
   }
-  return any;
+  return got;
 }
 
 void dl_sony_rumble(int left, int right) {

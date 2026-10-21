@@ -380,6 +380,14 @@ bool dl_gpu_texture(int slot, int format, const void *data, int w, int h) {
   return upload_as(GT_GAME + slot - 1, format, data, w, h);
 }
 
+// A texture shared by the game is Direct3D 11's: here the game always gives its pixels.
+bool dl_picture_shared(void *handle, double aspect) {
+  (void)handle;
+  (void)aspect;
+  return false;
+}
+void dl_pic_fetch(void) { dl_pic_shared = false; }
+
 // A quad over the rectangle x,y,w,h of the window (from the top) drawn by a program from texture
 // 'which' (-1: none), blended "over" for colours already multiplied by their opacity.
 static void quad(int x, int y, int w, int h, GLuint prog, int which, bool blend) {

@@ -90,6 +90,7 @@ typedef struct {
   int ahead;                          // run-ahead: frames the picture is ahead of the input (0-2; DlGame.run_ahead)
   int discord, updates;               // Internet (both off at first): the status on Discord, a look for a newer version at start
   int contrast, cvd, still, big_help; // accessibility: high contrast, colour-blind filter (0 off, 1 protan, 2 deutan, 3 tritan), still sky, large help text
+  int p2_pad;                         // DlGame.players 2: player 2 plays the second controller (0) or the first, player 1 keeping the keyboard (1)
 } DlCfg;
 extern DlCfg dl_cfg;
 void dl_defaults(bool picture_only);
@@ -102,6 +103,9 @@ extern u32 *dl_pic;          // the last picture of the game
 extern int dl_pic_w, dl_pic_h; // its size
 extern double dl_pic_aspect; // its proportions on screen (width / height)
 extern int dl_pic_scale;     // its pixels per pixel of the console (dl_picture_scale)
+extern bool dl_pic_shared;   // the last picture is in the game's shared texture, not in dl_pic (dl_picture_shared)
+int dl_frame(const DlInput *in, s16 *audio, int audio_max); // the game's frame() into dl_pic
+void dl_pic_fetch(void);     // dl_pic made to hold the last picture when it is in the shared texture
 extern bool dl_started;      // the player has started the game (it is paused while the menu is shown)
 extern bool dl_running;
 extern bool dl_start_done;   // the game's start() has run (the theme's pictures may be asked for)
@@ -120,12 +124,15 @@ void dl_draw_overlays(HDC dc, int x, int y, int w, int h); // the game's, over i
 void dl_beep(int kind); // 0 move, 1 choose
 void dl_toggle_fullscreen(void);
 void dl_play(void);      // start or resume the game
+// The game runs outside DarkLauncher (DlGame.play): the setup screen alone, no game inside it.
+#define DL_OUTSIDE (dl_game->play != NULL)
 void dl_menu_open(void); // from the game to the setup screen
 void dl_pause_open(void); // from the game to the pause menu (or the setup screen, as chosen)
 bool dl_save_png(const char *path, const u32 *px, int w, int h);
 
 // ---- controls (dl_input.c)
-#define DL_BTNS 12 // the game's buttons, in the order of the DL_* bits
+#define DL_BTNS 16 // the game's buttons, in the order of the DL_* bits (the last four only with DlGame.extra_buttons)
+#define DL_BTNS_CLASSIC 12
 #define DL_MAX_FUNCS 8 // functions of the game (dl_function)
 enum { FN_TURBO = DL_BTNS, FN_SAVE, FN_LOAD, FN_SHOT, FN_MENU, FN_COUNT, FN_ALL = FN_COUNT + DL_MAX_FUNCS }; // the program's functions after them, then the game's
 enum { HK_SAVE, HK_LOAD, HK_PREV, HK_NEXT, HK_SHOT, HK_FULL, HK_REWIND, HK_COUNT };                         // keyboard shortcuts
@@ -150,12 +157,15 @@ void dl_input_used(int kind);
 enum { GL_DPAD, GL_XA, GL_XB, GL_XX, GL_XY, GL_PS_SQUARE, GL_PS_CROSS, GL_PS_CIRCLE, GL_PS_TRIANGLE, GL_NUM };
 int dl_pad_glyph(bool confirm); // the button that chooses (true) or goes back in the menus, for dl_input_kind
 void dl_rumble_stop(void);      // at closing time
-// PlayStation pads read directly (dl_sony.c): their buttons as XInput codes, their rumble (0-255), and
-// looking for them again (Windows says devices came or went).
-bool dl_sony_poll(u32 *raw);
+// One controller as read this turn: its XInput codes held (bit n: code n; 16 LT, 17 RT; 18-21 the left
+// stick pushed up, down, left, right), its sticks as XInput's.
+typedef struct { u32 raw; s16 lx, ly, rx, ry; } DlPadRead;
+// PlayStation pads read directly (dl_sony.c): each one's buttons as XInput codes and sticks (returns how
+// many, at most max), their rumble (0-255), and looking for them again (Windows says devices came or went).
+int dl_sony_poll(DlPadRead *out, int max);
 void dl_sony_rumble(int left, int right);
 void dl_sony_rescan(void);
-u32 dl_game_buttons(void);         // DL_* bits held now
+void dl_game_input(DlInput in[2]); // the players' buttons and sticks now (in[1]: DlGame.players 2)
 void dl_input_release(void);       // the game gets no button until every one has been released
 bool dl_turbo_held(void);
 void dl_pad_poll(void);            // once per turn of the main loop
@@ -293,7 +303,8 @@ enum {
   T_VSYNC, T_H_VSYNC,
   // controls
   T_CTRL, T_TAB_CTRL, T_H_CTRL, T_KEYS, T_H_KEYS, T_PAD, T_H_PAD, T_HOT, T_H_HOT, T_TAB_KEYS, T_TAB_PAD, T_TAB_PADFN, T_TAB_HOT, T_PADFN,
-  T_BTN_UP, T_BTN_DOWN, T_BTN_LEFT, T_BTN_RIGHT, T_BTN_A, T_BTN_B, T_BTN_X, T_BTN_Y, T_BTN_L, T_BTN_R, T_BTN_START, T_BTN_SELECT, T_BTN_TURBO,
+  T_BTN_UP, T_BTN_DOWN, T_BTN_LEFT, T_BTN_RIGHT, T_BTN_A, T_BTN_B, T_BTN_X, T_BTN_Y, T_BTN_L, T_BTN_R, T_BTN_START, T_BTN_SELECT,
+  T_BTN_L2, T_BTN_R2, T_BTN_L3, T_BTN_R3, T_BTN_TURBO, // (in the order of the DL_* bits: KEY_ROW and PAD_ROW count on it)
   T_PH_WAIT, T_PH_TURBO, T_PH_BTN, T_PH_DEFAULTS, T_PH_FN, T_PH_ACT, T_FN_MENU, T_KH_WAIT, T_KH_TURBO, T_KH_BTN, T_KH_DEFAULTS,
   T_PAD_UP, T_PAD_DOWN, T_PAD_LEFT, T_PAD_RIGHT, T_PAD_LCLICK, T_PAD_RCLICK, T_NONE, T_DPAD_STICK, T_BUTTON_N, T_KEY_N,
   T_HK_SAVE, T_HK_LOAD, T_HK_PREV, T_HK_NEXT, T_HK_SHOT, T_HK_FULL, T_HKH,
@@ -323,6 +334,9 @@ enum {
   T_H_CTRL_NT, T_H_KEYS_NT, T_PH_FN_NT, T_KH_DEFAULTS_NT, // without fast forward (DL_HIDE_TURBO)
   T_PRESET, T_H_PRESET, T_H_PRESET_NOCRT, T_PRE_CUSTOM, T_PRE_ORIGINAL, T_PRE_LARGE, T_PRE_CRT, T_PRE_FAST,
   T_BACKUPS, T_H_BACKUPS, T_TAB_BACKUPS, T_BKH, T_BKH_GAME, T_BKH_CONFIRM, T_BK_NONE, T_BK_SESSION, T_BK_RESTORED,
+  T_H_PLAY_OUT, T_H_W_PLAY_OUT, T_M_PLAY_FAIL, // the game outside DarkLauncher (DlGame.play)
+  T_P2, T_H_P2, T_P2_SECOND, T_P2_FIRST,       // two players (DlGame.players)
+  T_PH_BTN_ANALOG,                             // DlGame.analog
   T_COUNT
 };
 extern const wchar_t *const dl_texts[T_COUNT][DL_LANGS];

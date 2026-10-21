@@ -2,8 +2,10 @@
 // bridge between DarkLauncher's thread and the game's.
 //
 // DarkLauncher asks for one picture at a time (frame). The game's own code runs in a thread of its
-// own and draws with Direct3D 11 into a picture off screen; when it presents one, the renderer hands
-// a copy here (DlBridgePresent) and the game waits until DarkLauncher asks for the next. So the game
+// own and draws with Direct3D 11 into a picture off screen; when it presents one, the renderer copies
+// it into a texture shared with DarkLauncher (DlBridgePresentShared, dl_picture_shared), or hands the
+// pixels here (DlBridgePresent) while DarkLauncher cannot show that, and the game waits until
+// DarkLauncher asks for the next. So the game
 // goes at DarkLauncher's pace, and stops while DarkLauncher's menu is open. The sound mixer fills a
 // reserve that frame() empties at the rate it is played.
 #include "dl_bridge.h"
@@ -50,6 +52,11 @@ std::condition_variable g_signal;
 std::vector<uint32_t> g_picture;   // the last picture the game presented, 0x00RRGGBB
 uint32_t g_pictureWidth, g_pictureHeight;
 uint64_t g_pictures;               // pictures presented so far
+uint32_t g_pixelsWidth, g_pixelsHeight; // the size of g_picture
+void* g_sharedHandle;              // the shared texture of the last picture, when it was shared
+bool g_lastShared;                 // the last picture is in the shared texture, not in g_picture
+std::atomic<void*> g_sharedGiven{ nullptr };
+std::atomic<int> g_sharedPause{ 0 }; // pictures to give as pixels before sharing again
 uint64_t g_asked;                  // pictures DarkLauncher asked for so far
 std::atomic<uint16_t> g_buttons;
 
@@ -403,14 +410,35 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
         bool fresh = g_signal.wait_for(lock, std::chrono::milliseconds(25), [&] { return g_pictures != seen; });
         if (!fresh)
             dl_picture_same(); // the last picture again: --bench counts the new ones apart
-        if (!g_picture.empty())
+        if (g_sharedPause > 0)
+            g_sharedPause--;
+        // the shared texture, for the same picture again too; DarkLauncher cannot show it (no graphics card
+        // path yet, or display without one): the pixels for two seconds, and the last ones until then
+        bool shown = false;
+        if (g_lastShared && g_sharedHandle != nullptr)
+        {
+            shown = dl_picture_shared(g_sharedHandle, 16.0 / 9.0);
+            if (shown)
+                g_sharedGiven = g_sharedHandle;
+            else
+                g_sharedPause = 120;
+        }
+        static int told = -1; // the way the picture goes, logged when it changes
+        if (int(shown) != told && (shown || !g_picture.empty()))
+        {
+            told = int(shown);
+            Log("DarkLauncher: picture given %s", shown ? "in a shared texture" : "as pixels");
+        }
+        if (!shown && !g_picture.empty())
         {
             memcpy(pixels, g_picture.data(), g_picture.size() * 4);
-            dl_picture_size(int(g_pictureWidth), int(g_pictureHeight), 16.0 / 9.0);
-            // the picture is drawn larger than the console's 720 lines: the scanlines and the CRT filter
-            // follow the console's lines, not the picture's (1920 x 1080, 1.5 times, cannot be said)
-            dl_picture_scale(g_pictureHeight % kHeight == 0 ? int(g_pictureHeight / kHeight) : 1);
+            dl_picture_size(int(g_pixelsWidth), int(g_pixelsHeight), 16.0 / 9.0);
         }
+        uint32_t height = shown ? g_pictureHeight : g_pixelsHeight;
+        // the picture is drawn larger than the console's 720 lines: the scanlines and the CRT filter
+        // follow the console's lines, not the picture's (1920 x 1080, 1.5 times, cannot be said)
+        if (shown || !g_picture.empty())
+            dl_picture_scale(height % kHeight == 0 ? int(height / kHeight) : 1);
     }
 
     // the game's rumble, to Xbox and PlayStation controllers alike (DarkLauncher sends only changes, and
@@ -451,13 +479,37 @@ void DlBridgePresent(const void* pixels, uint32_t width, uint32_t height, uint32
         for (uint32_t x = 0; x < width; x++)
             to[x] = from[x] & 0x00FFFFFF;
     }
-    g_pictureWidth = width;
-    g_pictureHeight = height;
+    g_pictureWidth = g_pixelsWidth = width;
+    g_pictureHeight = g_pixelsHeight = height;
+    g_lastShared = false;
     g_pictures++;
     uint64_t asked = g_asked;
     g_signal.notify_all();
     // Held until DarkLauncher asks for another picture: its menu pauses the game here.
     g_signal.wait(lock, [&] { return g_asked != asked; });
+}
+
+void DlBridgePresentShared(void* handle, uint32_t width, uint32_t height)
+{
+    std::unique_lock lock(g_mutex);
+    g_sharedHandle = handle;
+    g_lastShared = true;
+    g_pictureWidth = width;
+    g_pictureHeight = height;
+    g_pictures++;
+    uint64_t asked = g_asked;
+    g_signal.notify_all();
+    g_signal.wait(lock, [&] { return g_asked != asked; });
+}
+
+bool DlBridgeSharedWanted()
+{
+    return g_sharedPause == 0;
+}
+
+void* DlBridgeSharedGiven()
+{
+    return g_sharedGiven;
 }
 
 uint32_t DlBridgeHalves()
