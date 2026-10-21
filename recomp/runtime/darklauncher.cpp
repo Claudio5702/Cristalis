@@ -352,13 +352,13 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"メニューの音楽を修正|メニューを動かすたびに音楽が途切れることはなくなりました。プレビューも滑らかになりました。",
-    L"Musique des menus corrigée|La musique ne se coupe plus à chaque déplacement dans les menus, et l'aperçu reste fluide.",
-    L"Menu music fixed|The music no longer cuts out at every move in the menus, and the preview stays smooth.",
-    L"Música de los menús corregida|La música ya no se corta con cada movimiento en los menús, y la vista previa sigue fluida.",
-    L"Música dos menus corrigida|A música não corta mais a cada movimento nos menus, e a prévia continua fluida.",
-    L"Menümusik korrigiert|Die Musik bricht nicht mehr bei jeder Bewegung in den Menüs ab, und die Vorschau bleibt flüssig.",
-    L"Musica dei menu corretta|La musica non si interrompe più a ogni spostamento nei menu, e l'anteprima resta fluida." };
+    L"高解像度でより軽く|画像をグラフィックカード上で直接 DarkLauncher に渡すようになりました。4K でのプロセッサ使用量が約 17% 減り、720p と同じ程度になりました。",
+    L"Plus léger en haute résolution|L'image passe maintenant directement par la carte graphique. En 4K, le jeu utilise environ 17 % de processeur en moins, autant qu'en 720p.",
+    L"Lighter at high resolutions|The picture now goes straight through the graphics card. At 4K the game uses about 17% less processor time, as little as at 720p.",
+    L"Más ligero en alta resolución|La imagen pasa ahora directamente por la tarjeta gráfica. En 4K, el juego usa un 17 % menos de procesador, lo mismo que en 720p.",
+    L"Mais leve em alta resolução|A imagem agora passa direto pela placa de vídeo. Em 4K, o jogo usa cerca de 17% menos processador, o mesmo que em 720p.",
+    L"Leichter in hohen Auflösungen|Das Bild geht jetzt direkt über die Grafikkarte. In 4K braucht das Spiel etwa 17 % weniger Prozessorzeit, so wenig wie in 720p.",
+    L"Più leggero ad alta risoluzione|L'immagine ora passa direttamente dalla scheda grafica. In 4K il gioco usa circa il 17% di processore in meno, come in 720p." };
 
 // ---- The game ----
 

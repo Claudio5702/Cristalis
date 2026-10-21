@@ -14,7 +14,7 @@ per questo gioco. Una versione per Linux è sperimentale.
 **Non è inclusa alcuna risorsa del gioco**, né in questo repository né nelle release: immagini,
 suoni, musica e testi vengono letti dalla tua copia del gioco. Il repository non contiene nemmeno
 codice del gioco: il codice tradotto viene generato da un `default.xex` quando si compila il
-programma, e i programmi della [pagina delle release](https://github.com/Claudio5702/Cristalis/releases/latest) sono compilati così. **Versione 1.09,
+programma, e i programmi della [pagina delle release](https://github.com/Claudio5702/Cristalis/releases/latest) sono compilati così. **Versione 1.10,
 una beta**: finora giocata da poche persone.
 
 **Ti serve la tua copia di Crystal Defenders (Xbox 360).** Crystal Defenders appartiene a Square
@@ -180,7 +180,7 @@ compatibilità. La versione per Windows gira anche con Proton.
 Come funziona il progetto, come compilarlo, tradurre di nuovo il codice del gioco, verificarlo e
 creare il programma di installazione: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (in inglese).
 
-Cosa è cambiato in ogni versione (ora 1.09): [CHANGELOG.md](CHANGELOG.md) (in inglese).
+Cosa è cambiato in ogni versione (ora 1.10): [CHANGELOG.md](CHANGELOG.md) (in inglese).
 
 ## Domande frequenti
 

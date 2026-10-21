@@ -12,7 +12,7 @@
 #define PROJECT_SUBTITLE "Crystal Defenders Recomp" // what it is, beside the name
 #define PROJECT_LOGO_FIRST "C"                    // the setup screen's title: a large initial (also on the icon),
 #define PROJECT_LOGO_REST "RISTALIS"              // then the rest in smaller capitals
-#define GAME_VERSION "1.09"                    // this port's version (CHANGELOG.md): 1.01, 1.02... as DarkLauncher's
+#define GAME_VERSION "1.10"                    // this port's version (CHANGELOG.md): 1.01, 1.02... as DarkLauncher's
 // DarkLauncher's look for a new version (Settings, Internet; on at first): the newest release of
 // this repository. Its "Update" downloads and installs the release's Cristalis-Setup.exe (started
 // with /S /D=<folder> /NOSHORTCUTS /WAIT=<pid> /RUN) or Cristalis-linux-x86_64.tar.gz, DarkLauncher's

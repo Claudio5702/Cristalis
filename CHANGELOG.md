@@ -6,6 +6,15 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## 1.10
+
+- **Lighter at high resolutions (DarkLauncher 2.40)**: on Windows the picture now goes to DarkLauncher
+  in a texture shared on the graphics card (`dl_picture_shared`), instead of being read back through
+  the processor at every picture. At 3840 x 2160 the game takes about 17 % less processor time, as
+  little as at 1280 x 720 (30 s of play: 39.6 s, now 32.9 s). While DarkLauncher cannot show it (the
+  first seconds, a display without the graphics card), the pixels go as before. Linux is unchanged.
+- DarkLauncher 2.20 and 2.30 come with it, with nothing visible in this game.
+
 ## 1.09
 
 - **DarkLauncher 2.15**: the music behind the menus no longer cuts out at every move, and the
