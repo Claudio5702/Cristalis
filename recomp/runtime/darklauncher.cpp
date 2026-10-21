@@ -100,7 +100,7 @@ void ApplySettings()
 const DlText t_subtitle = { L"Windows 向け非公式ネイティブ移植版", L"portage natif non officiel pour Windows", L"unofficial native port for Windows",
     L"adaptación nativa no oficial para Windows", L"versão nativa não oficial para Windows", L"inoffizielle native Portierung für Windows", L"conversione nativa non ufficiale per Windows" };
 #else
-// experimental: so far only run under WSL, Linux running inside Windows
+// experimental: one real PC so far (Bazzite, 1.10), besides WSL
 const DlText t_subtitle = { L"Linux 向け非公式ネイティブ移植版（試験版）", L"portage natif non officiel pour Linux (expérimental)",
     L"unofficial native port for Linux (experimental)", L"adaptación nativa no oficial para Linux (experimental)",
     L"versão nativa não oficial para Linux (experimental)", L"inoffizielle native Portierung für Linux (experimentell)",

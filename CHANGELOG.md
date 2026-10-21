@@ -20,6 +20,8 @@ on DarkLauncher's "What's new" page.
   its shortcuts "Cristalis – Crystal Defenders" (taking away those of the name before). An installed
   copy stays where it is; the program's files keep their names (crystal_defenders.exe, .ini, the
   saves), so that updates and Steam shortcuts go on working.
+- **Linux on a real PC**: a whole game was played under Bazzite (a Linux close to SteamOS) with no
+  problem seen, the first time outside WSL. The READMEs say so; the build stays experimental.
 - DarkLauncher 2.20 and 2.30 come with it, with nothing visible in this game.
 
 ## 1.09
