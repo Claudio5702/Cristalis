@@ -4,7 +4,7 @@
 
 *[English](README.md) · **Français** · [Deutsch](README.de.md) · [Español](README.es.md) · [Italiano](README.it.md) · [日本語](README.ja.md)*
 
-![L'écran de réglages, DarkLauncher aux couleurs du jeu](docs/screenshots/launcher-en.png)
+![L'écran de réglages, DarkLauncher aux couleurs du jeu](docs/screenshots/launcher-fr.png)
 
 Ce projet fait tourner Crystal Defenders, le jeu Xbox Live Arcade, comme un programme Windows
 natif : le code PowerPC du jeu est traduit à l'avance en C++ avec
@@ -122,7 +122,7 @@ page de l'entrée sélectionnée s'affiche à côté. Entrée ou Droite y entre,
   - **Internet** : la recherche de nouvelles versions (activée au départ) et la mise à jour.
   - Le dossier du jeu, et les réglages par défaut.
 
-![La page Image](docs/screenshots/picture-en.png)
+![La page Image](docs/screenshots/picture-fr.png)
 
 ## Commandes
 

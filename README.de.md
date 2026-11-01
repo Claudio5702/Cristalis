@@ -4,7 +4,7 @@
 
 *[English](README.md) · [Français](README.fr.md) · **Deutsch** · [Español](README.es.md) · [Italiano](README.it.md) · [日本語](README.ja.md)*
 
-![Der Einstellungsbildschirm, DarkLauncher in den Farben des Spiels](docs/screenshots/launcher-en.png)
+![Der Einstellungsbildschirm, DarkLauncher in den Farben des Spiels](docs/screenshots/launcher-de.png)
 
 Dieses Projekt lässt Crystal Defenders, das Xbox-Live-Arcade-Spiel, als natives Windows-Programm
 laufen: Der PowerPC-Code des Spiels wird im Voraus mit
@@ -123,7 +123,7 @@ die Seite des gewählten Eintrags erscheint daneben. Enter oder Rechts öffnet s
   - **Internet**: die Suche nach neuen Versionen (anfangs eingeschaltet) und das Update selbst.
   - Der Spielordner und die Standardeinstellungen.
 
-![Die Seite Bild](docs/screenshots/picture-en.png)
+![Die Seite Bild](docs/screenshots/picture-de.png)
 
 ## Steuerung
 

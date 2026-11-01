@@ -4,7 +4,7 @@
 
 *[English](README.md) · [Français](README.fr.md) · [Deutsch](README.de.md) · [Español](README.es.md) · [Italiano](README.it.md) · **日本語***
 
-![設定画面：ゲームの色合いに合わせた DarkLauncher](docs/screenshots/launcher-en.png)
+![設定画面：ゲームの色合いに合わせた DarkLauncher](docs/screenshots/launcher-ja.png)
 
 このプロジェクトは、Xbox Live Arcade のゲーム「クリスタルディフェンダーズ」を Windows のネイティブ
 プログラムとして動かします。ゲームの PowerPC コードを
@@ -112,7 +112,7 @@ Windows 10 または 11（64 ビット）、Direct3D 11 対応のグラフィッ
   - **インターネット**：新しいバージョンの確認（最初はオン）とアップデート。
   - ゲームのフォルダーと初期設定。
 
-![「画面」ページ](docs/screenshots/picture-en.png)
+![「画面」ページ](docs/screenshots/picture-ja.png)
 
 ## 操作
 
