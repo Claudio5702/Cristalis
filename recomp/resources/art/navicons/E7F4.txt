@@ -1,0 +1,6 @@
+E7F4.png: an icon for DarkLauncher's bar (character U+E7F4), made 2026-10-22 by tools\art\navicons.ps1
+Model: FLUX.2 [klein] 4B (flux-2-klein-4b-fp8), Black Forest Labs, Apache 2.0 licence (commercial use and redistribution allowed); text encoder qwen_3_4b, VAE flux2-vae; run locally in ComfyUI.
+Seed 1, 4 steps, Euler, CFG 1.0, 1024 x 1024; then the subject found and centred (0.86 of the side),
+64 x 64, the background made clear.
+Prompt: 16-bit fantasy tactics RPG pixel art, bright jewel colours, sapphire blue and gold A small menu icon: a television screen. One simple object, large and centred, very bold shapes and a thick outline, readable at 16 pixels, few colours, on a plain flat magenta background. No text, no letters, no numbers, no logos, no border, no frame.
+Nothing taken from the game or its cover: a new picture in its art direction.

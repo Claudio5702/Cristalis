@@ -14,6 +14,8 @@ static bool is_ps(SDL_Gamepad *g) {
 }
 
 void dl_pads_added(SDL_JoystickID id) {
+  for (int k = 0; k < PADS; k++) // (a game's own window: the pads there before, then their events, dl_win32_adopt)
+    if (pads[k] && SDL_GetGamepadID(pads[k]) == id) return;
   for (int k = 0; k < PADS; k++)
     if (!pads[k]) { pads[k] = SDL_OpenGamepad(id); return; }
 }
@@ -57,6 +59,13 @@ DWORD WINAPI dl_xinput_get(DWORD slot, XINPUT_STATE *st) {
   return ERROR_SUCCESS;
 }
 
+// The id of the pad in an XInput slot (see DlPadRead): the slots follow the pads connected, SDL's id
+// stays with the pad.
+int dl_xinput_id(DWORD slot) {
+  SDL_Gamepad *g = pad_of(false, (int)slot);
+  return g ? 1000 + (int)SDL_GetGamepadID(g) : -1;
+}
+
 DWORD WINAPI dl_xinput_set(DWORD slot, XINPUT_VIBRATION *v) {
   SDL_Gamepad *g = pad_of(false, (int)slot);
   if (!g) return 1167;
@@ -80,7 +89,7 @@ int dl_sony_poll(DlPadRead *out, int max) {
     if (x.sThumbLY < -16000) r |= 1u << 19;
     if (x.sThumbLX < -16000) r |= 1u << 20;
     if (x.sThumbLX > 16000) r |= 1u << 21;
-    out[got++] = (DlPadRead){r, x.sThumbLX, x.sThumbLY, x.sThumbRX, x.sThumbRY};
+    out[got++] = (DlPadRead){r, x.sThumbLX, x.sThumbLY, x.sThumbRX, x.sThumbRY, 1000 + (int)SDL_GetGamepadID(g)};
   }
   return got;
 }

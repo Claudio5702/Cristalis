@@ -1,0 +1,41 @@
+# W1, first stage lost on purpose (one soldier), its end screen (12) looked at with the mouse.
+tapuntil 1000 title 1 60
+wait 1
+tapuntil 1000 title 12 20
+wait 1
+tapuntil 1000 title 4 20
+wait 1
+tap 1000
+wait 1
+tapuntil 1000 pack 1 30
+until stage 3 30
+tapuntil 1000 stage 9 20
+gold 999 keep
+clickuntil 478 466 stage 11 3
+clickuntil 397 257 stage 9 3
+wait 1
+click 478 466
+wait 1
+mclick 640 650
+repeat 8
+tapuntil 4000 stage 9 5
+tap 4000
+wait 2
+until stage 13|12 120
+jumpif stage 12 over
+tapuntil 1000 stage 9 10
+endrepeat
+label over
+until stage 12 30
+mclick 640 650
+wait 3
+shot x01_end
+dump m_end0
+peek 40065CF0
+peek 40065CF4
+peek 40065D70
+clickuntil 640 400 pack 0 10
+log after click
+wait 3
+shot x05_after
+log end

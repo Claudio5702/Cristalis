@@ -1,0 +1,41 @@
+# W1: the help's Settings page with the mouse: hover its rows, the wheel on the sound, then back.
+tapuntil 1000 title 1 60
+wait 1
+tapuntil 1000 title 12 20
+wait 1
+tapuntil 1000 title 4 20
+wait 1
+tap 1000
+wait 1
+tapuntil 1000 pack 1 30
+until stage 3 30
+tapuntil 1000 stage 9 20
+tapuntil 0010 stage 15 5
+wait 1
+clickuntil 650 236 stage 25 5
+wait 1
+move 650 394
+wait 1
+click 650 394
+wait 2
+peek 40053D6C
+move 600 298
+wait 1
+peek 4005FAB0
+move 600 254
+wait 1
+peek 4005FAB0
+peek 40054270
+wheel 1
+wait 2
+peek 40054270
+wheel 1
+wait 2
+peek 40054270
+wheel -1
+wait 2
+peek 40054270
+wheel -1
+wait 2
+peek 40054270
+log end

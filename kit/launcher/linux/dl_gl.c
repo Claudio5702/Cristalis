@@ -80,6 +80,7 @@ static const char gl_head[] =
     "uniform vec4 game[8];\n"
     "vec3 outc(vec3 c) { return hdr > 0.0 ? pow(max(c, 0.0), vec3(2.2)) * hdr : c; }\n"
     "vec3 px(ivec2 i) { return texelFetch(tex, clamp(i, ivec2(0, 0), ivec2(texSize) - 1), 0).rgb; }\n"
+    "float pm(ivec2 i) { return step(0.5, texelFetch(tex, clamp(i, ivec2(0, 0), ivec2(texSize) - 1), 0).a); }\n"
     "bool same(vec3 a, vec3 b) { return dot(abs(a - b), vec3(1.0)) < 0.09; }\n"
     "vec3 edges(vec2 t) {\n"
     "  ivec2 i = ivec2(floor(t)); vec2 f = t - floor(t);\n"
@@ -94,7 +95,53 @@ static const char gl_head[] =
     "  }\n"
     "  return r;\n"
     "}\n"
+    // xBR (2.65), as in dl_gpu.c: change both
+    "vec4 xd(vec4 a, vec4 b) { return abs(a - b); }\n"
+    "vec4 xeq(vec4 a, vec4 b) { return vec4(lessThan(xd(a, b), vec4(15.0))); }\n"
+    "vec4 xne(vec4 a, vec4 b) { return vec4(notEqual(a, b)); }\n"
+    "vec4 xwd(vec4 a, vec4 b, vec4 c, vec4 d, vec4 e, vec4 f, vec4 g, vec4 h) {\n"
+    "  return xd(a, b) + xd(a, c) + xd(d, e) + xd(d, f) + 4.0 * xd(g, h);\n"
+    "}\n"
+    "bool xrun(float x, float u, float d, float u2, float d2) {\n"
+    "  return abs(x - u) > 4.0 && abs(x - d) > 4.0 && abs(u - d) < 3.0 && abs(x - u2) < 3.0 && abs(x - d2) < 3.0;\n"
+    "}\n"
+    "vec3 xbr(vec2 t) {\n"
+    "  ivec2 p = ivec2(floor(t)); vec2 fp = t - floor(t);\n"
+    "  if (filt > 3.5 && pm(p) + pm(p + ivec2(0, -1)) + pm(p + ivec2(-1, 0)) + pm(p + ivec2(0, 1)) + pm(p + ivec2(1, 0)) == 0.0) return px(p);\n"
+    "  vec3 A1 = px(p + ivec2(-1, -2)), B1 = px(p + ivec2(0, -2)), C1 = px(p + ivec2(1, -2));\n"
+    "  vec3 A0 = px(p + ivec2(-2, -1)), A = px(p + ivec2(-1, -1)), B = px(p + ivec2(0, -1)), C = px(p + ivec2(1, -1)), C4 = px(p + ivec2(2, -1));\n"
+    "  vec3 D0 = px(p + ivec2(-2, 0)), D = px(p + ivec2(-1, 0)), E = px(p), F = px(p + ivec2(1, 0)), F4 = px(p + ivec2(2, 0));\n"
+    "  vec3 G0 = px(p + ivec2(-2, 1)), G = px(p + ivec2(-1, 1)), H = px(p + ivec2(0, 1)), I = px(p + ivec2(1, 1)), I4 = px(p + ivec2(2, 1));\n"
+    "  vec3 G5 = px(p + ivec2(-1, 2)), H5 = px(p + ivec2(0, 2)), I5 = px(p + ivec2(1, 2));\n"
+    "  vec3 w = vec3(14.352, 28.176, 5.472);\n"
+    "  vec4 b = vec4(dot(B, w), dot(D, w), dot(H, w), dot(F, w)), c = vec4(dot(C, w), dot(A, w), dot(G, w), dot(I, w));\n"
+    "  vec4 e = vec4(dot(E, w)), d = b.yzwx, f = b.wxyz, g = c.zwxy, h = b.zwxy, i = c.wxyz;\n"
+    "  vec4 i4 = vec4(dot(I4, w), dot(C1, w), dot(A0, w), dot(G5, w)), i5 = vec4(dot(I5, w), dot(C4, w), dot(A1, w), dot(G0, w));\n"
+    "  vec4 h5 = vec4(dot(H5, w), dot(F4, w), dot(B1, w), dot(D0, w)), f4 = h5.yzwx;\n"
+    "  if (xrun(e.x, b.x, b.z, h5.z, h5.x) || xrun(e.x, b.y, b.w, h5.w, h5.y) ||\n"
+    "      xrun(b.x, c.y, c.x, i4.z, i5.y) || xrun(b.z, c.z, c.w, i5.w, i4.x) ||\n"
+    "      xrun(b.y, c.y, c.z, i5.z, i4.w) || xrun(b.w, c.x, c.w, i4.y, i5.x)) return E;\n"
+    "  vec4 fx = vec4(1, -1, -1, 1) * fp.y + vec4(1, 1, -1, -1) * fp.x;\n"
+    "  vec4 fxl = vec4(1, -1, -1, 1) * fp.y + vec4(0.5, 2, -0.5, -2) * fp.x;\n"
+    "  vec4 fxu = vec4(1, -1, -1, 1) * fp.y + vec4(2, 0.5, -2, -0.5) * fp.x;\n"
+    "  float dl = 1.0 / max(outSize.x / texSize.x, 1.0);\n"
+    "  vec4 dt = vec4(dl), dtl = dl * vec4(0.5, 1, 0.5, 1), dtu = dtl.yxwz;\n"
+    "  vec4 lv0 = vec4(greaterThan(xd(e, f), vec4(4.0))) * vec4(greaterThan(xd(e, h), vec4(4.0)));\n"
+    "  vec4 lv1 = lv0 * clamp((1.0 - xeq(f, b)) * (1.0 - xeq(h, d)) + xeq(e, i) * (1.0 - xeq(f, i4)) * (1.0 - xeq(h, i5)) + xeq(e, g) + xeq(e, c), 0.0, 1.0);\n"
+    "  vec4 lv2l = xne(e, g) * xne(d, g), lv2u = xne(e, c) * xne(b, c);\n"
+    "  vec4 edr = vec4(lessThan(xwd(e, c, g, i, h5, f4, h, f), xwd(h, d, i5, f, i4, b, e, i))) * lv1;\n"
+    "  vec4 edrl = vec4(lessThanEqual(2.0 * xd(f, g), xd(h, c))) * lv2l, edru = vec4(greaterThanEqual(xd(f, g), 2.0 * xd(h, c))) * lv2u;\n"
+    "  vec4 m45 = edr * clamp((fx + dt - vec4(1.5, 0.5, -0.5, 0.5)) / (2.0 * dt), 0.0, 1.0);\n"
+    "  vec4 m30 = edrl * clamp((fxl + dtl - vec4(1.0, 1.0, -0.5, 0.0)) / (2.0 * dtl), 0.0, 1.0);\n"
+    "  vec4 m60 = edru * clamp((fxu + dtu - vec4(2.0, 0.0, -1.0, 0.5)) / (2.0 * dtu), 0.0, 1.0);\n"
+    "  vec4 pick = vec4(lessThanEqual(xd(e, f), xd(e, h))), m = max(max(m30, m60), m45);\n"
+    "  vec3 r1 = mix(mix(E, mix(H, F, pick.x), m.x), mix(B, D, pick.z), m.z);\n"
+    "  vec3 r2 = mix(mix(E, mix(F, B, pick.y), m.y), mix(D, H, pick.w), m.w);\n"
+    "  vec3 a1 = abs(E - r1), a2 = abs(E - r2);\n"
+    "  return mix(r1, r2, step(a1.r + a1.g + a1.b, a2.r + a2.g + a2.b));\n"
+    "}\n"
     "vec3 fetch(vec2 q) {\n"
+    "  if (filt > 2.5) return xbr(q * texSize);\n"
     "  if (filt > 1.5) {\n"
     "    vec2 t = q * texSize, o = 0.25 * texSize / outSize;\n"
     "    return (edges(t + vec2(-o.x, -o.y)) + edges(t + vec2(o.x, -o.y)) + edges(t + vec2(-o.x, o.y)) + edges(t + o)) * 0.25;\n"
@@ -160,6 +207,13 @@ static const char gl_ui[] =
     "#version 330 core\n"
     "in vec2 uv; out vec4 frag; uniform sampler2D tex;\n"
     "void main() { frag = textureLod(tex, uv, 0.0); }\n";
+
+// the setup screen's soft change of page (2.84, as ps_fade in dl_gpu.c): the page before (fadeOld) and
+// the new one mixed before they go over the sky
+static const char gl_fade[] =
+    "#version 330 core\n"
+    "in vec2 uv; out vec4 frag; uniform sampler2D tex, fadeOld; uniform float fadeT;\n"
+    "void main() { frag = mix(textureLod(fadeOld, uv, 0.0), textureLod(tex, uv, 0.0), clamp(fadeT, 0.0, 1.0)); }\n";
 
 // the window's own picture (the graphics card off): as it is
 static const char gl_copy[] =
@@ -246,7 +300,7 @@ static const char gl_sky[] =
     "  float time = origin.x, aspect = origin.y, style = game[0].z, grain = -1.0;\n"
     "  vec2 q = uv;\n"
     "  if (style > 2.5) {\n"
-    "    vec2 n = vec2(aspect * 120.0, 120.0);\n"
+    "    vec2 n = vec2(aspect * game[1].x, game[1].x);\n"
     "    ivec2 b = ivec2(floor(q * n));\n"
     "    q = (vec2(b) + 0.5) / n;\n"
     "    grain = (float(((b.x & 1) * 2 + (b.y & 1) * 3) % 4) + 0.5) / 4.0;\n"
@@ -259,11 +313,12 @@ static const char gl_sky[] =
     "}\n";
 
 // ---- state
-enum { GT_PICTURE, GT_MENU, GT_FPS, GT_NOTE, GT_TOAST, GT_OVERLAY, GT_GAME = GT_OVERLAY + DL_MAX_OVERLAYS, GT_COUNT = GT_GAME + 7 };
+// GT_MENU2: the setup screen's other layer, the two taking turns for the soft change of page (2.84)
+enum { GT_PICTURE, GT_MENU, GT_FPS, GT_NOTE, GT_TOAST, GT_OVERLAY, GT_GAME = GT_OVERLAY + DL_MAX_OVERLAYS, GT_MENU2 = GT_GAME + 7, GT_COUNT };
 typedef struct { GLuint id; int w, h, format; } GlTex;
 static struct {
   bool tried, ok;
-  GLuint vao, ps, ui, sky, copy;
+  GLuint vao, ps, ui, sky, copy, fade;
   GlTex t[GT_COUNT];
   int win_h; // the window's height, for OpenGL's viewports (from the bottom)
 } gl;
@@ -315,20 +370,21 @@ static GLuint program_of(const char *const *parts, int n, const char *what) {
 static bool gl_programs(void) {
   if (!dl_win32_sdl_window() || !gl_load()) return false;
   const char *scene = dl_game->shader_glsl ? dl_game->shader_glsl : gl_scene;
-  const char *main_parts[3] = {gl_head, scene, gl_tail}, *ui[1] = {gl_ui}, *sky[1] = {gl_sky}, *copy[1] = {gl_copy};
+  const char *main_parts[3] = {gl_head, scene, gl_tail}, *ui[1] = {gl_ui}, *sky[1] = {gl_sky}, *copy[1] = {gl_copy}, *fade[1] = {gl_fade};
   gl.ps = program_of(main_parts, 3, "picture");
   gl.ui = program_of(ui, 1, "setup screen");
   gl.sky = program_of(sky, 1, "sky");
   gl.copy = program_of(copy, 1, "copy");
+  gl.fade = program_of(fade, 1, "fade");
   if (!gl.vao) glGenVertexArrays(1, &gl.vao);
-  return gl.ps && gl.ui && gl.sky && gl.copy;
+  return gl.ps && gl.ui && gl.sky && gl.copy && gl.fade;
 }
 
 static void gl_shutdown(void) {
   for (int k = 0; k < GT_COUNT; k++)
     if (gl.t[k].id) { glDeleteTextures(1, &gl.t[k].id); gl.t[k] = (GlTex){0}; }
-  GLuint *progs[4] = {&gl.ps, &gl.ui, &gl.sky, &gl.copy};
-  for (int k = 0; k < 4; k++)
+  GLuint *progs[5] = {&gl.ps, &gl.ui, &gl.sky, &gl.copy, &gl.fade};
+  for (int k = 0; k < 5; k++)
     if (*progs[k]) { glDeleteProgram(*progs[k]); *progs[k] = 0; }
   gl.ok = false;
 }
@@ -343,6 +399,10 @@ static bool gl_start(void) {
 
 void dl_gpu_prepare(void) {} // OpenGL compiles at once, when first used
 bool dl_gpu_ready(void) { return dl_cfg.gpu && !dl_audit_dir && gl_start(); }
+// (a Windows matter: the flip model's last picture over GDI)
+bool dl_gpu_window_stale(void) { return false; }
+void dl_gpu_window_renewed(void) {}
+
 void dl_gpu_restart(void) {
   if (gl.tried && gl_load()) gl_shutdown();
   gl.tried = false;
@@ -380,13 +440,19 @@ bool dl_gpu_texture(int slot, int format, const void *data, int w, int h) {
   return upload_as(GT_GAME + slot - 1, format, data, w, h);
 }
 
-// A texture shared by the game is Direct3D 11's: here the game always gives its pixels.
+// A texture shared by the game, or DarkLauncher's target, is Direct3D's: here the game always gives its
+// pixels.
 bool dl_picture_shared(void *handle, double aspect) {
   (void)handle;
   (void)aspect;
   return false;
 }
+bool dl_picture_target(int w, int h, double aspect, DlTarget *t) {
+  (void)w, (void)h, (void)aspect, (void)t;
+  return false;
+}
 void dl_pic_fetch(void) { dl_pic_shared = false; }
+void dl_pic_release(void) {}
 
 // A quad over the rectangle x,y,w,h of the window (from the top) drawn by a program from texture
 // 'which' (-1: none), blended "over" for colours already multiplied by their opacity.
@@ -423,7 +489,7 @@ static void game_quad(int x, int y, int w, int h, int step, int steps) {
   set2(gl.ps, "outSize", (float)w, (float)h);
   set2(gl.ps, "origin", (float)x, (float)y);
   set2(gl.ps, "srcSize", (float)dl_pic_w / dl_pic_scale, (float)dl_pic_h / dl_pic_scale);
-  set1(gl.ps, "filt", (float)dl_cfg.smooth);
+  set1(gl.ps, "filt", (float)dl_filter());
   set1(gl.ps, "scan", dl_crt() ? 0.0f : (float)dl_scanlines());
   set1(gl.ps, "crt", (float)dl_crt());
   set1(gl.ps, "hdr", 0);
@@ -438,7 +504,7 @@ static void game_quad(int x, int y, int w, int h, int step, int steps) {
 }
 
 int dl_gpu_steps(void) {
-  int n = dl_mode == M_GAME && dl_game->gpu_steps && gl.ok ? dl_game->gpu_steps() : 1;
+  int n = dl_mode == M_GAME && dl_game->gpu_steps && !dl_game->pace_by_game && gl.ok ? dl_game->gpu_steps() : 1;
   return n < 1 ? 1 : n > 8 ? 8 : n;
 }
 
@@ -562,14 +628,36 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
   if (cw <= 0 || ch <= 0) return true;
   gl.win_h = ch;
   static int layer_w, layer_h, layer_mode = -1;
+  // the soft change of page, as in dl_gpu.c: the page before in the other slot for 150 ms
+  static int menu_t = GT_MENU, view_shown = -1;
+  static Uint64 fade_at;
   bool menu = dl_mode != M_GAME, good = true;
-  HDC wdc = GetDC(dl_hwnd);
-  if (menu && (rebuild || !gl.t[GT_MENU].id || layer_w != cw || layer_h != ch || layer_mode != dl_mode)) {
+  HDC wdc = NULL; // the window's, taken only to draw a layer
+  if (menu && (rebuild || !gl.t[menu_t].id || layer_w != cw || layer_h != ch || layer_mode != dl_mode)) {
+    int view = dl_menu_view();
+    if (view >= 0 && view_shown >= 0 && view != view_shown && layer_w == cw && layer_h == ch && !dl_cfg.still && !dl_no_fade) {
+      menu_t = menu_t == GT_MENU ? GT_MENU2 : GT_MENU;
+      fade_at = SDL_GetTicksNS();
+    }
+    view_shown = view;
+    wdc = GetDC(dl_hwnd);
     const u32 *layer = menu_layer(wdc, cw, ch);
-    good = layer && upload(GT_MENU, layer, cw, ch);
+    good = layer && upload(menu_t, layer, cw, ch);
     layer_w = cw, layer_h = ch, layer_mode = dl_mode;
   }
-  if (good) good = upload(GT_PICTURE, dl_pic, dl_pic_w, dl_pic_h);
+  if (!menu) view_shown = -1; // back from play: the menus come without a fade
+  double fade = 1;
+  if (fade_at) {
+    fade = (double)(SDL_GetTicksNS() - fade_at) / 1e9 / 0.15;
+    if (fade >= 1 || view_shown < 0) fade = 1, fade_at = 0;
+  }
+  int menu_old = menu_t == GT_MENU ? GT_MENU2 : GT_MENU;
+  static u32 pic_serial; // dl_pic_serial of the pixels in GT_PICTURE: taken again only when they changed (as in dl_gpu.c)
+  const GlTex *pt = &gl.t[GT_PICTURE];
+  if (good && (pic_serial != dl_pic_serial || !pt->id || pt->w != dl_pic_w || pt->h != dl_pic_h)) {
+    good = upload(GT_PICTURE, dl_pic, dl_pic_w, dl_pic_h);
+    pic_serial = dl_pic_serial;
+  }
   int x = 0, y = 0, w = 0, h = 0, fw = 0, fhh = 0, nw = 0, nh = 0, tw = 0, th = 0;
   bool game = dl_mode == M_GAME || dl_mode == M_TRY || dl_mode == M_PAUSE, fps = dl_cfg.show_fps && dl_mode != M_PAUSE && !dl_shot_game;
   bool note = dl_mode == M_GAME && dl_note_now() && !dl_shot_game, toast = dl_mode == M_GAME && dl_toast_now() && !dl_shot_game;
@@ -577,6 +665,7 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
     dl_fit(cw, ch, dl_cfg.integer_scale, &w, &h);
     x = (cw - w) / 2;
     y = (ch - h) / 2;
+    if ((fps || note || toast) && !wdc) wdc = GetDC(dl_hwnd);
     if (good && fps) good = fps_layer(wdc, h, &fw, &fhh);
     if (good && note) good = note_layer(wdc, h, &nw, &nh);
     if (good && toast) good = toast_layer(wdc, h, &tw, &th);
@@ -585,7 +674,7 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
   int ov_n = dl_mode == M_GAME && dl_game->overlays ? dl_game->overlays(x, y, w, h, ov, DL_MAX_OVERLAYS) : 0;
   for (int k = 0; good && k < ov_n && k < DL_MAX_OVERLAYS; k++)
     if (ov[k].pixels && ov[k].w > 0 && ov[k].h > 0) good = upload(GT_OVERLAY + k, ov[k].pixels, ov[k].w, ov[k].h);
-  ReleaseDC(dl_hwnd, wdc);
+  if (wdc) ReleaseDC(dl_hwnd, wdc);
   int steps = dl_shot_path[0] ? 1 : dl_gpu_steps();
   SDL_GL_SetSwapInterval(vsync || steps > 1 ? 1 : 0);
   for (int step = 1; good && step <= steps; step++) {
@@ -600,7 +689,7 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
       }
       for (int k = 0; k < ov_n && k < DL_MAX_OVERLAYS; k++)
         if (ov[k].pixels && ov[k].w > 0 && ov[k].h > 0) quad(ov[k].x, ov[k].y, ov[k].w, ov[k].h, gl.ui, GT_OVERLAY + k, true);
-      if (dl_mode != M_GAME) quad(0, 0, cw, ch, gl.ui, GT_MENU, true);
+      if (dl_mode != M_GAME) quad(0, 0, cw, ch, gl.ui, menu_t, true);
       if (fps) quad(x, y, fw, fhh, gl.ui, GT_FPS, true);
       if (note) {
         int fh = h / 22 < 14 ? 14 : h / 22;
@@ -613,13 +702,21 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
       if (!t0) t0 = SDL_GetTicksNS();
       float g[32] = {0};
       g[2] = (float)ui_sky_style();
+      g[4] = (float)ui_sky_rows();
       if (ui_theme_hsl(&g[0], &g[1])) g[3] = 1;
       glUseProgram(gl.sky);
       set2(gl.sky, "origin", dl_cfg.still ? 0.0f : (float)((SDL_GetTicksNS() - t0) / 1e9), (float)cw / (float)ch);
       GLint at = glGetUniformLocation(gl.sky, "game");
       if (at >= 0) glUniform4fv(at, 8, g);
       quad(0, 0, cw, ch, gl.sky, -1, false);
-      quad(0, 0, cw, ch, gl.ui, GT_MENU, true);
+      if (fade < 1 && gl.t[menu_old].id) { // the page before, giving way to the new one
+        glUseProgram(gl.fade);
+        set1(gl.fade, "fadeT", (float)(fade * fade * (3 - 2 * fade)));
+        glUniform1i(glGetUniformLocation(gl.fade, "fadeOld"), 1);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, gl.t[menu_old].id);
+        quad(0, 0, cw, ch, gl.fade, menu_t, true);
+      } else quad(0, 0, cw, ch, gl.ui, menu_t, true);
       if (dl_prev_w > 0) game_quad(dl_prev_x, dl_prev_y, dl_prev_w, dl_prev_h, 1, 1);
     }
     if (dl_shot_path[0]) {

@@ -1,0 +1,63 @@
+# W1, first stage, played long: units on the grass with the mouse (gold kept at 999), the first one's
+# menu, then five waves in a row with the fast forward kept on (middle button); each wave's result
+# confirmed. Every wait gives up after a minute at most.
+tapuntil 1000 title 1 60
+wait 1
+tapuntil 1000 title 12 20
+wait 1
+tapuntil 1000 title 4 20
+wait 1
+tap 1000
+wait 1
+tapuntil 1000 pack 1 30
+until stage 3 30
+tapuntil 1000 stage 9 20
+gold 999 keep
+clickuntil 478 466 stage 11 5
+clickuntil 397 257 stage 9 5
+wait 1
+click 478 466
+wait 1
+clickuntil 640 300 stage 11 5
+clickuntil 494 257 stage 9 5
+wait 1
+click 640 300
+wait 1
+clickuntil 560 160 stage 11 5
+clickuntil 591 257 stage 9 5
+wait 1
+click 560 160
+wait 1
+shot l02_units
+clickuntil 478 466 stage 10 5
+move 545 303
+wait 1
+shot l03_unitmenu
+click 545 303
+wait 1
+rclick 545 303
+until stage 9 5
+# five waves, the fast forward on
+tap 4000
+wait 1
+mclick 640 650
+until stage 13 60
+shot l04_clear1
+tapuntil 1000 stage 9 10
+tap 4000
+until stage 13 60
+tapuntil 1000 stage 9 10
+tap 4000
+until stage 13 60
+shot l05_clear3
+tapuntil 1000 stage 9 10
+tap 4000
+until stage 13 60
+tapuntil 1000 stage 9 10
+tap 4000
+until stage 13 60
+shot l06_clear5
+tapuntil 1000 stage 9 10
+mclick 640 650
+wait 1
+log end

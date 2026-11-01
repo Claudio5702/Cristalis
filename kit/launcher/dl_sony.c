@@ -280,7 +280,7 @@ int dl_sony_poll(DlPadRead *out, int max) {
     }
     if (gone) { pad_close(k); continue; }
     rumble_send(s); // a change that waited for the last write
-    if (got_n < max) out[got_n++] = (DlPadRead){s->raw, s->lx, s->ly, s->rx, s->ry};
+    if (got_n < max) out[got_n++] = (DlPadRead){s->raw, s->lx, s->ly, s->rx, s->ry, 16 + k};
   }
   return got_n;
 }

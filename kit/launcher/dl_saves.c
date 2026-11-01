@@ -43,9 +43,9 @@ const wchar_t *dl_note_now(void) {
 
 static HFONT note_font(int h) {
   static HFONT f;
-  static int fh;
+  static int fh, lang = -1;
   int want = h / 22 < 14 ? 14 : h / 22;
-  if (want != fh) { if (f) DeleteObject(f); fh = want; f = CreateFontW(-fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, dl_cfg.ui_lang ? L"Verdana" : L"Yu Gothic UI"); }
+  if (want != fh || lang != dl_cfg.ui_lang) { if (f) DeleteObject(f); fh = want; lang = dl_cfg.ui_lang; f = CreateFontW(-fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, dl_lang_face() ? dl_lang_face() : L"Verdana"); }
   return f;
 }
 
@@ -383,7 +383,7 @@ static void row_date(const FILETIME *ft, wchar_t *out, bool seconds) {
   SYSTEMTIME st;
   FileTimeToLocalFileTime(ft, &lt);
   FileTimeToSystemTime(&lt, &st);
-  bool month_first = dl_cfg.ui_lang == 0 || dl_cfg.ui_lang == 2; // Japanese and English
+  bool month_first = dl_cfg.ui_lang == DL_LANG_JP || dl_cfg.ui_lang == DL_LANG_EN || dl_cfg.ui_lang == DL_LANG_ZH || dl_cfg.ui_lang == DL_LANG_KO;
   int a = month_first ? st.wMonth : st.wDay, b = month_first ? st.wDay : st.wMonth;
   if (seconds) wsprintfW(out, L"%02d/%02d/%04d  %02d:%02d:%02d", a, b, st.wYear, st.wHour, st.wMinute, st.wSecond);
   else wsprintfW(out, L"%02d/%02d  %02d:%02d", a, b, st.wHour, st.wMinute);
@@ -567,6 +567,7 @@ static bool state_picture(int k) {
     }
     dl_game->state_from_mem(keep);
     memcpy(dl_pic, keep_px, px_n * 4);
+    dl_pic_serial++;
     dl_pic_w = w;
     dl_pic_h = h;
     dl_pic_aspect = a;

@@ -1,0 +1,6 @@
+crystal_defenders.ico (and crystal_defenders_uninstall.ico, the same in grey): a program's icon, made 2026-10-22 by tools\art\icon.ps1
+Model: FLUX.2 [klein] 4B (flux-2-klein-4b-fp8), Black Forest Labs, Apache 2.0 licence (commercial use and redistribution allowed); text encoder qwen_3_4b, VAE flux2-vae; run locally in ComfyUI.
+Seed 2, 4 steps, Euler, CFG 1.0, 1024 x 1024; then the subject found and centred (0.82 of the side),
+rounded corners (0.18 of the side) and the sizes 256 to 16.
+Prompt: A small cute chibi knight in silver armour with a sword and a round shield, standing in front of a large glowing sapphire-blue faceted crystal, the same knight as a 16-bit fantasy tactics RPG hero, bright jewel colours, sapphire blue, silver and gold, pixel art. Original character. Square app icon: the subject large and centred, filling most of the square, bold simple shapes and a strong silhouette readable at a very small size, few colours, a plain background colour filling the whole square. No text, no letters, no numbers, no logos, no border, no frame.
+Nothing taken from the game or its cover: a new picture in its art direction.

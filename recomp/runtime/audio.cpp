@@ -643,6 +643,9 @@ GUEST_IMPORT(XAudioSubmitRenderDriverFrame)
 
 static void RenderThread()
 {
+#ifdef _WIN32
+    SetThreadDescription(GetCurrentThread(), L"Cristalis audio"); // (named for profiling)
+#endif
     WAVEFORMATEX format{};
     format.wFormatTag = WAVE_FORMAT_PCM;
     format.nChannels = 2;

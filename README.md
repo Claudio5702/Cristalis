@@ -14,8 +14,8 @@ one game. A Linux build is experimental.
 **No game assets are included**, in this repository or in the releases: the pictures, sounds, music
 and texts are read from your own copy of the game. The repository holds none of the game's code
 either: the translated code is generated from a `default.xex` when the program is built, and the
-programs on the [Releases page](https://github.com/Claudio5702/Cristalis/releases/latest) are built that way. **Version 1.10, a beta**: played by few
-people so far.
+programs on the [Releases page](https://github.com/Claudio5702/Cristalis/releases/latest) are built that way. **Version 1.11**: played to the end, but
+on few machines so far; please [report any problem](https://github.com/Claudio5702/Cristalis/issues).
 
 **You must supply your own copy of Crystal Defenders (Xbox 360).** Crystal Defenders belongs to
 Square Enix; this project is not affiliated with or endorsed by Square Enix.
@@ -60,12 +60,23 @@ is not.
 - **The game in [DarkLauncher](kit/launcher)**, the launcher made
   for Kahna (Bahamut Lagoon Recomp): a settings screen before the game and a pause menu in game, in
   seven languages, with the keyboard, a controller or the mouse. Its look follows the game's art
-  direction: the blue of its windows, the gold of its crystals, a starry night. DarkLauncher draws
-  all of it; nothing is taken from the game's files.
+  direction: the blue of its windows, the gold of its crystals, a land of crystals in pixel art under
+  moving clouds, with a small knight as the program's icon. These pictures were painted for the
+  project; nothing is taken from the game's files. The achievements show their own pictures, read
+  from your copy of the game.
 - **Six languages of the game** (French, English, German, Spanish, Italian, Japanese), chosen in the
   settings; the game restarts in the new one.
 - **Display through the graphics card**: the game drawn at 1280×720, 1920×1080, 2560×1440 or 3840×2160, then sharp,
   smooth or smooth-edged at any window size; HDR (Windows).
+- **Played with the mouse**: the cursor goes straight to the square under the pointer and a click
+  deploys a unit; the row of units, the menus and the pause menu follow the pointer, and the button
+  guide shows the keys, the mouse or the controller in use.
+- **Fills the screen**: on a screen of other proportions (the Steam Deck's 16:10, 21:9...), the game's
+  backgrounds widen and the rest stays in the middle, without black bands (Settings, Picture).
+- **Fast forward kept on**: the game's fast forward (RB, held) stays on from one press to the next:
+  F, the mouse's middle button or a controller button chosen in the Controls.
+- **Light**: about a tenth of a processor core at 60 pictures a second; a finger on a touch screen
+  (Steam Deck, tablet) works as the mouse.
 - **Achievements stored on the computer**, with a notice over the game and a list in the settings.
 - **The console's own offline behaviour on request**: the "Not connected to Xbox LIVE" notice and
   the choice of the storage device are off by default, and can be turned on.
@@ -170,7 +181,7 @@ Proton.
 How the project works, how to build it, translate the game's code again, check it and make the
 installer: [docs/DEVELOPERS.md](docs/DEVELOPERS.md).
 
-What changed in each version (now 1.10): [CHANGELOG.md](CHANGELOG.md).
+What changed in each version (now 1.11): [CHANGELOG.md](CHANGELOG.md).
 
 ## FAQ
 
@@ -213,5 +224,7 @@ it, following the requests and the tests of the project's author.
 - [FFmpeg](https://ffmpeg.org) (LGPL): XMA decoding.
 - [Xenia](https://xenia.jp): its documentation of the Xbox 360, used as reference.
 - [llvm-mingw](https://github.com/mstorsjo/llvm-mingw): the compiler of the program and the installer.
+- [FLUX.2 [klein] 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) (Black Forest Labs, Apache 2.0), run locally in ComfyUI: the launcher's pictures and the
+  icon, made with AI; each one's prompt and settings are beside it in `recomp/resources`.
 
 And of course Square Enix, who made Crystal Defenders.

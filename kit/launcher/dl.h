@@ -11,7 +11,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "2.41"
+#define DL_VERSION "2.98"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -20,9 +20,10 @@
 extern "C" { // a game written in C++ includes it as it is
 #endif
 
-// Languages of the setup screen, in the order of every table of texts: jp, fr, en, es, br, de, it.
-enum { DL_LANG_JP, DL_LANG_FR, DL_LANG_EN, DL_LANG_ES, DL_LANG_BR, DL_LANG_DE, DL_LANG_IT };
-#define DL_LANGS 7
+// Languages of the setup screen, in the order of every table of texts: jp, fr, en, es, br, de, it, zh
+// (Simplified Chinese), ko.
+enum { DL_LANG_JP, DL_LANG_FR, DL_LANG_EN, DL_LANG_ES, DL_LANG_BR, DL_LANG_DE, DL_LANG_IT, DL_LANG_ZH, DL_LANG_KO };
+#define DL_LANGS 9
 // DlGame.langs of a game whose texts are in every language of DarkLauncher.
 #define DL_LANGS_ALL ((1u << DL_LANGS) - 1)
 // A text in each language, in the order above. A missing one (NULL, or left out at the end) is shown
@@ -56,7 +57,8 @@ enum { DL_MENU_VIEW, DL_MENU_HOLD, DL_MENU_NONE };
 // What a game does not offer (DlGame.hide): the CRT filter, the scanlines (an HD game made for flat
 // screens...); DarkLauncher's fast forward (a game that has its own, or runs on a thread of its own and
 // cannot give several pictures at once): its speed, its key, its controller button.
-enum { DL_HIDE_CRT = 1 << 0, DL_HIDE_SCANLINES = 1 << 1, DL_HIDE_TURBO = 1 << 2 };
+enum { DL_LOOK_PIXELS, DL_LOOK_RETRO3D, DL_LOOK_MODERN }; // DlGame.look (2.81): 2D pixel art, an old console's 3D, modern 3D
+enum { DL_HIDE_CRT = 1 << 0, DL_HIDE_SCANLINES = 1 << 1, DL_HIDE_TURBO = 1 << 2, DL_HIDE_GAMES = 1 << 3 }; // GAMES (2.71): no "Other games"
 
 // A picture laid over the game's (high-resolution text, a panel...): w x h pixels 0xAARRGGBB, colours
 // already multiplied by their opacity, at x,y in the window.
@@ -67,7 +69,7 @@ typedef struct { const uint32_t *pixels; int x, y, w, h; } DlOverlay;
 enum { DL_FRAME_ROUND, DL_FRAME_SQUARE, DL_FRAME_DOUBLE, DL_FRAME_SOFT };  // panels: rounded with a line; square; a double line (an RPG window); very round without a line
 enum { DL_CURSOR_BAR, DL_CURSOR_ARROW, DL_CURSOR_OUTLINE };               // selection: a filled bar; a pointer before a faint bar; an outline
 enum { DL_SKY_CLOUDS, DL_SKY_GRADIENT, DL_SKY_STARS, DL_SKY_PIXEL };      // behind the menus: sky and sea of clouds; a plain gradient with a glow; a starry night; the clouds in big pixels with few colours
-enum { DL_TITLE_METAL, DL_TITLE_FLAT };                                   // the project's name: slanted metal letters; upright letters in the value colour
+enum { DL_TITLE_METAL, DL_TITLE_FLAT };                                   // the project's name: slanted metal letters; upright letters in the value colour (or title_colour)
 enum { DL_BEEP_BELL, DL_BEEP_CHIP, DL_BEEP_SOFT, DL_BEEP_CRYSTAL };       // menu sounds: soft bell; square wave of old consoles; low muffled click; bright chime
 
 // The look of the setup screen fitted to the game's art direction (DlGame.theme; NULL: DarkLauncher's
@@ -84,7 +86,9 @@ typedef struct DlTheme {
   uint32_t value;                                // 0xRRGGBB of the values and bars; 0: from colour
   const wchar_t *title_font;                     // the project's name and subtitle (an installed font); NULL: Palatino Linotype
   const wchar_t *text_font;                      // the menus, except in Japanese; NULL: Verdana
-  const uint32_t *(*backdrop)(int *w, int *h);   // behind the menus instead of the sky (the player's launcher_bg.* still wins)
+  // Behind the menus instead of the sky (the player's launcher_bg.* still wins). Since 2.52, where it
+  // is not opaque the sky shows through, moving (DlTheme.sky): a landscape under DarkLauncher's clouds.
+  const uint32_t *(*backdrop)(int *w, int *h);
   const uint32_t *(*logo)(int *w, int *h);       // at the top left instead of the project's name
   // A picture for an icon of the navigation bar, known by its Segoe MDL2 Assets character (dl_section;
   // DarkLauncher's own: 0xE768 Play, 0xE74E Saves, 0xE722 Screenshots, 0xE774 Languages, 0xE7F4 Picture,
@@ -95,6 +99,16 @@ typedef struct DlTheme {
   // The menus' sounds (kind 0 moving, 1 choosing): n mono 16-bit samples, rate per second.
   const int16_t *(*sound)(int kind, int *n, int *rate);
   int frame, cursor, sky, title, beep; // DL_FRAME_*, DL_CURSOR_*, DL_SKY_*, DL_TITLE_*, DL_BEEP_*
+  // Fields added later come here, at the end: a game may fill DlTheme by position.
+  // With DL_TITLE_FLAT (2.53): 0xRRGGBB of the project's name (0: value), or of its first title_split
+  // characters only, counted from its start (PROJECT_LOGO_FIRST, then PROJECT_LOGO_REST), the rest in
+  // value. The rule under the name: title_colour for the whole name, value otherwise.
+  uint32_t title_colour;
+  int title_split;
+  // With DL_SKY_PIXEL (2.70): the size of the sky's pixels, in pixels of the 640 x 400 canvas (a backdrop
+  // of 1280 x 800 has two of its pixels to one: 1.5 matches a pixel-art backdrop drawn in blocks of three).
+  // 0: 400 / 120, as before.
+  double sky_pixel;
 } DlTheme;
 
 typedef struct DlGame {
@@ -182,7 +196,8 @@ typedef struct DlGame {
   const char *shader_glsl;
   // Before the game's picture is drawn through the graphics card: fills game (32 floats) and gives its
   // textures with dl_gpu_texture. step of steps: this picture is shown over steps screen refreshes,
-  // this is the step-th (1..steps).
+  // this is the step-th (1..steps). Under the pause menu (2.98) the picture is drawn again only when
+  // something changes, not 60 times a second: the game is paused, what it gives here stays the same.
   void (*gpu_frame)(float *game, int step, int steps);
   // Screen refreshes for each picture of the game played (smooth motion on a 120 or 240 Hz screen);
   // 1 or NULL: one. With more than one, the screen sets the pace and the sound is stretched by a few
@@ -211,8 +226,9 @@ typedef struct DlGame {
   const wchar_t *const *news;
 
   // The languages of the game's own texts (its DlTexts, and the tables it reads with dl_lang()): bits
-  // 1 << DL_LANG_*, or DL_LANGS_ALL. 0: the first six (jp to de), the languages before Italian. The
-  // Languages page offers only these, and dl_lang() never returns another.
+  // 1 << DL_LANG_*, or DL_LANGS_ALL (Chinese and Korean too since 2.90: a game that gives it must have
+  // them). 0: the first six (jp to de), the languages before Italian. The Languages page offers only
+  // these, and dl_lang() never returns another.
   unsigned langs;
 
   // DL_HIDE_*: rows left out (0: all shown). What they set is not applied then (the picture is drawn
@@ -241,6 +257,57 @@ typedef struct DlGame {
   // player 1 keeping the keyboard. Both controllers share the controller assignments. 0 or 1: one
   // player, with the keyboard and every controller.
   int players;
+
+  // Fields added later come here, at the end: a game may fill DlGame by position.
+  // ---- the first start (2.62, optional): a page of the game's own, the last of the first start's
+  // pages (the language, the controls, the screen, then this one; with play, the language then this
+  // one), which DarkLauncher ends with "Start playing". Its rows as a page's (DL_CHOICE with show and run,
+  // a help each...). NULL tab or no rows: no such page.
+  const wchar_t *const *welcome_tab; // its tab (a DlText)
+  const struct DlRow *welcome_rows; // (DlRow, declared below)
+  int welcome_count;
+  // Draws in the place of the preview for row k of that page and returns true (as DlList.preview: x0,
+  // y0, x1, y1 on the 640 x 400 canvas, dc an HDC, dl_ui_text and dl_ui_box); false, or NULL: the live
+  // picture.
+  bool (*welcome_preview)(void *dc, int k, double x0, double y0, double x1, double y1);
+  // ---- achievements' pictures (2.63, optional): the picture of the achievement id, w x h pixels
+  // 0xAARRGGBB with colours multiplied by their opacity (as the theme's), valid while the program runs;
+  // asked once start() has run, once each. Shown on the Achievements page (in grey until unlocked; a
+  // secret one keeps the locked star) and in "Achievement unlocked". NULL, or NULL returned: the star.
+  const uint32_t *(*achievement_picture)(const char *id, int *w, int *h);
+  // ---- the start (2.64, optional): a picture shown in the preview, "Starting the game…" over it, while
+  // the game has given no real picture yet (dl_picture_same; 0xAARRGGBB premultiplied, valid while the
+  // program runs; asked once). NULL, or NULL returned: the text alone.
+  const uint32_t *(*starting_picture)(int *w, int *h);
+  // ---- xBR (2.68, optional): true when bit 0x80 of the top byte of each pixel says what the xBR
+  // filter may round (2.69; the other seven bits stay the game's own): set, a pixel of a character or an
+  // object (sprites); clear, the painted scenery, kept exactly as drawn (its noise, its dithers and a
+  // veil moving over it would turn into squiggles). A shared picture (dl_picture_shared,
+  // dl_picture_target) says it in its texture's alpha (0.5 or more: set).
+  bool xbr_mask;
+  // ---- the mouse in play (2.74, optional): true for a game played with the mouse too (dl_mouse). The
+  // pointer is then shown over the picture while it moves, even in console mode, and hidden again after
+  // three seconds without moving. false: as before (shown, except in console mode).
+  bool mouse_in_game;
+  // ---- the kind of picture (2.81, DL_LOOK_*): what the Picture page offers. DL_LOOK_PIXELS (0: as
+  // before): pixel art, every row. DL_LOOK_RETRO3D: an old console's polygons at a low resolution: Sharp
+  // or Smooth only (Smooth edges and xBR are made for drawn pixels), integer scaling off at first,
+  // scanlines and CRT kept. DL_LOOK_MODERN: a high-definition 3D picture: smoothed at any size, without
+  // integer scaling, scanlines, CRT nor the presets (nor their rows). The game's own options (render
+  // resolution, anti-aliasing...) stay on its own pages.
+  int look;
+  // ---- the pace set by the game (2.82, optional): true for a game whose frame() takes the time of
+  // its own picture (a recompilation at 30, 120, 240 pictures a second, or a varying rate): frame() is
+  // called again at once, fps is then the most pictures a second (0: no limit), and the screen shows the
+  // newest picture at each of its refreshes (a picture that comes sooner waits, the one before it is
+  // left out; on Windows the swap chain never waits for the screen). frame() gives the sound it made in
+  // its own time. No smooth motion over several refreshes, no fast forward, no run-ahead then;
+  // pace_by_sound is not used.
+  bool pace_by_game;
+  // ---- fast forward's speed at first (2.96, optional): 2 or 4 (times), what the Controls page shows
+  // before the player chooses and after "Defaults"; 0: Max, as before (as fast as the computer goes,
+  // which differs from one to the next). The player's choice is kept in the settings file.
+  int turbo_default;
 } DlGame;
 
 // ---- pages: lists of rows, drawn and handled by DarkLauncher
@@ -265,6 +332,10 @@ typedef struct DlRow {
   void (*run)(void);                         // DL_ACTION: the action; others: after a change (may be NULL)
   int page;                                  // DL_PAGE: the page to open
   const wchar_t *(*more)(void);              // text added under the help (a state of the moment), or NULL
+  // The game takes this value when the program starts only (its resolution, a mod...). Once such a row
+  // differs from its value at start, the pages that have one show "Restart to apply" (dl_relaunch, back on
+  // the same page), and "Play" starts the program again before playing (2.67). Its help may say so.
+  bool at_start;
 } DlRow;
 
 // A page whose rows the game makes each time it is shown (saves of its own, live values...). The rows
@@ -354,9 +425,45 @@ void dl_note(const wchar_t *text);              // a few words over the game (or
 void dl_restart(void);                          // the game from the beginning ("Restart"; shown only when the game has reset)
 // Closes the program as usual (the session and the settings are kept), then starts it again with the
 // same command line: for a change the game can only take at start (another language of its data...).
+// It comes back to the page of the setup screen it was called from (2.67), or into the game when it
+// was "Play" (rows marked at_start), without the one-time options (--play...).
 void dl_relaunch(void);
 bool dl_in_game(void);                          // the game is being played (not the setup screen, not the preview before it)
+// The mouse over the game's picture (2.74), from frame(): *x, *y in the picture's pixels (as frame()
+// writes them, 0,0 its top left corner; the window's size, the black bands, the integer scale and the
+// filters taken away, not a curved CRT's curve), *buttons held now (bit 0 left, 1 right, 2 middle) or
+// pressed since the last call too, so that a tap let go before this picture is seen once; a touch screen
+// is the mouse, a finger its left button, held as long as it stays (2.96, Windows and Linux), *wheel the
+// notches turned since the last call (up: positive; given to a frame run ahead as 0). false,
+// *buttons and *wheel 0: not in play, the window not in front, or the pointer not over the picture.
+// DarkLauncher takes no click and no notch in play (the pause menu stays on its key). Any may be NULL.
+bool dl_mouse(double *x, double *y, unsigned *buttons, int *wheel);
 bool dl_running_ahead(void);                    // from frame(): this frame is one run ahead, to be taken back (DlGame.run_ahead)
+// From frame() (2.97): the picture of this frame will not be shown, so the game may leave out its drawing
+// (run-ahead: the frame taken for good and the middle frames ahead; only the last one ahead gives the
+// picture). Its sound and everything else are needed as usual. DarkLauncher shows, saves and compares
+// only pictures of frames where it is false.
+bool dl_picture_unused(void);
+// The game's own button prompts (2.94): what the player uses now, in play too (the device of the last key,
+// controller button or, for a game with mouse_in_game, mouse move or click in play), and a picture of one
+// of the game's buttons (a DL_* bit, as DlInput.buttons) as that device shows it: the Xbox letter, the
+// PlayStation symbol, another controller's button number, a key cap with the assigned key's name (the
+// player's own assignments: a change shows), the directional pad with that direction lit; with the
+// mouse, DL_A and DL_B as its left and right buttons (the others as keys). size is its height in pixels
+// (8 to 256); *w (the width, wider for a long name) and *h are set. 0xAARRGGBB, colours multiplied by
+// their opacity (as DlOverlay). The picture stays until dl_input_serial() changes (the device or an
+// assignment changed: ask again), NULL for a button with nothing assigned. From frame() or the game's
+// loop (DarkLauncher's thread).
+enum { DL_DEVICE_KEYBOARD, DL_DEVICE_MOUSE, DL_DEVICE_XBOX, DL_DEVICE_PLAYSTATION, DL_DEVICE_OTHER };
+int dl_input_device(void);
+unsigned dl_input_serial(void);
+const uint32_t *dl_button_picture(unsigned button, int size, int *w, int *h);
+// The proportions (width / height) of the area the game's picture is shown in now (2.95): the window's
+// inside, the whole screen in full screen (console mode too); it changes when the window is resized or
+// goes full screen. A game that can draw at any proportions (its backgrounds widened) gives a picture of
+// these with dl_picture_size and fills the screen without black bands. With the integer scale on, bands
+// may stay (the picture's size is a whole multiple). From frame() or the game's thread.
+double dl_view_aspect(void);
 bool dl_gpu_on(void);                           // the picture goes through the graphics card now
 void dl_open_page(int page);                    // shows a page of the setup screen (from a list, the pause menu...)
 // The game is not started any more (another game was loaded: another language...): it runs behind the
@@ -384,7 +491,9 @@ void dl_picture_size(int w, int h, double aspect);
 void dl_picture_scale(int s);
 // From frame(): the picture is the one given last time, unchanged (the game had no new one in time: it
 // waits for another thread, it is paused...). Optional: --bench and --gpu-check then count the new
-// pictures apart, so that a game that stops making them shows at once.
+// pictures apart, so that a game that stops making them shows at once. Until a game's first picture
+// with something in it (not black, or in a shared texture), the preview says "Starting the game…"
+// instead of staying black (2.55; a minute at most): a console that takes seconds to start.
 void dl_picture_same(void);
 // From frame(), instead of writing the pixels (2.40): the picture is in a Direct3D 11 texture the game
 // shares with DarkLauncher, which shows it without a copy through the processor (a game that draws with
@@ -399,9 +508,82 @@ void dl_picture_same(void);
 // False: DarkLauncher cannot show it now (no graphics card path, another graphics card, Linux...): the
 // game writes the pixels this time, as usual.
 bool dl_picture_shared(void *handle, double aspect);
+// From frame(), for a game that draws with Direct3D 12 or Vulkan (or Direct3D 11) on a device of its own
+// (2.50): DarkLauncher makes the texture the picture goes in and a fence, both shared, and shows the
+// picture without a copy through the processor. Asked for each picture, before the game draws it: w x h
+// (at most width x height; another size, another texture), aspect as for dl_picture_size. True: on its
+// graphics card queue the game waits for the fence to reach t->wait, writes the whole picture into the
+// texture, then sets the fence to t->signal; always, the same picture again too, since DarkLauncher waits
+// for that value (a game that has not set it half a second later is given false from then on).
+// DarkLauncher reads the texture only between two calls of frame(). False: not possible now (no graphics
+// card path, Linux...): the game writes the pixels this time, as usual.
+typedef struct DlTarget {
+  // NT handle of the texture: DXGI_FORMAT_R8G8B8A8_UNORM, one level, usable as a render target, a copy's
+  // destination or an unordered access view. Direct3D 12: ID3D12Device::OpenSharedHandle (an
+  // ID3D12Resource, in the state COMMON before and after); Vulkan: an image's dedicated memory imported as
+  // VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT, its queue family taken from and given back to
+  // VK_QUEUE_FAMILY_EXTERNAL; Direct3D 11: ID3D11Device1::OpenSharedResource1.
+  void *texture;
+  // NT handle of the fence. Direct3D 12: OpenSharedHandle (an ID3D12Fence); Vulkan: a timeline semaphore
+  // imported as VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT; Direct3D 11: ID3D11Device5::OpenSharedFence.
+  void *fence;
+  uint64_t wait, signal;
+  // The graphics card DarkLauncher draws with, where the game makes its device: DXGI's AdapterLuid,
+  // Vulkan's VkPhysicalDeviceIDProperties::deviceLUID.
+  uint8_t luid[8];
+  // Changes when the texture or the fence is a new one: the game opens them again. The handles stay
+  // DarkLauncher's, open until then; the game closes neither.
+  int serial;
+} DlTarget;
+bool dl_picture_target(int w, int h, double aspect, DlTarget *t);
 
 // Runs the program: window, setup screen, game. Returns the exit code.
 int dl_run(const DlGame *game, int argc, char **argv);
+
+// ---- the menus over the game (2.80): for a game that keeps its own window, renderer, pace and HDR (a
+// modern recompilation). DarkLauncher has no window nor loop then: the game's loop calls it, and lays
+// its menus, a picture with opacity, over its own picture. What DlGame gives is used as with dl_run
+// (setup and its pages, settings, theme, achievements, functions, begin, reset, save states...), but no
+// frame(): the picture, the sound and the pace are the game's. No Picture or Sound pages, no preview,
+// no screenshots by DarkLauncher (as with DlGame.play).
+//   The game's loop: at start dl_over_start(); each picture dl_over_turn(): while it says DL_OVER_MENU
+//   the player's input is DarkLauncher's, while it says DL_OVER_PAUSE the game waits (before the first
+//   "Play" it may run behind the menus, its title as inside DarkLauncher); dl_over_layer() when it says
+//   DL_OVER_LAYER, laid over the game's picture (one quad, premultiplied alpha); every message of its
+//   window to dl_over_message() first; at the end (DL_OVER_QUIT, or the game's own) dl_over_end().
+// window: the game's HWND on Windows. On Linux (2.92) its SDL_Window (SDL3), DarkLauncher never drawing
+// into it nor reading SDL's events: the game gives each event it polls to dl_over_sdl_event() first
+// (or a window of DarkLauncher's stand-ins of Windows' API, given messages by dl_over_message, as the
+// demo's --over). Returns -1 to go on, otherwise the exit code to end the program with at once
+// (--version, --ui-audit, the game's start() said no...).
+int dl_over_start(const DlGame *game, int argc, char **argv, void *window);
+enum {
+  DL_OVER_MENU = 1,  // DarkLauncher's menus are shown (the setup screen, the pause menu): the player's input is theirs
+  DL_OVER_PAUSE = 2, // the game waits: menus over the game once started, or the window behind another one with "Pause in background"
+  DL_OVER_LAYER = 4, // the layer changed: take it again (dl_over_layer)
+  DL_OVER_QUIT = 8,  // the player chose Quit (or the program must start again): end the game, then call dl_over_end
+};
+unsigned dl_over_turn(void);
+// The layer: w x h (the window's client area) pixels 0xAARRGGBB, colours multiplied by their opacity,
+// valid until the next call. Transparent where nothing is shown (in play: only a note or "Achievement
+// unlocked" there).
+const uint32_t *dl_over_layer(int *w, int *h);
+// A message of the game's window (its window procedure's four values), given first: true when
+// DarkLauncher took it (a key or a click for its menus, its pause key in play; the pointer hidden in
+// console mode), and the window procedure then returns TRUE without doing anything else with it.
+bool dl_over_message(void *window, unsigned msg, uintptr_t wparam, intptr_t lparam);
+// Linux, a game with its own SDL window (2.92): each SDL_Event it polls (its address), given first; true
+// when DarkLauncher took it (as dl_over_message: a key or a click for its menus, its pause key in play),
+// and the game then does nothing else with it. Its quitting and its window's closing stay the game's;
+// while DL_OVER_MENU, the input that is not taken (key releases, pads' buttons) is the game's to leave.
+// On Windows it takes nothing.
+bool dl_over_sdl_event(const void *event);
+// The players' buttons as the Controls give them (keyboard and controllers), for a game that reads its
+// input through DarkLauncher; zero while a menu shows.
+void dl_over_input(DlInput in[2]);
+// The end: the settings and the session kept, the running mark removed; the program started again
+// if that was asked for (dl_relaunch, an update). Returns the exit code.
+int dl_over_end(void);
 
 #ifdef __cplusplus
 }

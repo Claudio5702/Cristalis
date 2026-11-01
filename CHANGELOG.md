@@ -6,6 +6,59 @@ does: small improvements move the second figure (1.01, 1.02...); a large novelty
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## 1.11
+
+- **Played with the mouse (DarkLauncher 2.74)**: on the map the cursor goes at once to the square
+  under the pointer, with the game's own checks of where a unit may stand (the game's functions that
+  look under the cursor are called, as its own move does); a click deploys or opens a unit's menu. The
+  row of units to deploy, a unit's menu, the pause menu and the menus before a stage (the title's
+  turning menu, the packs, a pack's menu, the stages) follow the pointer, and the wheel moves through
+  them; in W2 and W3 the units and the power crystals stand in two rows, and the pointer reaches both;
+  a click on the arrows above and below goes up or down, to W2's summons too (a click on the summon
+  chooses it), a power crystal's menu of four rows, every entry of the pause menu and its questions,
+  and its help (its menu, How to Play's nine pages with their arrows, the Settings whose sound the
+  wheel changes, the Credits that the wheel scrolls). So
+  do the game's questions (Yes or No, such as "Back to the main screen?") the best scores and
+  Mastery's demos (a click on an arrow turns the page, the wheel too). The right button is B (back, cancel).
+- **The touch screen (DarkLauncher 2.96)**: a finger works as the mouse's left button, on a Steam Deck
+  or a Windows tablet: a tap on a square brings the cursor there and confirms.
+- **Fast forward kept on**: the game's own fast forward is RB held; a new function keeps it on without
+  holding anything, from one press to the next: F on the keyboard, a controller button chosen on the
+  Controls page, the mouse's middle button, or the pause menu. It stops when the stage ends.
+- **About ten times less processor time**: the game's Direct3D waits for the graphics processor by
+  asking again and again whether it may stop (`sub_820F3110`, read with Ghidra); on the console a core
+  spun there, and here a whole core of the computer did too, about 16 ms of every picture. After a few
+  questions each one now waits a millisecond: 30 s at 1280 x 720 took 31 s of processor time, now
+  2.7 s (4K: 1.8 s), still at 60 pictures a second without a gap in the sound. Held to a single
+  processor core, the game still keeps 60 pictures a second (it used to fall short with the core full).
+  The thread that reads the game's graphics commands now sleeps until the game sends some (`sub_820F8B30`,
+  its only writer of the ring buffer's pointer, found with `CD_WATCH`) instead of looking every
+  millisecond: paused, in the menus or behind another window it wakes 60 times a second, not 1000. The
+  sound thread, with enough sound waiting, now sleeps until DarkLauncher takes some, instead of looking
+  every 2 ms (582 wake-ups a second, now 252). On a
+  laptop or a Steam Deck, less heat and a longer battery.
+- **Mouse fix**: the pointer puts the cursor on the map's even points only, as the game's own moves do
+  (two points at a time): on the points between, a unit could not be deployed ("Unit deployment not
+  possible here!") although the ground was right. And the cursor is moved only on the map itself; while a stage loaded, a pointer over the
+  window could make the game look at a map not yet ready, and the game could stop there.
+- **The button guide follows the device (DarkLauncher 2.94)**: the game's own button pictures (A, B, X,
+  Y, RB) are replaced by the keys or the PlayStation buttons in use, and come back for an Xbox
+  controller.
+- **Fill the screen (DarkLauncher 2.95)**: on a screen or a window of other proportions (the Steam
+  Deck's 16:10, 21:9, 4:3), the game's backgrounds are widened to fill it and everything else stays in
+  the middle, without black bands; on a taller screen the stage's bar of gold and crystals goes down to
+  its bottom. On by default, in Settings, Picture.
+- **The launcher's own pictures**: a land of crystals in pixel art as its backdrop, a picture while the
+  game starts, icons for its bar and a small knight as the program's icon, painted for the project
+  (FLUX.2 [klein], prompts beside them in `recomp/resources`). The achievements show their own
+  pictures, read from the player's copy of the game.
+- **No longer called a beta on Windows**: the game has been played to the end; the Linux build stays
+  experimental.
+- DarkLauncher 2.50 to 2.98 come with it (2.98: its own part of a picture is now about 0.06 ms, and it
+  draws nothing again while the game is paused under its menu): among others the console mode found by itself under Steam's
+  Big Picture and Game Mode, FreeSync and G-Sync on Windows, the xBR filter, soft fades between pages,
+  and Chinese and Korean in its menus.
+
 ## 1.10
 
 - **Lighter at high resolutions (DarkLauncher 2.40)**: on Windows the picture now goes to DarkLauncher

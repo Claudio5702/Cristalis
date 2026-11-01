@@ -4,6 +4,7 @@
 // drawing differs (overlay.cpp instead of GDI).
 #include "renderer.h"
 #include "config.h"
+#include "game_state.h"
 #include "translations.h"
 #include "guest.h"
 #include "overlay.h"
@@ -47,8 +48,12 @@ static GLuint g_frameTexture;
 static GLuint g_whiteTexture;
 static GLuint g_depthBuffer;
 static uint32_t g_halves; // the frame is 1280x720 times this, counted in halves (2: 1280x720, 3: 1920x1080...)
-static uint32_t FrameWidth() { return kHostWidth * g_halves / 2; }
-static uint32_t FrameHeight() { return kHostHeight * g_halves / 2; }
+// Filling a screen of another shape (DarkLauncher's "Fill the screen"): the frame is wider or taller than the
+// console's picture by these console pixels, the picture in its middle; draws from edge to edge of it, the
+// game's backgrounds, are stretched over the frame's width or height.
+static uint32_t g_extraWidth, g_extraHeight;
+static uint32_t FrameWidth() { return (kHostWidth + g_extraWidth) * g_halves / 2; }
+static uint32_t FrameHeight() { return (kHostHeight + g_extraHeight) * g_halves / 2; }
 static float g_clearColor[4] = { 0, 0, 0, 1 };
 static uint32_t g_frameNumber = 1;
 static bool g_fullscreen;
@@ -350,6 +355,9 @@ static GLuint GetTexture(const HostTexture& info)
     uint32_t step = byteSize / 4 > 4096 ? (byteSize / 4 / 4096) * 4 : 4;
     for (uint32_t i = 0; i < byteSize; i += step)
         contentHash = (contentHash ^ *(const uint32_t*)(g_base + info.address + i)) * 0x100000001B3ull;
+#ifdef CD_DARKLAUNCHER
+    contentHash ^= uint64_t(DlBridgePromptGeneration()) << 40; // the button pictures changed: upload again
+#endif
     if (cached.texture != 0 && cached.contentHash == contentHash)
         return cached.texture;
 
@@ -363,6 +371,9 @@ static GLuint GetTexture(const HostTexture& info)
             pixels[size_t(y) * info.width + x] = Load32(info.address + offset);
         }
     }
+#ifdef CD_DARKLAUNCHER
+    DlBridgePrompt(pixels.data(), info.width, info.height); // a button picture: the player's device's
+#endif
     if (cached.texture == 0)
     {
         glGenTextures(1, &cached.texture);
@@ -482,11 +493,49 @@ void RendererDraw(const HostDraw& draw)
 
     // Only textures the game wants smoothed need the sharp filter.
     UseProgram(g_halves > 2 && draw.texture.present && draw.texture.linear);
-    // the scissor in frame pixels (its far edges round up at one and a half times)
+    // the scissor in frame pixels (its far edges round up at one and a half times), from the top
     auto scaled = [](int value) { return (value * int(g_halves) + 1) / 2; };
     int left = scaled(draw.scissor[0]), right = scaled(draw.scissor[2]);
-    int bottom = scaled(int(kHostHeight) - draw.scissor[3]), top = scaled(int(kHostHeight) - draw.scissor[1]);
-    glScissor(left, bottom, right - left, top - bottom);
+    int top = scaled(draw.scissor[1]), bottom = scaled(draw.scissor[3]);
+    // Filling the screen: a draw from edge to edge of the picture is stretched over the frame that way, the
+    // others keep their place in its middle. The scissor moves with the picture, and a side on the picture's
+    // edge goes to the frame's: the game draws the picture in three bands (y 0-256, 256-512, 512-720, each
+    // with all its draws), and a stretched background must stay in its own band.
+    float scale = g_halves / 2.0f;
+    float viewport[4] = { g_extraWidth / 2 * scale, g_extraHeight / 2 * scale, kHostWidth * scale, kHostHeight * scale };
+    if (g_extraWidth != 0 || g_extraHeight != 0)
+    {
+        float minX = 2, maxX = -2, minY = 2, maxY = -2;
+        for (const HostVertex& vertex : draw.vertices)
+        {
+            minX = std::min(minX, vertex.x), maxX = std::max(maxX, vertex.x);
+            minY = std::min(minY, vertex.y), maxY = std::max(maxY, vertex.y);
+        }
+        if (g_extraWidth != 0 && minX <= -0.995f && maxX >= 0.995f)
+            viewport[0] = 0, viewport[2] = float(FrameWidth());
+        bool stretched = viewport[0] == 0 && g_extraWidth != 0;
+        if (g_extraHeight != 0 && minY <= -0.995f && maxY >= 0.995f)
+            viewport[1] = 0, viewport[3] = float(FrameHeight()), stretched = true;
+        int offsetX = int(g_extraWidth / 2 * g_halves / 2), offsetY = int(g_extraHeight / 2 * g_halves / 2);
+        // lines added above and below: in a stage (the map, its row of units, a unit's menu) what lies wholly
+        // below line 570 and right of the button guide (from x 230, or across the whole width: what hides the
+        // map under the bar), the bar of gold and crystals and its messages, goes down to the frame's bottom
+        // (viewport[1] from the frame's bottom: 0 there)
+        bool belowBar = (1 - maxY) / 2 * kHostHeight >= kBottomBarTop &&
+            ((minX + 1) / 2 * kHostWidth >= kBottomBarLeft || (minX <= -0.99f && maxX >= 0.99f));
+        if (!stretched && g_extraHeight != 0 && belowBar && GameStateBottomBarShown())
+        {
+            viewport[1] = 0;
+            offsetY *= 2;
+        }
+        int width = int(kHostWidth * g_halves / 2), height = int(kHostHeight * g_halves / 2);
+        left = left <= 0 ? 0 : left + offsetX;
+        right = right >= width ? int(FrameWidth()) : right + offsetX;
+        top = top <= 0 ? 0 : top + offsetY;
+        bottom = bottom >= height ? int(FrameHeight()) : bottom + offsetY;
+    }
+    glViewport(int(viewport[0]), int(viewport[1]), int(viewport[2]), int(viewport[3])); // the same from the bottom
+    glScissor(left, int(FrameHeight()) - bottom, right - left, bottom - top);
     GLint first = StreamVertices(draw.vertices.data(), draw.vertices.size());
     if (first >= 0)
         glDrawArrays(GL_TRIANGLES, first, GLsizei(draw.vertices.size()));
@@ -1549,6 +1598,15 @@ void LinuxToast(const std::wstring&, const std::wstring&) {}
 // ready by now, goes to DarkLauncher (one picture later, 16 ms: what lets a slower machine, the Steam
 // Deck, keep the card and the processor busy at once). DarkLauncher waits for it; the game is held
 // there until DarkLauncher asks for the next one.
+static std::mutex g_shotMutex;
+static std::string g_shotName; // a picture to save as <name>.bmp, with the next one shown (debug mode)
+
+void RendererRequestShot(const char* name)
+{
+    std::lock_guard lock(g_shotMutex);
+    g_shotName = name;
+}
+
 static GLuint g_readBuffers[2];
 static GLsync g_readFences[2];
 static uint32_t g_readWidth[2], g_readHeight[2];
@@ -1576,8 +1634,30 @@ static void PresentReadBuffer(int k)
         glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
     }
     glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-    if (rows != nullptr)
-        DlBridgePresent(picture.data(), width, height, width * 4);
+    if (rows == nullptr)
+        return;
+    // the debug mode's "shot" (RendererRequestShot): a 32-bit BMP, bottom row first
+    {
+        std::lock_guard lock(g_shotMutex);
+        if (!g_shotName.empty())
+        {
+            if (FILE* file = fopen((g_shotName + ".bmp").c_str(), "wb"))
+            {
+                uint32_t size = width * height * 4;
+                uint8_t header[54]{ 'B', 'M' };
+                auto put = [&](int at, uint32_t value) { memcpy(header + at, &value, 4); };
+                put(2, 54 + size), put(10, 54), put(14, 40), put(18, width), put(22, height);
+                header[26] = 1, header[28] = 32;
+                put(34, size);
+                fwrite(header, 1, sizeof(header), file);
+                for (uint32_t y = height; y-- > 0;)
+                    fwrite(&picture[size_t(y) * width], 4, width, file);
+                fclose(file);
+            }
+            g_shotName.clear();
+        }
+    }
+    DlBridgePresent(picture.data(), width, height, width * 4);
 }
 
 void RendererPresent()
@@ -1603,9 +1683,15 @@ void RendererPresent()
     PresentReadBuffer(g_readPending >= 0 ? g_readPending : k);
     g_readPending = k;
 
-    uint32_t wanted = DlBridgeHalves();
-    if (wanted != g_halves && CreateFrameTargets(wanted))
-        Log("Renderer: drawing at %ux%u", FrameWidth(), FrameHeight());
+    uint32_t wanted = DlBridgeHalves(), extraWidth, extraHeight;
+    DlBridgeFill(extraWidth, extraHeight);
+    if (wanted != g_halves || extraWidth != g_extraWidth || extraHeight != g_extraHeight)
+    {
+        g_extraWidth = extraWidth;
+        g_extraHeight = extraHeight;
+        if (CreateFrameTargets(wanted))
+            Log("Renderer: drawing at %ux%u", FrameWidth(), FrameHeight());
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, g_frameBuffer);
     glViewport(0, 0, FrameWidth(), FrameHeight());
     glDisable(GL_SCISSOR_TEST);

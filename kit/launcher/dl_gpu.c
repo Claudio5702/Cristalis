@@ -8,7 +8,7 @@
 // goes back to GDI for the rest of the session.
 #define COBJMACROS
 #include "dl_int.h"
-#include <d3d11_1.h>
+#include <d3d11_4.h>
 #include <dxgi1_6.h>
 #include <math.h>
 
@@ -17,7 +17,7 @@
 static const char gpu_hlsl_head[] =
     "Texture2D tex : register(t0);\n"
     "SamplerState smp : register(s0);\n"
-    "cbuffer C : register(b0) { float2 texSize; float2 outSize; float2 origin; float filt; float scan; float crt; float hdr; float2 srcSize; float cvd; float3 cvdPad; float4 game[8]; };\n" // srcSize: the console's resolution (texSize / dl_picture_scale)
+    "cbuffer C : register(b0) { float2 texSize; float2 outSize; float2 origin; float filt; float scan; float crt; float hdr; float2 srcSize; float cvd; float fadeT; float2 cvdPad; float4 game[8]; };\n" // srcSize: the console's resolution (texSize / dl_picture_scale)
     "struct V { float4 p : SV_Position; float2 uv : TEXCOORD0; };\n"
     "V vs(uint id : SV_VertexID) {\n"
     "  V o; float2 t = float2((id << 1) & 2, id & 2);\n"
@@ -27,6 +27,7 @@ static const char gpu_hlsl_head[] =
     // and the white is brought to the chosen brightness
     "float3 outc(float3 c) { return hdr > 0 ? pow(max(c, 0), 2.2) * hdr : c; }\n"
     "float3 px(int2 i) { return tex.Load(int3(clamp(i, int2(0, 0), int2(texSize) - 1), 0)).rgb; }\n"
+    "float pm(int2 i) { return step(0.5, tex.Load(int3(clamp(i, int2(0, 0), int2(texSize) - 1), 0)).a); }\n" // xBR's mask: bit 0x80 of the top byte (DlGame.xbr_mask)
     "bool same(float3 a, float3 b) { return dot(abs(a - b), float3(1, 1, 1)) < 0.09; }\n"
     // Pixel-art edges: where two neighbours of a pixel agree across a corner and the pixel itself
     // differs (a staircase), that corner is cut along the diagonal, so slanted lines become straight.
@@ -43,9 +44,66 @@ static const char gpu_hlsl_head[] =
     "  }\n"
     "  return r;\n"
     "}\n"
+    // xBR (Hyllian's level 2, 2.65): pixel art made larger with its diagonal edges rounded at 45, 30 and
+    // 60 degrees, the flat colours and every colour of the game kept, over the whole picture at once.
+    // The four rotations of a 5 x 5 neighbourhood at once (x up B, y left D, z down H, w right F), the
+    // colours compared by their weighted luminance; t in the picture's pixels.
+    "float4 xd(float4 a, float4 b) { return abs(a - b); }\n"
+    "float4 xeq(float4 a, float4 b) { return xd(a, b) < 15.0 ? 1.0 : 0.0; }\n"
+    "float4 xne(float4 a, float4 b) { return a != b ? 1.0 : 0.0; }\n"
+    "float4 xwd(float4 a, float4 b, float4 c, float4 d, float4 e, float4 f, float4 g, float4 h) {\n"
+    "  return xd(a, b) + xd(a, c) + xd(d, e) + xd(d, f) + 4.0 * xd(g, h);\n"
+    "}\n"
+    // (2.66) a dither, as SNES games draw grass, water and shading (a checkerboard, lines one pixel
+    // apart): five pixels in a row that alternate, x2 u x d x2 (a sprite's one-pixel gap does not)
+    "bool xrun(float x, float u, float d, float u2, float d2) {\n"
+    "  return abs(x - u) > 4 && abs(x - d) > 4 && abs(u - d) < 3 && abs(x - u2) < 3 && abs(x - d2) < 3;\n"
+    "}\n"
+    "float3 xbr(float2 t) {\n"
+    "  int2 p = int2(floor(t)); float2 fp = t - floor(t);\n"
+    // filt 4: the game marks what may be rounded (DlGame.xbr_mask, 2.68): a pixel neither marked nor
+    // next to a marked one is the scenery, as drawn; the scenery's side of a character's edge is rounded
+    "  if (filt > 3.5 && pm(p) + pm(p + int2(0, -1)) + pm(p + int2(-1, 0)) + pm(p + int2(0, 1)) + pm(p + int2(1, 0)) == 0) return px(p);\n"
+    "  float3 A1 = px(p + int2(-1, -2)), B1 = px(p + int2(0, -2)), C1 = px(p + int2(1, -2));\n"
+    "  float3 A0 = px(p + int2(-2, -1)), A = px(p + int2(-1, -1)), B = px(p + int2(0, -1)), C = px(p + int2(1, -1)), C4 = px(p + int2(2, -1));\n"
+    "  float3 D0 = px(p + int2(-2, 0)), D = px(p + int2(-1, 0)), E = px(p), F = px(p + int2(1, 0)), F4 = px(p + int2(2, 0));\n"
+    "  float3 G0 = px(p + int2(-2, 1)), G = px(p + int2(-1, 1)), H = px(p + int2(0, 1)), I = px(p + int2(1, 1)), I4 = px(p + int2(2, 1));\n"
+    "  float3 G5 = px(p + int2(-1, 2)), H5 = px(p + int2(0, 2)), I5 = px(p + int2(1, 2));\n"
+    "  float3 w = float3(14.352, 28.176, 5.472);\n" // luminance, weighted as xBR's (48 x Y)
+    "  float4 b = float4(dot(B, w), dot(D, w), dot(H, w), dot(F, w)), c = float4(dot(C, w), dot(A, w), dot(G, w), dot(I, w));\n"
+    "  float4 e = dot(E, w).xxxx, d = b.yzwx, f = b.wxyz, g = c.zwxy, h = b.zwxy, i = c.wxyz;\n"
+    "  float4 i4 = float4(dot(I4, w), dot(C1, w), dot(A0, w), dot(G5, w)), i5 = float4(dot(I5, w), dot(C4, w), dot(A1, w), dot(G0, w));\n"
+    "  float4 h5 = float4(dot(H5, w), dot(F4, w), dot(B1, w), dot(D0, w)), f4 = h5.yzwx;\n"
+    // a dither at this pixel, or one that ends next to it, stays as it is: rounded, it turns into
+    // squiggles (2.66). Up and down, then left and right; then the same for the neighbours, whose own
+    // runs reach as far as the 5 x 5 goes
+    "  if (xrun(e.x, b.x, b.z, h5.z, h5.x) || xrun(e.x, b.y, b.w, h5.w, h5.y) ||\n"
+    "      xrun(b.x, c.y, c.x, i4.z, i5.y) || xrun(b.z, c.z, c.w, i5.w, i4.x) ||\n" // B, H left and right (A0 A B C C4, G0 G H I I4)
+    "      xrun(b.y, c.y, c.z, i5.z, i4.w) || xrun(b.w, c.x, c.w, i4.y, i5.x)) return E;\n" // D, F up and down (A1 A D G G5, C1 C F I I5)
+    "  float4 fx = float4(1, -1, -1, 1) * fp.y + float4(1, 1, -1, -1) * fp.x;\n"          // the lines under which it blends
+    "  float4 fxl = float4(1, -1, -1, 1) * fp.y + float4(0.5, 2, -0.5, -2) * fp.x;\n"
+    "  float4 fxu = float4(1, -1, -1, 1) * fp.y + float4(2, 0.5, -2, -0.5) * fp.x;\n"
+    "  float dl = 1.0 / max(outSize.x / texSize.x, 1.0);\n"                              // one screen pixel, smoothed
+    "  float4 dt = dl.xxxx, dtl = dl * float4(0.5, 1, 0.5, 1), dtu = dtl.yxwz;\n"
+    "  float4 lv0 = (xd(e, f) > 4.0 ? 1.0 : 0.0) * (xd(e, h) > 4.0 ? 1.0 : 0.0);\n" // only clear edges: not a translucent veil's shades (2.66)
+    "  float4 lv1 = lv0 * saturate((1 - xeq(f, b)) * (1 - xeq(h, d)) + xeq(e, i) * (1 - xeq(f, i4)) * (1 - xeq(h, i5)) + xeq(e, g) + xeq(e, c));\n"
+    "  float4 lv2l = xne(e, g) * xne(d, g), lv2u = xne(e, c) * xne(b, c);\n"
+    "  float4 edr = (xwd(e, c, g, i, h5, f4, h, f) < xwd(h, d, i5, f, i4, b, e, i) ? 1.0 : 0.0) * lv1;\n"
+    "  float4 edrl = (2.0 * xd(f, g) <= xd(h, c) ? 1.0 : 0.0) * lv2l, edru = (xd(f, g) >= 2.0 * xd(h, c) ? 1.0 : 0.0) * lv2u;\n"
+    "  float4 m45 = edr * saturate((fx + dt - float4(1.5, 0.5, -0.5, 0.5)) / (2 * dt));\n"
+    "  float4 m30 = edrl * saturate((fxl + dtl - float4(1.0, 1.0, -0.5, 0.0)) / (2 * dtl));\n"
+    "  float4 m60 = edru * saturate((fxu + dtu - float4(2.0, 0.0, -1.0, 0.5)) / (2 * dtu));\n"
+    "  float4 pick = xd(e, f) <= xd(e, h) ? 1.0 : 0.0, m = max(max(m30, m60), m45);\n"
+    "  float3 r1 = lerp(lerp(E, lerp(H, F, pick.x), m.x), lerp(B, D, pick.z), m.z);\n"
+    "  float3 r2 = lerp(lerp(E, lerp(F, B, pick.y), m.y), lerp(D, H, pick.w), m.w);\n"
+    "  float3 a1 = abs(E - r1), a2 = abs(E - r2);\n"
+    "  return lerp(r1, r2, step(a1.r + a1.g + a1.b, a2.r + a2.g + a2.b));\n"
+    "}\n"
     // filt 0: flat pixels, only the one-screen-pixel border between two of them is blended
-    // filt 1: plain interpolation;  filt 2: flat pixels with the staircases straightened
+    // filt 1: plain interpolation;  filt 2: flat pixels with the staircases straightened;  filt 3: xBR
+    // (4: xBR on what the game marks)
     "float3 fetch(float2 uv) {\n"
+    "  if (filt > 2.5) return xbr(uv * texSize);\n"
     "  if (filt > 1.5) {\n"
     "    float2 t = uv * texSize, o = 0.25 * texSize / outSize;\n" // four samples per screen pixel
     "    return (edges(t + float2(-o.x, -o.y)) + edges(t + float2(o.x, -o.y)) + edges(t + float2(-o.x, o.y)) + edges(t + o)) * 0.25;\n"
@@ -122,6 +180,13 @@ static const char gpu_hlsl_tail[] =
     // what GDI drew (the setup screen, the frame rate): colours already multiplied by their opacity
     "float4 ps_ui(V v) : SV_Target {\n"
     "  float4 u = tex.SampleLevel(smp, v.uv, 0);\n"
+    "  return float4(outc(u.a > 0 ? u.rgb / u.a : float3(0, 0, 0)) * u.a, u.a);\n"
+    "}\n"
+    // the setup screen's soft change of page (2.84): the page before (fadeOld) and the new one (tex)
+    // mixed before they go over the sky, fadeT from 0 to 1, so what did not change does not flicker
+    "Texture2D fadeOld : register(t15);\n"
+    "float4 ps_fade(V v) : SV_Target {\n"
+    "  float4 u = lerp(fadeOld.SampleLevel(smp, v.uv, 0), tex.SampleLevel(smp, v.uv, 0), saturate(fadeT));\n"
     "  return float4(outc(u.a > 0 ? u.rgb / u.a : float3(0, 0, 0)) * u.a, u.a);\n"
     "}\n"
     // ---- backdrop of the setup screen: the same sky as sky_pixel in dl_draw.c, animated: the wisps
@@ -202,8 +267,8 @@ static const char gpu_hlsl_tail[] =
     "float4 ps_sky(V v) : SV_Target {\n"
     "  float time = origin.x, aspect = origin.y, style = game[0].z, grain = -1;\n"
     "  float2 uv = v.uv;\n"
-    "  if (style > 2.5) {\n" // big pixels, few colours with an ordered dither
-    "    float2 n = float2(aspect * 120, 120);\n"
+    "  if (style > 2.5) {\n" // big pixels (game[1].x rows of them: DlTheme.sky_pixel), few colours with an ordered dither
+    "    float2 n = float2(aspect * game[1].x, game[1].x);\n"
     "    int2 b = int2(floor(uv * n));\n"
     "    uv = (float2(b) + 0.5) / n;\n"
     "    grain = (((b.x & 1) * 2 + (b.y & 1) * 3) % 4 + 0.5) / 4;\n"
@@ -215,11 +280,12 @@ static const char gpu_hlsl_tail[] =
     "  return float4(outc(dl_tint(col)), 1);\n"
     "}\n";
 
-typedef struct { float tex_size[2], out_size[2], origin[2], filt, scan, crt, hdr, src_size[2], cvd, cvd_pad[3], game[32]; } GpuConsts;
+typedef struct { float tex_size[2], out_size[2], origin[2], filt, scan, crt, hdr, src_size[2], cvd, fade, cvd_pad[2], game[32]; } GpuConsts;
 
 typedef struct { ID3D11Texture2D *tex; ID3D11ShaderResourceView *srv; int w, h, format; } GpuTex;
 // the game's textures t1-t7 (dl_gpu_texture) come after the kit's own
-enum { GT_PICTURE, GT_MENU, GT_FPS, GT_NOTE, GT_TOAST, GT_OVERLAY, GT_GAME = GT_OVERLAY + DL_MAX_OVERLAYS, GT_COUNT = GT_GAME + 7 };
+// GT_MENU2: the setup screen's other layer, the two taking turns for the soft change of page (2.84)
+enum { GT_PICTURE, GT_MENU, GT_FPS, GT_NOTE, GT_TOAST, GT_OVERLAY, GT_GAME = GT_OVERLAY + DL_MAX_OVERLAYS, GT_MENU2 = GT_GAME + 7, GT_COUNT };
 
 static struct {
   bool tried, ok;
@@ -228,12 +294,14 @@ static struct {
   IDXGISwapChain *swap;
   ID3D11RenderTargetView *rtv;
   ID3D11VertexShader *vs;
-  ID3D11PixelShader *ps, *ps_ui, *ps_sky;
+  ID3D11PixelShader *ps, *ps_ui, *ps_sky, *ps_fade;
   ID3D11BlendState *blend;
   ID3D11SamplerState *linear;
   ID3D11Buffer *consts;
   GpuTex t[GT_COUNT];
   int bb_w, bb_h;
+  UINT chain_flags; // as the swap chain was made (ResizeBuffers takes them again)
+  bool tearing;     // a picture may go to the screen at once, without waiting: vsync off, and VRR
 } gpu;
 
 // HDR output: hdr_want is set by dl_gpu_follow; the swap chain is made for it when the graphics card
@@ -250,29 +318,50 @@ bool dl_shot_ok, dl_shot_game;
 #define GPU_RELEASE(p) do { if (p) { (p)->lpVtbl->Release(p); (p) = NULL; } } while (0)
 
 // The game's picture in a texture of its own device that it shares (dl_picture_shared), opened on
-// DarkLauncher's device; read between AcquireSync(0) and ReleaseSync(0), as the game writes it.
+// DarkLauncher's device; read between AcquireSync(0) and ReleaseSync(0), as the game writes it. Or in
+// DarkLauncher's own target (dl_picture_target), read once its fence has reached the picture's value.
 static struct {
   HANDLE handle;                 // as the game gave it last
   bool failed;                   // that handle cannot be opened on this device (not tried again)
   ID3D11Texture2D *tex;          // NULL: not opened yet on this device
   ID3D11ShaderResourceView *srv;
-  IDXGIKeyedMutex *mutex;
+  IDXGIKeyedMutex *mutex;        // a game's texture
+  ID3D11Fence *fence;            // the target's: its fence on this device
   int w, h;
   DXGI_FORMAT format;            // of the view: B8G8R8A8_UNORM or R8G8B8A8_UNORM
 } shared;
 
+// The target of a game with a device of its own (dl_picture_target): a texture and a fence made on a
+// device of their own, which outlives a restart of the drawing device; that one opens them as it opens
+// a game's shared texture. The handles are DarkLauncher's and stay open while the texture is in use.
+static struct {
+  ID3D11Device *dev;
+  ID3D11DeviceContext *ctx;
+  LUID luid;                     // the graphics card of both devices
+  ID3D11Fence *fence;
+  HANDLE fence_h;
+  ID3D11Texture2D *tex;
+  HANDLE tex_h;
+  int w, h, serial;
+  uint64_t given, released;      // the fence's value of the last picture, and the one set once it was read
+  HANDLE event;                  // for waiting for the game's value
+  bool broken;                   // the game did not set its value: the target is not offered any more
+} target;
+
 static void shared_close(void) {
   GPU_RELEASE(shared.mutex);
+  GPU_RELEASE(shared.fence);
   GPU_RELEASE(shared.srv);
   GPU_RELEASE(shared.tex);
   shared.failed = false;
 }
 
 static void gpu_shutdown(void) {
-  shared_close(); // opened again from its handle by the next device
+  dl_pic_release(); // after this device's last reading of the target, before the device goes
+  shared_close();   // opened again from its handle by the next device
   if (gpu.ctx) ID3D11DeviceContext_ClearState(gpu.ctx);
   for (int k = 0; k < GT_COUNT; k++) { GPU_RELEASE(gpu.t[k].srv); GPU_RELEASE(gpu.t[k].tex); gpu.t[k].w = 0; }
-  GPU_RELEASE(gpu.consts); GPU_RELEASE(gpu.linear); GPU_RELEASE(gpu.ps); GPU_RELEASE(gpu.ps_ui); GPU_RELEASE(gpu.ps_sky);
+  GPU_RELEASE(gpu.consts); GPU_RELEASE(gpu.linear); GPU_RELEASE(gpu.ps); GPU_RELEASE(gpu.ps_ui); GPU_RELEASE(gpu.ps_sky); GPU_RELEASE(gpu.ps_fade);
   GPU_RELEASE(gpu.blend); GPU_RELEASE(gpu.vs);
   GPU_RELEASE(gpu.rtv);
   GPU_RELEASE(gpu.swap);
@@ -296,8 +385,8 @@ static bool gpu_target(void) {
 // Compiling the shaders takes Windows about two seconds. It is done once, on a second thread while
 // the setup screen is already shown by GDI, and the result is kept in gpu_shaders.bin next to the
 // program (redone whenever the shader text above changes), so later starts do not compile at all.
-enum { SH_VS, SH_PS, SH_UI, SH_SKY, SH_COUNT };
-static const char *const shader_entry[SH_COUNT] = {"vs", "ps", "ps_ui", "ps_sky"};
+enum { SH_VS, SH_PS, SH_UI, SH_SKY, SH_FADE, SH_COUNT };
+static const char *const shader_entry[SH_COUNT] = {"vs", "ps", "ps_ui", "ps_sky", "ps_fade"};
 static struct { u8 *code; u32 size; } shader[SH_COUNT];
 static volatile LONG shaders_state; // 0 not asked, 1 being prepared, 2 ready, 3 failed
 #define SHADER_CACHE_MAGIC 0x314C4447u // "GDL1"
@@ -397,12 +486,19 @@ static bool gpu_start(void) {
   GetClientRect(dl_hwnd, &rc);
   DXGI_SWAP_CHAIN_DESC sd = {0};
   hdr_chain = hdr_want;
-  // once a window has shown a flip-model swap chain, Windows keeps showing its last picture instead
-  // of what a copying swap chain puts there: after HDR, the flip model is kept for the ordinary output
-  static bool flipped;
-  bool flip = hdr_chain || flipped;
-  flipped = flip;
-  sd.BufferCount = flip ? 2 : 1;
+  // The flip model always (2.58; before, a copying chain, and the flip model only once HDR had been
+  // shown, since Windows then keeps showing its last picture instead of a copying chain's): full screen,
+  // it lets Windows hand the window's pictures to the screen itself ("independent flip"), which variable
+  // refresh (FreeSync, G-Sync) needs; a copying chain was always composed by Windows, at the screen's
+  // refresh. With tearing allowed (Windows 10 and its driver), a picture without vsync goes at once.
+  gpu.tearing = false;
+  IDXGIFactory5 *f5 = NULL;
+  if (SUCCEEDED(CreateDXGIFactory1(&IID_IDXGIFactory5, (void **)&f5))) {
+    BOOL allow = FALSE;
+    gpu.tearing = SUCCEEDED(IDXGIFactory5_CheckFeatureSupport(f5, DXGI_FEATURE_PRESENT_ALLOW_TEARING, &allow, sizeof allow)) && allow;
+    IDXGIFactory5_Release(f5);
+  }
+  sd.BufferCount = 2;
   sd.BufferDesc.Width = (UINT)(rc.right > 0 ? rc.right : 1);
   sd.BufferDesc.Height = (UINT)(rc.bottom > 0 ? rc.bottom : 1);
   sd.BufferDesc.Format = hdr_chain ? DXGI_FORMAT_R16G16B16A16_FLOAT : DXGI_FORMAT_B8G8R8A8_UNORM;
@@ -410,15 +506,18 @@ static bool gpu_start(void) {
   sd.OutputWindow = dl_hwnd;
   sd.SampleDesc.Count = 1;
   sd.Windowed = TRUE;
-  // copies into the window, so that GDI can still draw there when the graphics card is turned off;
-  // HDR needs the flip model
-  sd.SwapEffect = flip ? DXGI_SWAP_EFFECT_FLIP_DISCARD : DXGI_SWAP_EFFECT_DISCARD;
+  sd.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
   D3D_FEATURE_LEVEL got;
   // hardware first; the software rasteriser of Windows second (remote sessions, missing driver)
   static const D3D_DRIVER_TYPE kinds[2] = {D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP};
   HRESULT hr = E_FAIL;
-  for (int k = 0; k < 2 && FAILED(hr); k++)
-    hr = D3D11CreateDeviceAndSwapChain(NULL, kinds[k], NULL, 0, NULL, 0, D3D11_SDK_VERSION, &sd, &gpu.swap, &gpu.dev, &got, &gpu.ctx);
+  bool tear_ok = gpu.tearing;
+  for (int k = 0; k < 4 && FAILED(hr); k++) { // each kind with tearing, then without (in case)
+    gpu.tearing = tear_ok && k % 2 == 0;
+    gpu.chain_flags = sd.Flags = gpu.tearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0;
+    if (k % 2 && !tear_ok) continue; // (the same as the try before)
+    hr = D3D11CreateDeviceAndSwapChain(NULL, kinds[k / 2], NULL, 0, NULL, 0, D3D11_SDK_VERSION, &sd, &gpu.swap, &gpu.dev, &got, &gpu.ctx);
+  }
   if (FAILED(hr)) return false;
   // Alt+Enter is handled by the program itself (borderless window), not by DXGI
   IDXGIFactory *factory = NULL;
@@ -432,7 +531,8 @@ static bool gpu_start(void) {
               SUCCEEDED(ID3D11Device_CreateVertexShader(gpu.dev, shader[SH_VS].code, shader[SH_VS].size, NULL, &gpu.vs)) &&
               SUCCEEDED(ID3D11Device_CreatePixelShader(gpu.dev, shader[SH_PS].code, shader[SH_PS].size, NULL, &gpu.ps)) &&
               SUCCEEDED(ID3D11Device_CreatePixelShader(gpu.dev, shader[SH_UI].code, shader[SH_UI].size, NULL, &gpu.ps_ui)) &&
-              SUCCEEDED(ID3D11Device_CreatePixelShader(gpu.dev, shader[SH_SKY].code, shader[SH_SKY].size, NULL, &gpu.ps_sky));
+              SUCCEEDED(ID3D11Device_CreatePixelShader(gpu.dev, shader[SH_SKY].code, shader[SH_SKY].size, NULL, &gpu.ps_sky)) &&
+              SUCCEEDED(ID3D11Device_CreatePixelShader(gpu.dev, shader[SH_FADE].code, shader[SH_FADE].size, NULL, &gpu.ps_fade));
   if (good) {
     D3D11_SAMPLER_DESC sm = {0};
     sm.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
@@ -457,6 +557,13 @@ static bool gpu_start(void) {
 }
 
 bool dl_gpu_ready(void) { return dl_cfg.gpu && !dl_audit_dir && gpu_start(); }
+
+// A window that has shown a flip-model swap chain keeps showing its last picture over what GDI draws
+// there: true when GDI is to draw from now on (the Display row turned to it, or the graphics card lost)
+// in a window that has; dl_app.c then makes the window again (window_renew).
+static bool flip_shown;
+bool dl_gpu_window_stale(void) { return flip_shown && !gpu.ok && (!dl_cfg.gpu || gpu.tried); }
+void dl_gpu_window_renewed(void) { flip_shown = false; }
 
 void dl_gpu_restart(void) {
   if (gpu.tried) gpu_shutdown();
@@ -517,6 +624,15 @@ static bool shared_open(HANDLE handle) {
   HRESULT hr = ID3D11Device1_OpenSharedResource1(dev1, handle, &IID_ID3D11Texture2D, (void **)&shared.tex);
   ID3D11Device1_Release(dev1);
   if (FAILED(hr)) { shared.tex = NULL; return false; }
+  bool own = handle == target.tex_h; // the target: its fence instead of a keyed mutex
+  bool sync = false;
+  if (own) {
+    ID3D11Device5 *dev5 = NULL;
+    sync = SUCCEEDED(ID3D11Device_QueryInterface(gpu.dev, &IID_ID3D11Device5, (void **)&dev5)) &&
+           SUCCEEDED(ID3D11Device5_OpenSharedFence(dev5, target.fence_h, &IID_ID3D11Fence, (void **)&shared.fence));
+    GPU_RELEASE(dev5);
+  } else
+    sync = SUCCEEDED(ID3D11Texture2D_QueryInterface(shared.tex, &IID_IDXGIKeyedMutex, (void **)&shared.mutex));
   D3D11_TEXTURE2D_DESC td;
   ID3D11Texture2D_GetDesc(shared.tex, &td);
   DXGI_FORMAT view = td.Format == DXGI_FORMAT_B8G8R8A8_UNORM || td.Format == DXGI_FORMAT_B8G8R8A8_TYPELESS   ? DXGI_FORMAT_B8G8R8A8_UNORM
@@ -526,8 +642,7 @@ static bool shared_open(HANDLE handle) {
   vd.Format = view;
   vd.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
   vd.Texture2D.MipLevels = 1;
-  bool good = view != DXGI_FORMAT_UNKNOWN && (td.BindFlags & D3D11_BIND_SHADER_RESOURCE) &&
-              SUCCEEDED(ID3D11Texture2D_QueryInterface(shared.tex, &IID_IDXGIKeyedMutex, (void **)&shared.mutex)) &&
+  bool good = sync && view != DXGI_FORMAT_UNKNOWN && (td.BindFlags & D3D11_BIND_SHADER_RESOURCE) &&
               SUCCEEDED(ID3D11Device_CreateShaderResourceView(gpu.dev, (ID3D11Resource *)shared.tex, &vd, &shared.srv));
   if (!good) { shared_close(); shared.failed = true; return false; }
   shared.failed = false;
@@ -544,15 +659,139 @@ bool dl_picture_shared(void *handle, double aspect) {
   return true;
 }
 
-// The shared picture for one drawing: true once the game has let go of it, then shared_unlock after
-// the drawing. False: the picture is not there, or the game holds it too long (not drawn this time).
+// True once the game has set the target's fence to the last picture's value, waited for here up to half a
+// second. False: the game did not; DarkLauncher no longer offers the target (the game gives pixels), so
+// that nothing waits on the graphics card for a value that may never come.
+static bool target_ready(void) {
+  if (target.broken) return false;
+  if (ID3D11Fence_GetCompletedValue(target.fence) >= target.given) return true;
+  if (!target.event) target.event = CreateEventA(NULL, FALSE, FALSE, NULL);
+  if (target.event && SUCCEEDED(ID3D11Fence_SetEventOnCompletion(target.fence, target.given, target.event)) &&
+      WaitForSingleObject(target.event, 500) == WAIT_OBJECT_0)
+    return true;
+  target.broken = true;
+  return false;
+}
+
+// The fence set to value by the graphics card, after what the context ctx has sent before.
+static void fence_set(ID3D11DeviceContext *ctx, ID3D11Fence *fence, uint64_t value) {
+  ID3D11DeviceContext4 *c4 = NULL;
+  if (FAILED(ID3D11DeviceContext_QueryInterface(ctx, &IID_ID3D11DeviceContext4, (void **)&c4))) return;
+  ID3D11DeviceContext4_Signal(c4, fence, value);
+  ID3D11DeviceContext_Flush(ctx); // sent now: the game's device waits for it
+  ID3D11DeviceContext4_Release(c4);
+}
+
+// Done reading the picture in the target, before frame() lets the game write it again: the fence set to
+// one more than the picture's after the drawing device's readings (by the target's own device when the
+// drawing device has gone). Only once the game's value is there: the fence never goes back.
+void dl_pic_release(void) {
+  if (!target.fence || target.given <= target.released || !target_ready()) return;
+  if (shared.fence) fence_set(gpu.ctx, shared.fence, target.given + 1);
+  else fence_set(target.ctx, target.fence, target.given + 1);
+  target.released = target.given + 1;
+}
+
+// The target's device and fence on the graphics card of the drawing device (made again on another one).
+static bool target_device(void) {
+  IDXGIDevice *xd = NULL;
+  IDXGIAdapter *ad = NULL;
+  DXGI_ADAPTER_DESC desc;
+  bool got = SUCCEEDED(ID3D11Device_QueryInterface(gpu.dev, &IID_IDXGIDevice, (void **)&xd)) && SUCCEEDED(IDXGIDevice_GetAdapter(xd, &ad)) &&
+             SUCCEEDED(IDXGIAdapter_GetDesc(ad, &desc));
+  GPU_RELEASE(xd);
+  if (got && target.dev && desc.AdapterLuid.LowPart == target.luid.LowPart && desc.AdapterLuid.HighPart == target.luid.HighPart) {
+    GPU_RELEASE(ad);
+    return true;
+  }
+  if (target.dev) { // another graphics card: the game opens everything again
+    dl_pic_release();
+    if (shared.handle == target.tex_h) shared_close();
+    GPU_RELEASE(target.tex);
+    GPU_RELEASE(target.fence);
+    GPU_RELEASE(target.ctx);
+    GPU_RELEASE(target.dev);
+    if (target.tex_h) CloseHandle(target.tex_h);
+    if (target.fence_h) CloseHandle(target.fence_h);
+    target.tex_h = target.fence_h = NULL;
+  }
+  ID3D11Device5 *dev5 = NULL;
+  bool ok = got && SUCCEEDED(D3D11CreateDevice(ad, D3D_DRIVER_TYPE_UNKNOWN, NULL, 0, NULL, 0, D3D11_SDK_VERSION, &target.dev, NULL, &target.ctx)) &&
+            SUCCEEDED(ID3D11Device_QueryInterface(target.dev, &IID_ID3D11Device5, (void **)&dev5)) &&
+            SUCCEEDED(ID3D11Device5_CreateFence(dev5, 0, D3D11_FENCE_FLAG_SHARED, &IID_ID3D11Fence, (void **)&target.fence)) &&
+            SUCCEEDED(ID3D11Fence_CreateSharedHandle(target.fence, NULL, GENERIC_ALL, NULL, &target.fence_h));
+  GPU_RELEASE(dev5);
+  GPU_RELEASE(ad);
+  if (!ok) {
+    GPU_RELEASE(target.fence);
+    GPU_RELEASE(target.ctx);
+    GPU_RELEASE(target.dev);
+    target.fence_h = NULL;
+    return false;
+  }
+  target.luid = desc.AdapterLuid;
+  target.given = target.released = 0;
+  target.w = target.h = 0;
+  target.serial++;
+  return true;
+}
+
+// The target's texture, w x h (made again for another size).
+static bool target_texture(int w, int h) {
+  if (target.tex && target.w == w && target.h == h) return true;
+  if (shared.handle == target.tex_h) shared_close();
+  GPU_RELEASE(target.tex);
+  HANDLE old = target.tex_h; // closed after the new one is made, so that the new handle differs
+  target.tex_h = NULL;
+  D3D11_TEXTURE2D_DESC td = {0};
+  td.Width = (UINT)w;
+  td.Height = (UINT)h;
+  td.MipLevels = td.ArraySize = 1;
+  td.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+  td.SampleDesc.Count = 1;
+  td.Usage = D3D11_USAGE_DEFAULT;
+  td.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET | D3D11_BIND_UNORDERED_ACCESS;
+  td.MiscFlags = D3D11_RESOURCE_MISC_SHARED | D3D11_RESOURCE_MISC_SHARED_NTHANDLE;
+  IDXGIResource1 *res = NULL;
+  bool ok = SUCCEEDED(ID3D11Device_CreateTexture2D(target.dev, &td, NULL, &target.tex)) &&
+            SUCCEEDED(ID3D11Texture2D_QueryInterface(target.tex, &IID_IDXGIResource1, (void **)&res)) &&
+            SUCCEEDED(IDXGIResource1_CreateSharedHandle(res, NULL, DXGI_SHARED_RESOURCE_READ | DXGI_SHARED_RESOURCE_WRITE, NULL, &target.tex_h));
+  GPU_RELEASE(res);
+  if (old) CloseHandle(old);
+  if (!ok) { GPU_RELEASE(target.tex); target.tex_h = NULL; return false; }
+  target.w = w;
+  target.h = h;
+  target.serial++;
+  return true;
+}
+
+bool dl_picture_target(int w, int h, double aspect, DlTarget *t) {
+  if (!t || !gpu.ok || target.broken || w <= 0 || h <= 0 || w > dl_game->width || h > dl_game->height) return false;
+  dl_pic_release(); // (a second picture in the same frame())
+  if (target.given > target.released || !target_device() || !target_texture(w, h) || !shared_open(target.tex_h)) return false;
+  t->texture = target.tex_h;
+  t->fence = target.fence_h;
+  t->wait = target.released;
+  t->signal = target.given = target.released + 1;
+  memcpy(t->luid, &target.luid, sizeof t->luid);
+  t->serial = target.serial;
+  dl_picture_size(w, h, aspect);
+  dl_pic_shared = true;
+  return true;
+}
+
+// The shared picture for one drawing: true once the game has let go of it (the target: once its fence
+// has the picture's value), then shared_unlock after the drawing. False: the picture is not there, or
+// the game holds it too long (not drawn this time).
 static bool shared_lock(void) {
-  return dl_pic_shared && shared_open(shared.handle) && IDXGIKeyedMutex_AcquireSync(shared.mutex, 0, 500) == S_OK;
+  if (!dl_pic_shared || !shared_open(shared.handle)) return false;
+  if (shared.fence) return target_ready();
+  return IDXGIKeyedMutex_AcquireSync(shared.mutex, 0, 500) == S_OK;
 }
 static void shared_unlock(void) {
   ID3D11ShaderResourceView *none = NULL; // nothing of the game's texture stays bound
   ID3D11DeviceContext_PSSetShaderResources(gpu.ctx, 0, 1, &none);
-  IDXGIKeyedMutex_ReleaseSync(shared.mutex, 0);
+  if (shared.mutex) IDXGIKeyedMutex_ReleaseSync(shared.mutex, 0);
 }
 
 // The shared picture read back into dl_pic, which holds it from then on (a save state's picture, a
@@ -562,6 +801,7 @@ void dl_pic_fetch(void) {
   bool locked = shared_lock();
   dl_pic_shared = false;
   if (!locked) return;
+  dl_pic_serial++;
   D3D11_TEXTURE2D_DESC td;
   ID3D11Texture2D_GetDesc(shared.tex, &td);
   td.Usage = D3D11_USAGE_STAGING;
@@ -595,7 +835,7 @@ static bool gpu_resize(int cw, int ch) {
   GPU_RELEASE(gpu.rtv);
   gpu.bb_w = cw;
   gpu.bb_h = ch;
-  return SUCCEEDED(IDXGISwapChain_ResizeBuffers(gpu.swap, 0, (UINT)cw, (UINT)ch, DXGI_FORMAT_UNKNOWN, 0)) && gpu_target();
+  return SUCCEEDED(IDXGISwapChain_ResizeBuffers(gpu.swap, 0, (UINT)cw, (UINT)ch, DXGI_FORMAT_UNKNOWN, gpu.chain_flags)) && gpu_target();
 }
 
 static void gpu_consts(const GpuConsts *c) { ID3D11DeviceContext_UpdateSubresource(gpu.ctx, (ID3D11Resource *)gpu.consts, 0, NULL, c, 0, 0); }
@@ -614,7 +854,7 @@ static void gpu_quad(int x, int y, int w, int h, ID3D11PixelShader *ps, int whic
 // its own constants and textures first (step of steps: smooth motion).
 static void gpu_game_quad(int x, int y, int w, int h, int step, int steps) {
   GpuConsts c = {{(float)dl_pic_w, (float)dl_pic_h}, {(float)w, (float)h}, {(float)x, (float)y},
-                 (float)dl_cfg.smooth, dl_crt() ? 0.0f : (float)dl_scanlines(), (float)dl_crt(), hdr_chain ? hdr_white : 0,
+                 (float)dl_filter(), dl_crt() ? 0.0f : (float)dl_scanlines(), (float)dl_crt(), hdr_chain ? hdr_white : 0,
                  {(float)dl_pic_w / dl_pic_scale, (float)dl_pic_h / dl_pic_scale}};
   c.cvd = (float)dl_cfg.cvd;
   if (dl_game->gpu_frame) dl_game->gpu_frame(c.game, step, steps);
@@ -646,7 +886,7 @@ static void gpu_states(void) {
 
 // Screen refreshes for each picture of the game played (DlGame.gpu_steps; smooth motion).
 int dl_gpu_steps(void) {
-  int n = dl_mode == M_GAME && dl_game->gpu_steps && gpu.ok ? dl_game->gpu_steps() : 1;
+  int n = dl_mode == M_GAME && dl_game->gpu_steps && !dl_game->pace_by_game && gpu.ok ? dl_game->gpu_steps() : 1;
   return n < 1 ? 1 : n > 8 ? 8 : n;
 }
 
@@ -812,17 +1052,44 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
   int cw = rc.right, ch = rc.bottom;
   if (cw <= 0 || ch <= 0) return true;
   static int layer_w, layer_h, layer_mode = -1;
+  // the soft change of page: the layer of the page before kept in the other slot, the new one shown
+  // over it more and more, for 150 ms (not with "Reduce motion", nor in --gpu-check)
+  static int menu_t = GT_MENU, view_shown = -1;
+  static LARGE_INTEGER fade_at, fq;
+  if (!fq.QuadPart) QueryPerformanceFrequency(&fq);
   bool menu = dl_mode != M_GAME, good = gpu_resize(cw, ch);
-  HDC wdc = GetDC(dl_hwnd);
-  if (good && menu && (rebuild || !gpu.t[GT_MENU].tex || layer_w != cw || layer_h != ch || layer_mode != dl_mode)) {
+  HDC wdc = NULL; // the window's, taken only to draw a layer
+  if (good && menu && (rebuild || !gpu.t[menu_t].tex || layer_w != cw || layer_h != ch || layer_mode != dl_mode)) {
+    int view = dl_menu_view();
+    if (view >= 0 && view_shown >= 0 && view != view_shown && layer_w == cw && layer_h == ch && !dl_cfg.still && !dl_no_fade) {
+      menu_t = menu_t == GT_MENU ? GT_MENU2 : GT_MENU;
+      QueryPerformanceCounter(&fade_at);
+    }
+    view_shown = view;
+    if (!wdc) wdc = GetDC(dl_hwnd);
     const u32 *layer = menu_layer(wdc, cw, ch);
-    good = layer && gpu_upload(GT_MENU, layer, cw, ch);
+    good = layer && gpu_upload(menu_t, layer, cw, ch);
     layer_w = cw;
     layer_h = ch;
     layer_mode = dl_mode;
   }
-  // the picture as pixels; one in the game's shared texture is drawn from there without a copy
-  if (good && !(dl_pic_shared && shared_open(shared.handle))) good = gpu_upload(GT_PICTURE, dl_pic, dl_pic_w, dl_pic_h);
+  if (!menu) view_shown = -1; // back from play: the menus come without a fade
+  double fade = 1;
+  if (fade_at.QuadPart) {
+    LARGE_INTEGER t;
+    QueryPerformanceCounter(&t);
+    fade = (double)(t.QuadPart - fade_at.QuadPart) / (double)fq.QuadPart / 0.15;
+    if (fade >= 1 || view_shown < 0) fade = 1, fade_at.QuadPart = 0;
+  }
+  int menu_old = menu_t == GT_MENU ? GT_MENU2 : GT_MENU;
+  // the picture as pixels, when they changed (not again for each picture of the pause menu or of the
+  // setup screen over a paused game); one in the game's shared texture is drawn from there without a copy
+  static u32 pic_serial; // dl_pic_serial of the pixels in GT_PICTURE
+  const GpuTex *pt = &gpu.t[GT_PICTURE];
+  if (good && !(dl_pic_shared && shared_open(shared.handle)) && (pic_serial != dl_pic_serial || !pt->tex || pt->w != dl_pic_w || pt->h != dl_pic_h)) {
+    good = gpu_upload(GT_PICTURE, dl_pic, dl_pic_w, dl_pic_h);
+    pic_serial = dl_pic_serial;
+  }
   int x = 0, y = 0, w = 0, h = 0, fw = 0, fhh = 0, nw = 0, nh = 0;
   bool game = dl_mode == M_GAME || dl_mode == M_TRY || dl_mode == M_PAUSE, fps = dl_cfg.show_fps && dl_mode != M_PAUSE && !dl_shot_game;
   bool note = dl_mode == M_GAME && dl_note_now() && !dl_shot_game;
@@ -832,6 +1099,7 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
     dl_fit(cw, ch, dl_cfg.integer_scale, &w, &h);
     x = (cw - w) / 2;
     y = (ch - h) / 2;
+    if ((fps || note || toast) && !wdc) wdc = GetDC(dl_hwnd);
     if (good && fps) good = fps_layer(wdc, h, &fw, &fhh);
     if (good && note) good = note_layer(wdc, h, &nw, &nh);
     if (good && toast) good = toast_layer(wdc, h, &tw, &th);
@@ -840,7 +1108,7 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
   int ov_n = dl_mode == M_GAME && dl_game->overlays ? dl_game->overlays(x, y, w, h, ov, DL_MAX_OVERLAYS) : 0;
   for (int k = 0; good && k < ov_n && k < DL_MAX_OVERLAYS; k++)
     if (ov[k].pixels && ov[k].w > 0 && ov[k].h > 0) good = gpu_upload(GT_OVERLAY + k, ov[k].pixels, ov[k].w, ov[k].h);
-  ReleaseDC(dl_hwnd, wdc);
+  if (wdc) ReleaseDC(dl_hwnd, wdc);
   // smooth motion: the picture over several screen refreshes, each one drawn again a step further
   int steps = dl_shot_path[0] ? 1 : dl_gpu_steps();
   for (int step = 1; good && step <= steps; step++) {
@@ -859,7 +1127,7 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
       }
       for (int k = 0; k < ov_n && k < DL_MAX_OVERLAYS; k++)
         if (ov[k].pixels && ov[k].w > 0 && ov[k].h > 0) gpu_quad(ov[k].x, ov[k].y, ov[k].w, ov[k].h, gpu.ps_ui, GT_OVERLAY + k, true);
-      if (dl_mode != M_GAME) gpu_quad(0, 0, cw, ch, gpu.ps_ui, GT_MENU, true); // the pause menu, "Press a key to go back"
+      if (dl_mode != M_GAME) gpu_quad(0, 0, cw, ch, gpu.ps_ui, menu_t, true); // the pause menu, "Press a key to go back"
       if (fps) gpu_quad(x, y, fw, fhh, gpu.ps_ui, GT_FPS, true);
       if (note) {
         int fh = h / 22 < 14 ? 14 : h / 22;
@@ -875,17 +1143,28 @@ bool dl_gpu_show(bool rebuild, bool vsync) {
       GpuConsts sky = {{1, 1}, {(float)cw, (float)ch}, {dl_cfg.still ? 0.0f : (float)((double)(now.QuadPart - t0.QuadPart) / (double)fq.QuadPart), (float)cw / (float)ch}};
       sky.hdr = hdr_chain ? hdr_white : 0;
       sky.game[2] = (float)ui_sky_style();
+      sky.game[4] = (float)ui_sky_rows();
       if (ui_theme_hsl(&sky.game[0], &sky.game[1])) sky.game[3] = 1;
       gpu_consts(&sky);
       gpu_quad(0, 0, cw, ch, gpu.ps_sky, -1, false);
-      gpu_quad(0, 0, cw, ch, gpu.ps_ui, GT_MENU, true);
+      if (fade < 1 && gpu.t[menu_old].tex) { // the page before, giving way to the new one
+        sky.fade = (float)(fade * fade * (3 - 2 * fade)); // eased
+        gpu_consts(&sky);
+        ID3D11DeviceContext_PSSetShaderResources(gpu.ctx, 15, 1, &gpu.t[menu_old].srv);
+        gpu_quad(0, 0, cw, ch, gpu.ps_fade, menu_t, true);
+      } else gpu_quad(0, 0, cw, ch, gpu.ps_ui, menu_t, true);
       if (dl_prev_w > 0) gpu_game_quad(dl_prev_x, dl_prev_y, dl_prev_w, dl_prev_h, 1, 1);
     }
     if (dl_shot_path[0]) {
       dl_shot_ok = gpu_save(dl_shot_path, 0, 0, 0, 0);
       dl_shot_path[0] = 0;
     }
-    good = SUCCEEDED(IDXGISwapChain_Present(gpu.swap, vsync || steps > 1 ? 1 : 0, 0));
+    // a game at its own pace (dl_present_latest): never a wait for the screen; with the sync, the flip
+    // model shows the newest picture at the next refresh without tearing; without it, as soon as it comes
+    UINT interval = dl_present_latest ? 0 : vsync || steps > 1 ? 1 : 0;
+    bool tear = interval == 0 && gpu.tearing && !(dl_present_latest && vsync);
+    good = SUCCEEDED(IDXGISwapChain_Present(gpu.swap, interval, tear ? DXGI_PRESENT_ALLOW_TEARING : 0));
+    if (good) flip_shown = true;
   }
   if (!good) { gpu_shutdown(); dl_dirty = true; } // device lost or anything else: GDI from now on
   return good;

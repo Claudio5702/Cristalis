@@ -1,0 +1,63 @@
+# W2, first stage: a soldier then a power crystal deployed with the mouse (a crystal wants a unit first),
+# a wave; the crystal's own menu (four rows); then the summon from the row of units, and its question.
+tapuntil 1000 title 1 90
+wait 1
+tapuntil 1000 title 12 20
+wait 1
+tap 0002
+wait 1
+tapuntil 1000 title 4 20
+wait 1
+tap 1000
+wait 1
+tapuntil 1000 pack 2 30
+until stage 3 30
+tapuntil 1000 stage 9 20
+gold 999
+clickuntil 560 300 stage 11
+clickuntil 400 250 stage 9
+wait 1
+clickuntil 560 300 gold <999 5
+wait 1
+clickuntil 720 180 stage 11
+clickuntil 639 380 stage 9
+wait 1
+clickuntil 720 180 gold <991 5
+wait 1
+tap 4000
+wait 2
+# the crystal's menu
+clickuntil 720 180 stage 10 5
+wait 1
+shot d05_crystalmenu
+peek 40077B08
+peek 40077B0C
+move 600 332
+wait 1
+peek 40077B08
+move 600 417
+wait 1
+peek 40077B08
+rclick 720 180
+until stage 9 5
+# the row of units (A on the sand), down to the summons, the summon
+clickuntil 640 500 stage 11 5
+clickuntil 640 453 stage 17 5
+shot d06_summon
+click 638 325
+wait 1
+shot d07_question
+peek 40065D70
+peek 40065CF0
+peek 40065CF4
+move 640 393
+wait 1
+peek 40065CF0
+shot d08_yes
+move 640 435
+wait 1
+peek 40065CF0
+shot d09_no
+rclick 640 420
+wait 1
+log end

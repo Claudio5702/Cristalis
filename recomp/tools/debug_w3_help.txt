@@ -1,0 +1,44 @@
+# W3: the pause menu's help with the mouse: its menu of four, How to Play, its pages' arrows, back.
+tapuntil 1000 title 1 90
+wait 1
+tapuntil 1000 title 12 20
+wait 1
+tap 0002
+wait 1
+tap 0002
+wait 1
+tapuntil 1000 title 4 20
+wait 1
+tap 1000
+wait 1
+tapuntil 1000 pack 3 30
+until stage 3 30
+tapuntil 1000 stage 9 20
+tapuntil 0010 stage 15 5
+wait 1
+clickuntil 650 236 stage 25 5
+wait 1
+shot k01_help
+move 650 395
+wait 1
+peek 4008101C
+move 650 308
+wait 1
+peek 4008101C
+click 650 308
+wait 1
+peek 40053D6C
+peek 4005FB4C
+click 943 375
+wait 1
+click 943 375
+wait 1
+peek 4005FB4C
+click 336 375
+wait 1
+peek 4005FB4C
+shot k02_page2
+rclick 640 375
+wait 1
+peek 40053D6C
+log end

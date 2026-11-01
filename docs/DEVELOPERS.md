@@ -107,6 +107,17 @@ Test hooks, as environment variables:
 | `CD_STATS=1` | statistics: sound every five seconds; pictures, draws and the time of each picture every two |
 | `CD_SETUP_SOURCE=<folder>` | first start: takes the game from there without asking |
 | `CD_LAUNCHER_SHOT=<file.bmp>` | classic version: draws the start screen once into a file |
+| `CD_ASPECT=<width/height>` | "Fill the screen" as for a screen of those proportions (1.6 for 16:10) |
+| `CD_MOUSE_AT=<s>,<x>,<y>[,<buttons>]` | a pointer at that point of the 1280×720 picture after that many seconds of play |
+| `CD_DRAWLOG=<frame>` or `s<seconds>`, `CD_TEXLOG=1` | logs the draws of one picture; logs (and saves) the small textures |
+| `CD_MEMDUMP=<frame>` or `s<seconds>`, `CD_POKE=<frame>:<hex address>=<value>,…` | saves the game's memory; writes words into it at each picture |
+| `CD_WORDS=<hex address>,…` | logs each of those words of the game's memory when it changes |
+| `CD_SAMPLE=<seconds>[,<times>]` | logs where every guest thread is (the recompiled function), that many times: where the processor time goes |
+| `CD_TURBO=<seconds>` | the fast forward kept on from then, in a stage |
+| `CD_DEBUG=<commands>` or `@<file>` | the debug mode: a scenario run picture by picture, its waits on the game's state (`until stage 9`, `tapuntil`, `clickuntil`), the pointer and buttons, `gold 999 keep`, `poke`, `peek`, `shot <name>`; every command logged with the game's state (see `runtime/debug_script.h`; examples in `recomp/tools/debug_*.txt`: `debug_w2_summon.txt` deploys a soldier and a crystal in W2, starts a wave and checks the summon's question with the mouse; `debug_w3_row.txt` the two rows of units and the pause menu; `debug_w3_help.txt` the help's menu and pages; `debug_w1_pause_all.txt` every entry of the pause menu; `debug_w1_settings.txt` the help's Settings and the wheel; `debug_w1_game_over.txt` a stage lost; `debug_w1_victory.txt` a stage won, the crystals kept at 20 (about ten minutes)) |
+| `CD_WARP=1` | the game drawn by WARP, Windows' software rasterizer, on the processor: the weakest graphics there can be (its pictures go to DarkLauncher as pixels) |
+| `CD_SPIN=1` | as before 1.11, to compare: the game's waits for the graphics processor spin (no millisecond's sleep), the command thread looks for new commands every millisecond, the sound thread every 2 ms for room |
+| `CD_IMAGEDUMP=<folder>`, `CD_WATCH=<address>,<seconds>` | saves the game's code image and its functions (for Ghidra, kept local); logs who writes a word |
 
 ## The installer
 
@@ -132,7 +143,7 @@ C:\scratch\cd\Uninstall.exe /S /ALL     # removes everything
 | `recomp/config` | XenonRecomp configuration: function bounds, jump tables, hooks |
 | `recomp/runtime` | the runtime (see above); `linux/` for the Linux build |
 | `recomp/tools` | scripts used during the port, packaging, the installer (`setup/`) |
-| `recomp/resources` | the icons, drawn by `tools/make_icon.ps1`: the initial C of Cristalis with an original crystal, and a grey copy for the uninstaller |
+| `recomp/resources` | the icons (a small knight, and a grey copy for the uninstaller) and, in `art/`, DarkLauncher's backdrop, starting picture and bar icons: painted for the project with FLUX.2 [klein], each one's prompt and settings in a `.txt` beside it (`tools/make_icon.ps1` drew the icon before 1.11) |
 | `kit/launcher` | DarkLauncher, copied from its repository by its `sync_to_project.ps1` (not changed here), MIT license (`kit/launcher/LICENSE`) |
 | `project.h` | this project's names for DarkLauncher and its installer |
 | `build.ps1`, `recompile.ps1` | build, and translate the game's code again |

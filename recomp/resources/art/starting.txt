@@ -1,0 +1,6 @@
+starting.png: the picture shown while the game starts (DlGame.starting_picture), kept whole, made 2026-10-22 by tools\art\backdrop.ps1
+Model: FLUX.2 [klein] 4B (flux-2-klein-4b-fp8), Black Forest Labs, Apache 2.0 licence (commercial use and redistribution allowed); text encoder qwen_3_4b, VAE flux2-vae; run locally in ComfyUI.
+Seed 1, 4 steps, Euler, CFG 1.0, 1280 x 720.
+Prompt: Three small chibi fantasy heroes standing guard in front of a great glowing blue crystal on a stone altar: a young knight in silver armour with a sword and shield, an archer girl in green with a bow, a young mage in a blue robe holding a wooden staff. A grassy plain at dawn, a road, forests and mountains far away, a warm sunrise sky with soft clouds. 16-bit fantasy tactics RPG pixel art, cute proportions, bright jewel colours, sapphire blue and gold. Original characters, no text.
+Then: kept whole (opaque).
+Nothing taken from the game or its cover: a new picture in its art direction.

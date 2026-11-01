@@ -166,7 +166,7 @@ int GetTimeFormatW(DWORD locale, DWORD flags, const SYSTEMTIME *st, const wchar_
 }
 
 WORD GetUserDefaultUILanguage(void) {
-  static const struct { const char *code; WORD id; } codes[] = {{"ja", 0x11}, {"fr", 0x0C}, {"es", 0x0A}, {"pt", 0x16}, {"de", 0x07}, {"it", 0x10}};
+  static const struct { const char *code; WORD id; } codes[] = {{"ja", 0x11}, {"fr", 0x0C}, {"es", 0x0A}, {"pt", 0x16}, {"de", 0x07}, {"it", 0x10}, {"zh", 0x04}, {"ko", 0x12}};
   const char *e = getenv("LC_ALL");
   if (!e || !*e) e = getenv("LANG");
   for (size_t k = 0; e && k < sizeof codes / sizeof codes[0]; k++)
@@ -878,6 +878,7 @@ typedef struct {
   HBITMAP fb;
   LONG style;
   bool focused;
+  bool foreign; // the game's own SDL window (dl_win32_adopt): nothing shown in it, its events given by the game
 } Win;
 static Win *the;
 
@@ -892,7 +893,7 @@ HICON CreateIconIndirect(ICONINFO *ii) {
 }
 
 LRESULT SendMessageW(HWND w, UINT msg, WPARAM wp, LPARAM lp) { // WM_SETICON: the window's icon
-  if (msg == WM_SETICON && w && lp && wp == ICON_BIG) SDL_SetWindowIcon(((Win *)w)->win, (SDL_Surface *)lp);
+  if (msg == WM_SETICON && w && lp && wp == ICON_BIG && !((Win *)w)->foreign) SDL_SetWindowIcon(((Win *)w)->win, (SDL_Surface *)lp);
   return 0;
 }
 
@@ -927,7 +928,8 @@ HWND CreateWindowW(LPCWSTR cls, LPCWSTR title, DWORD style, int x, int y, int w,
     win->win = SDL_CreateWindow(t, cw, ch, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
   }
   if (!win->win) { free(win); return NULL; }
-  SDL_SetWindowPosition(win->win, x + FRAME_L, y + FRAME_T);
+  if (x == CW_USEDEFAULT) SDL_SetWindowPosition(win->win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED); // (a window of the game's own: --over)
+  else SDL_SetWindowPosition(win->win, x + FRAME_L, y + FRAME_T);
   if (win->gl) SDL_GL_MakeCurrent(win->win, win->gl);
   else win->ren = SDL_CreateRenderer(win->win, NULL);
   { // the program's icon: <program>.png next to it (tools/linux_package.sh puts it there)
@@ -944,13 +946,34 @@ HWND CreateWindowW(LPCWSTR cls, LPCWSTR title, DWORD style, int x, int y, int w,
   return win;
 }
 
+// The menus over a game that has its own SDL3 window (2.92, No Fear's psxrecomp runtime): that window as
+// DarkLauncher's, which never draws into it (GetDC gives a picture of its size, ReleaseDC shows nothing)
+// nor reads SDL's events (the game gives them, dl_win32_event). A window of these stand-ins (the demo's
+// --over) is given back as it is.
+HWND dl_win32_adopt(void *window) {
+  if (!window || window == the) return window;
+  if (!sdl_up()) return NULL;
+  Win *win = calloc(1, sizeof *win);
+  if (!win) return NULL;
+  win->win = window;
+  win->foreign = true;
+  win->focused = SDL_GetWindowFlags(win->win) & SDL_WINDOW_INPUT_FOCUS;
+  win->style = (SDL_GetWindowFlags(win->win) & SDL_WINDOW_FULLSCREEN) ? 0 : WS_OVERLAPPEDWINDOW;
+  int n = 0;
+  SDL_JoystickID *ids = SDL_GetGamepads(&n); // those there before: their events went to the game already
+  for (int k = 0; k < n; k++) dl_pads_added(ids[k]);
+  SDL_free(ids);
+  the = win;
+  return win;
+}
+
 BOOL DestroyWindow(HWND h) {
   Win *w = h;
   if (!w) return FALSE;
   if (w->tex) SDL_DestroyTexture(w->tex);
   if (w->ren) SDL_DestroyRenderer(w->ren);
   if (w->gl) SDL_GL_DestroyContext(w->gl);
-  SDL_DestroyWindow(w->win);
+  if (!w->foreign) SDL_DestroyWindow(w->win);
   if (w->dc) DeleteDC(w->dc);
   if (w->fb) DeleteObject(w->fb);
   if (the == w) the = NULL;
@@ -958,7 +981,7 @@ BOOL DestroyWindow(HWND h) {
   return TRUE;
 }
 
-BOOL ShowWindow(HWND h, int how) { return h && (how == SW_HIDE ? SDL_HideWindow(((Win *)h)->win) : SDL_ShowWindow(((Win *)h)->win)); }
+BOOL ShowWindow(HWND h, int how) { return h && !((Win *)h)->foreign && (how == SW_HIDE ? SDL_HideWindow(((Win *)h)->win) : SDL_ShowWindow(((Win *)h)->win)); }
 BOOL IsIconic(HWND h) { return h && (SDL_GetWindowFlags(((Win *)h)->win) & SDL_WINDOW_MINIMIZED); }
 LRESULT DefWindowProcW(HWND w, UINT msg, WPARAM wp, LPARAM lp) { (void)w, (void)msg, (void)wp, (void)lp; return 0; }
 void PostQuitMessage(int code) { (void)code; }
@@ -966,6 +989,15 @@ BOOL InvalidateRect(HWND w, const RECT *r, BOOL erase) { (void)w, (void)r, (void
 
 HICON LoadIconW(HINSTANCE inst, LPCWSTR name) { (void)inst, (void)name; return NULL; }
 HANDLE LoadCursorW(HINSTANCE inst, LPCWSTR name) { (void)inst, (void)name; return NULL; }
+
+// The pointer hidden over the window, or shown (console mode, dl_app.c).
+void dl_pointer_hide(bool hide) {
+  static bool hidden;
+  if (hide == hidden) return;
+  hidden = hide;
+  if (hide) SDL_HideCursor();
+  else SDL_ShowCursor();
+}
 
 static float density(void) {
   float d = the ? SDL_GetWindowPixelDensity(the->win) : 1;
@@ -996,7 +1028,7 @@ BOOL AdjustWindowRect(RECT *r, DWORD style, BOOL menu) {
 BOOL SetWindowPos(HWND h, HWND after, int x, int y, int cx, int cy, UINT flags) {
   (void)after;
   Win *w = h;
-  if (!w || (SDL_GetWindowFlags(w->win) & SDL_WINDOW_FULLSCREEN)) return TRUE;
+  if (!w || w->foreign || (SDL_GetWindowFlags(w->win) & SDL_WINDOW_FULLSCREEN)) return TRUE;
   if (!(flags & SWP_NOSIZE)) SDL_SetWindowSize(w->win, cx - FRAME_L - FRAME_R, cy - FRAME_T - FRAME_B);
   if (!(flags & SWP_NOMOVE)) SDL_SetWindowPosition(w->win, x + FRAME_L, y + FRAME_T);
   SDL_SyncWindow(w->win);
@@ -1014,7 +1046,7 @@ LONG SetWindowLongW(HWND h, int index, LONG value) {
   LONG old = w->style;
   w->style = value;
   bool was = old & WS_OVERLAPPEDWINDOW, now = value & WS_OVERLAPPEDWINDOW;
-  if (was != now) SDL_SetWindowFullscreen(w->win, !now);
+  if (was != now && !w->foreign) SDL_SetWindowFullscreen(w->win, !now);
   return old;
 }
 
@@ -1089,7 +1121,7 @@ bool dl_gl_present(const uint32_t *px, int w, int h); // dl_gl.c
 
 int ReleaseDC(HWND h, HDC dc) {
   Win *w = h;
-  if (!w || dc != w->dc) return 1;
+  if (!w || dc != w->dc || w->foreign) return 1; // (the game's own window: the game shows the layer)
   int fw, fh;
   uint32_t *px = dl_gdi_bits(dc, &fw, &fh);
   if (w->gl) { // through OpenGL (nothing when the graphics card path shows the window)
@@ -1125,38 +1157,58 @@ static void key_message(const SDL_KeyboardEvent *k) {
   else if (!(k->mod & SDL_KMOD_ALT)) post(WM_KEYDOWN, (WPARAM)vk, lp);
 }
 
+// One SDL event as the window procedure's messages, queued.
+static void event_post(const SDL_Event *e) {
+  float d = density();
+  switch (e->type) {
+    case SDL_EVENT_QUIT:
+    case SDL_EVENT_WINDOW_CLOSE_REQUESTED: post(WM_CLOSE, 0, 0); break;
+    case SDL_EVENT_KEY_DOWN: key_message(&e->key); break;
+    case SDL_EVENT_TEXT_INPUT: {
+      wchar_t w[64];
+      int n = utf8_to_wide(e->text.text, -1, w, 64) - 1;
+      for (int k = 0; k < n; k++)
+        if (w[k] >= 32) post(WM_CHAR, (WPARAM)w[k], 1);
+      break;
+    }
+    case SDL_EVENT_MOUSE_MOTION: post(WM_MOUSEMOVE, 0, (LPARAM)(((int)(e->motion.x * d) & 0xFFFF) | ((int)(e->motion.y * d) & 0xFFFF) << 16)); break;
+    case SDL_EVENT_MOUSE_BUTTON_DOWN: {
+      LPARAM lp = (LPARAM)(((int)(e->button.x * d) & 0xFFFF) | ((int)(e->button.y * d) & 0xFFFF) << 16);
+      if (e->button.button == SDL_BUTTON_LEFT) post(WM_LBUTTONDOWN, 1, lp);
+      else if (e->button.button == SDL_BUTTON_RIGHT) post(WM_RBUTTONDOWN, 2, lp);
+      else if (e->button.button == SDL_BUTTON_MIDDLE) post(WM_MBUTTONDOWN, 16, lp);
+      break;
+    }
+    case SDL_EVENT_MOUSE_BUTTON_UP: { // (dl_mouse: the buttons held in play)
+      LPARAM lp = (LPARAM)(((int)(e->button.x * d) & 0xFFFF) | ((int)(e->button.y * d) & 0xFFFF) << 16);
+      if (e->button.button == SDL_BUTTON_LEFT) post(WM_LBUTTONUP, 0, lp);
+      else if (e->button.button == SDL_BUTTON_RIGHT) post(WM_RBUTTONUP, 0, lp);
+      else if (e->button.button == SDL_BUTTON_MIDDLE) post(WM_MBUTTONUP, 0, lp);
+      break;
+    }
+    case SDL_EVENT_WINDOW_MOUSE_LEAVE: post(WM_MOUSELEAVE, 0, 0); break;
+    case SDL_EVENT_MOUSE_WHEEL: post(WM_MOUSEWHEEL, (WPARAM)((uint32_t)(uint16_t)(int16_t)(e->wheel.y * 120) << 16), 0); break;
+    case SDL_EVENT_WINDOW_RESIZED:
+    case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: post(WM_SIZE, 0, 0); break;
+    case SDL_EVENT_WINDOW_EXPOSED: post(WM_PAINT, 0, 0); break;
+    case SDL_EVENT_WINDOW_FOCUS_GAINED: if (the) the->focused = true; break;
+    case SDL_EVENT_WINDOW_FOCUS_LOST: if (the) the->focused = false; break;
+    case SDL_EVENT_GAMEPAD_ADDED: dl_pads_added(e->gdevice.which); post(WM_DEVICECHANGE, 7, 0); break;
+    case SDL_EVENT_GAMEPAD_REMOVED: dl_pads_removed(e->gdevice.which); post(WM_DEVICECHANGE, 7, 0); break;
+  }
+}
+
 static void pump(void) {
   SDL_Event e;
-  float d = density();
-  while (SDL_PollEvent(&e)) {
-    switch (e.type) {
-      case SDL_EVENT_QUIT:
-      case SDL_EVENT_WINDOW_CLOSE_REQUESTED: post(WM_CLOSE, 0, 0); break;
-      case SDL_EVENT_KEY_DOWN: key_message(&e.key); break;
-      case SDL_EVENT_TEXT_INPUT: {
-        wchar_t w[64];
-        int n = utf8_to_wide(e.text.text, -1, w, 64) - 1;
-        for (int k = 0; k < n; k++)
-          if (w[k] >= 32) post(WM_CHAR, (WPARAM)w[k], 1);
-        break;
-      }
-      case SDL_EVENT_MOUSE_MOTION: post(WM_MOUSEMOVE, 0, (LPARAM)(((int)(e.motion.x * d) & 0xFFFF) | ((int)(e.motion.y * d) & 0xFFFF) << 16)); break;
-      case SDL_EVENT_MOUSE_BUTTON_DOWN: {
-        LPARAM lp = (LPARAM)(((int)(e.button.x * d) & 0xFFFF) | ((int)(e.button.y * d) & 0xFFFF) << 16);
-        if (e.button.button == SDL_BUTTON_LEFT) post(WM_LBUTTONDOWN, 1, lp);
-        else if (e.button.button == SDL_BUTTON_RIGHT) post(WM_RBUTTONDOWN, 2, lp);
-        break;
-      }
-      case SDL_EVENT_MOUSE_WHEEL: post(WM_MOUSEWHEEL, (WPARAM)((uint32_t)(uint16_t)(int16_t)(e.wheel.y * 120) << 16), 0); break;
-      case SDL_EVENT_WINDOW_RESIZED:
-      case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: post(WM_SIZE, 0, 0); break;
-      case SDL_EVENT_WINDOW_EXPOSED: post(WM_PAINT, 0, 0); break;
-      case SDL_EVENT_WINDOW_FOCUS_GAINED: if (the) the->focused = true; break;
-      case SDL_EVENT_WINDOW_FOCUS_LOST: if (the) the->focused = false; break;
-      case SDL_EVENT_GAMEPAD_ADDED: dl_pads_added(e.gdevice.which); post(WM_DEVICECHANGE, 7, 0); break;
-      case SDL_EVENT_GAMEPAD_REMOVED: dl_pads_removed(e.gdevice.which); post(WM_DEVICECHANGE, 7, 0); break;
-    }
-  }
+  while (SDL_PollEvent(&e)) event_post(&e);
+}
+
+// The game's own window (dl_win32_adopt): each SDL event it polls, given to DarkLauncher as messages
+// (not its quitting or its closing: those are the game's), taken by dl_win32_take.
+void dl_win32_event(const void *event) {
+  const SDL_Event *e = event;
+  if (!e || !the || !the->foreign || e->type == SDL_EVENT_QUIT || e->type == SDL_EVENT_WINDOW_CLOSE_REQUESTED) return;
+  event_post(e);
 }
 
 // For tests: DL_TEST_KEYS="28 28 0D" plays those keys (virtual-key codes in hexadecimal) to this window,
@@ -1176,7 +1228,15 @@ static void test_keys(void) {
   char *end;
   long vk = strtol(next, &end, 16);
   next = end;
-  if (vk > 0) post(WM_KEYDOWN, (WPARAM)vk, 1);
+  if (vk > 0 && the->foreign) { // the game's own window: a key of SDL's, which the game polls and gives back
+    for (int k = 0; k < KEYS; k++)
+      if (keys[k].vk == vk) {
+        SDL_Event e = {.key = {.type = SDL_EVENT_KEY_DOWN, .timestamp = SDL_GetTicksNS(), .windowID = SDL_GetWindowID(the->win),
+                               .scancode = keys[k].sc, .key = SDL_GetKeyFromScancode(keys[k].sc, SDL_KMOD_NONE, false), .down = true}};
+        SDL_PushEvent(&e);
+        break;
+      }
+  } else if (vk > 0) post(WM_KEYDOWN, (WPARAM)vk, 1);
   at = SDL_GetTicks() + 400;
 }
 
@@ -1190,6 +1250,25 @@ BOOL PeekMessageW(MSG *m, HWND w, UINT lo, UINT hi, UINT remove) {
   q_head = (q_head + 1) % 256;
   q_n--;
   return TRUE;
+}
+
+// The game's own window: the next message for DarkLauncher (its events, the test keys), without
+// reading SDL's events, which are the game's; and its text typed only while DarkLauncher's menus
+// show (text: their state each turn).
+bool dl_win32_take(MSG *m, bool text) {
+  static bool typing;
+  if (!the || !the->foreign) return false;
+  if (text != typing) {
+    typing = text;
+    if (text) SDL_StartTextInput(the->win);
+    else SDL_StopTextInput(the->win);
+  }
+  if (!q_n) test_keys();
+  if (!q_n) return false;
+  *m = queue[q_head];
+  q_head = (q_head + 1) % 256;
+  q_n--;
+  return true;
 }
 
 // The main loop's waits: a timer, and the wait for it or for a message (an event from SDL, or a

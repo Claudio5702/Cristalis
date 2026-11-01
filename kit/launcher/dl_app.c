@@ -36,8 +36,15 @@ static int bench_secs; // --bench N: N seconds of play, then the frame rate and 
 bool dl_start_done;
 static bool play_now;  // --play: straight into the game, without the setup screen
 static bool relaunch;  // dl_relaunch: started again once closed
+bool dl_over;          // the menus over the game (dl_over_start): the window, the picture and the loop are the game's
+bool dl_no_fade;        // --gpu-check: no soft change of page
+bool dl_present_latest; // DlGame.pace_by_game in play: the swap chain shows the newest picture without waiting (dl_gpu.c)
+// where the program started again goes ("<settings file>.relaunch"): "play", the setup screen's place
+// (dl_menu_where), or "" (as any start)
+static char relaunch_where[256];
 
 void dl_relaunch(void) {
+  if (!relaunch) dl_menu_where(relaunch_where, sizeof relaunch_where);
   relaunch = true;
   dl_running = false;
 }
@@ -80,12 +87,15 @@ static int saved[160]; // the values as last written
 bool dl_safe;
 static int safe_orig[160], safe_forced[160];
 
+static bool full_forced; // full screen by console mode, not by the player: written as off
 static void settings_save(void) {
   FILE *f = fopen(ini_path, "w");
   if (!f) return;
   for (int k = 0; k < setting_n; k++) {
     int v = *settings[k].value;
-    fprintf(f, "%s=%d\n", settings[k].name, dl_safe && v == safe_forced[k] ? safe_orig[k] : v);
+    int put = dl_safe && v == safe_forced[k] ? safe_orig[k] : v;
+    if (settings[k].value == &dl_cfg.fullscreen && full_forced) put = 0; // full screen by console mode only
+    fprintf(f, "%s=%d\n", settings[k].name, put);
     saved[k] = v;
   }
   fclose(f);
@@ -311,6 +321,7 @@ void dl_safe_restart(void) {
   for (int k = 0; k < setting_n; k++) *settings[k].value = safe_orig[k];
   dl_safe = false;
   dl_relaunch();
+  relaunch_where[0] = 0; // a normal start, not back to this page
 }
 
 void dl_defaults(bool picture_only) {
@@ -339,11 +350,24 @@ int dl_lang_default(void) {
     case 0x16: lang = DL_LANG_BR; break;
     case 0x07: lang = DL_LANG_DE; break;
     case 0x10: lang = DL_LANG_IT; break;
+    case 0x04: lang = DL_LANG_ZH; break; // Traditional Chinese too: closer than English
+    case 0x12: lang = DL_LANG_KO; break;
     default: lang = DL_LANG_EN; break;
   }
   if (!dl_lang_ok(lang)) lang = DL_LANG_EN;
   for (int k = 0; !dl_lang_ok(lang) && k < DL_LANGS; k++) lang = k; // a game without English
   return lang;
+}
+
+// The face of the setup screen's texts in a language that Verdana and the theme's faces do not write
+// (NULL in the others): Windows' own for it (on Linux, dl_gdi.c's Noto Sans CJK).
+const wchar_t *dl_lang_face(void) {
+  switch (dl_cfg.ui_lang) {
+    case DL_LANG_JP: return L"Yu Gothic UI";
+    case DL_LANG_ZH: return L"Microsoft YaHei UI";
+    case DL_LANG_KO: return L"Malgun Gothic";
+  }
+  return NULL;
 }
 
 // ---------------------------------------------------------------- picture
@@ -383,8 +407,13 @@ void dl_fit(int cw, int ch, bool integer, int *w, int *h) {
   *h = sh;
 }
 
-int dl_crt(void) { return dl_game && (dl_game->hide & DL_HIDE_CRT) ? 0 : dl_cfg.crt; }
-int dl_scanlines(void) { return dl_game && (dl_game->hide & DL_HIDE_SCANLINES) ? 0 : dl_cfg.scanlines; }
+unsigned dl_hides(void) {
+  if (!dl_game) return 0;
+  return dl_game->hide | (dl_game->look == DL_LOOK_MODERN ? DL_HIDE_CRT | DL_HIDE_SCANLINES : 0) | (dl_game->pace_by_game ? DL_HIDE_TURBO : 0); // a game's own pace: no fast forward
+}
+int dl_crt(void) { return dl_hides() & DL_HIDE_CRT ? 0 : dl_cfg.crt; }
+int dl_scanlines(void) { return dl_hides() & DL_HIDE_SCANLINES ? 0 : dl_cfg.scanlines; }
+int dl_filter(void) { return dl_cfg.smooth == 3 && dl_game && dl_game->xbr_mask ? 4 : dl_cfg.smooth; }
 
 // The game's picture into a rectangle, with the filter and the scanlines; the frame rate on top.
 void dl_blit(HDC dc, int x, int y, int w, int h) {
@@ -450,9 +479,11 @@ void dl_picture_size(int w, int h, double aspect) {
 }
 
 // The game's pictures over its own (DlGame.overlays), colours multiplied by their opacity.
+static int overlays_drawn; // how many, the last time
 void dl_draw_overlays(HDC dc, int x, int y, int w, int h) {
   DlOverlay ov[DL_MAX_OVERLAYS];
   int n = dl_game->overlays ? dl_game->overlays(x, y, w, h, ov, DL_MAX_OVERLAYS) : 0;
+  overlays_drawn = n;
   for (int k = 0; k < n && k < DL_MAX_OVERLAYS; k++) {
     if (!ov[k].pixels || ov[k].w <= 0 || ov[k].h <= 0) continue;
     BITMAPINFO bi = {{sizeof(BITMAPINFOHEADER), ov[k].w, -ov[k].h, 1, 32}};
@@ -509,11 +540,163 @@ static void present(HDC dc) {
   if (oy > 0) { RECT t = {0, 0, cw, oy}, b = {0, oy + h, cw, ch}; FillRect(dc, &t, black); FillRect(dc, &b, black); }
 }
 
+// In play through GDI: false when the window already shows what present() would draw (the same picture,
+// dl_picture_same, at the same size, nothing over it that changes), so that it is not drawn again (2.98:
+// on a weak computer the stretched copy is DarkLauncher's largest cost). The window's own repaints go
+// through WM_PAINT; present_stale: something else was shown since (the menus, the graphics card).
+static bool present_stale = true;
+static bool present_needed(void) {
+  static u32 serial;
+  static int fps = -1, cw, ch;
+  static bool over;
+  static double aspect;
+  RECT rc;
+  GetClientRect(dl_hwnd, &rc);
+  bool now_over = dl_note_now() || dl_toast_now() || overlays_drawn > 0; // (and one more time once they go)
+  bool need = present_stale || serial != dl_pic_serial || rc.right != cw || rc.bottom != ch || aspect != dl_pic_aspect || over || now_over || (dl_cfg.show_fps && fps != dl_fps_shown);
+  serial = dl_pic_serial, fps = dl_fps_shown, cw = rc.right, ch = rc.bottom, over = now_over, aspect = dl_pic_aspect;
+  present_stale = false;
+  return need;
+}
+
+// ---------------------------------------------------------------- console mode (2.56)
+// Started by Steam's interfaces for a television or a handheld: Big Picture (Steam sets SteamTenfoot=1
+// for the games it starts there), the Game Mode of SteamOS and of systems like Bazzite (SteamGamepadUI,
+// SteamDeck; on Linux also gamescope, which draws that mode). DarkLauncher then starts full screen
+// (not saved: the desktop keeps the player's choice), hides the pointer until the mouse moves, and its
+// footer shows a controller's buttons from the start. DL_CONSOLE=1 or 0 says it instead (tests).
+bool dl_console;
+static const char *console_why;
+static void console_detect(void) {
+  const char *f = getenv("DL_CONSOLE");
+  if (f && *f) {
+    dl_console = *f == '1';
+    console_why = "DL_CONSOLE";
+    return;
+  }
+  static const char *const vars[] = {"SteamTenfoot", "SteamGamepadUI", "SteamDeck"};
+  for (int k = 0; k < 3; k++) {
+    const char *v = getenv(vars[k]);
+    if (v && !strcmp(v, "1")) {
+      dl_console = true;
+      console_why = vars[k];
+      return;
+    }
+  }
+#ifndef _WIN32
+  const char *d = getenv("XDG_CURRENT_DESKTOP");
+  if ((d && strstr(d, "gamescope")) || getenv("GAMESCOPE_WAYLAND_DISPLAY")) {
+    dl_console = true;
+    console_why = "gamescope";
+  }
+#endif
+}
+
+#ifdef _WIN32
+// The pointer hidden over the window (console mode), or shown again; Linux: dl_win32.c, through SDL.
+static bool pointer_hidden;
+void dl_pointer_hide(bool hide) {
+  if (hide == pointer_hidden) return;
+  pointer_hidden = hide;
+  POINT p;
+  RECT rc;
+  if (GetCursorPos(&p) && ScreenToClient(dl_hwnd, &p) && GetClientRect(dl_hwnd, &rc) && PtInRect(&rc, p))
+    SetCursor(hide ? NULL : LoadCursorW(NULL, (LPCWSTR)IDC_ARROW));
+}
+#endif
+
+// ---- the mouse in play (dl_mouse, 2.74): followed through the window's messages, the same on both
+// systems: where the pointer last moved in the window (until it leaves it), the buttons held, the notches
+static int mouse_x, mouse_y;
+static bool mouse_inside;
+static unsigned mouse_buttons;
+static unsigned mouse_tapped; // pressed since dl_mouse last answered (a tap on a touch screen may be let go before the game's next picture)
+static int mouse_wheel, mouse_wheel_part; // whole notches; what is left of a smooth wheel's delta (120 a notch)
+static DWORD mouse_moved;                 // GetTickCount() of the last real move (DlGame.mouse_in_game hides the pointer after 3 s)
+
+bool dl_mouse(double *x, double *y, unsigned *buttons, int *wheel) {
+  if (buttons) *buttons = 0;
+  if (wheel) *wheel = 0;
+  bool ahead = dl_running_ahead();
+  int notches = ahead ? 0 : mouse_wheel;
+  unsigned tapped = mouse_tapped;
+  if (!ahead) mouse_wheel = 0, mouse_tapped = 0;
+  if (dl_mode != M_GAME || !mouse_inside || GetForegroundWindow() != dl_hwnd || dl_pic_w <= 0 || dl_pic_h <= 0) return false;
+  RECT rc;
+  GetClientRect(dl_hwnd, &rc);
+  int w, h;
+  dl_fit(rc.right, rc.bottom, dl_cfg.integer_scale, &w, &h);
+  int ox = (rc.right - w) / 2, oy = (rc.bottom - h) / 2; // as present() and the graphics card place it
+  if (w <= 0 || h <= 0 || mouse_x < ox || mouse_y < oy || mouse_x >= ox + w || mouse_y >= oy + h) return false;
+  if (x) *x = (mouse_x - ox + 0.5) * dl_pic_w / w;
+  if (y) *y = (mouse_y - oy + 0.5) * dl_pic_h / h;
+  if (buttons) *buttons = mouse_buttons | tapped;
+  if (wheel) *wheel = notches;
+  return true;
+}
+
+// The window's inside, as the picture is fitted in it (dl_fit); the last one known while it has none
+// (minimized).
+double dl_view_aspect(void) {
+  static double last = 16.0 / 9;
+  RECT rc;
+  if (dl_hwnd && GetClientRect(dl_hwnd, &rc) && rc.right > 0 && rc.bottom > 0) last = (double)rc.right / rc.bottom;
+  return last;
+}
+
+// A button pressed or released (bit 0 left, 1 right, 2 middle); in play the window keeps the mouse while
+// one is held, so that its release outside is seen.
+static void mouse_button(unsigned bit, bool down) {
+  if (down) mouse_buttons |= bit, mouse_tapped |= bit;
+  else mouse_buttons &= ~bit;
+#ifdef _WIN32
+  if (down && dl_mode == M_GAME) SetCapture(dl_hwnd);
+  else if (!mouse_buttons && GetCapture() == dl_hwnd) ReleaseCapture();
+#endif
+}
+
+// Each turn of the loop: a game played with the mouse hides the pointer after three seconds without a
+// move, in play; and the buttons are let go when the window is no longer in front.
+static void mouse_follow(void) {
+  if (GetForegroundWindow() != dl_hwnd) mouse_buttons = 0, mouse_tapped = 0, mouse_wheel = 0;
+  if (dl_game->mouse_in_game && dl_mode == M_GAME && GetTickCount() - mouse_moved > 3000) dl_pointer_hide(true);
+}
+
 // ---------------------------------------------------------------- window
 static WINDOWPLACEMENT win_prev = {sizeof win_prev};
 static bool is_fullscreen;
 
+#ifdef _WIN32
+// The window made again, in the same place, size and state (full screen or not, the foreground), for
+// GDI to draw in: one that has shown a flip-model swap chain keeps showing its last picture over GDI
+// (dl_gpu_window_stale). The old one goes once the new one is shown.
+static void window_renew(void) {
+  HWND old = dl_hwnd;
+  present_stale = true;
+  WINDOWPLACEMENT place = {sizeof place};
+  RECT r;
+  if (!GetWindowPlacement(old, &place) || !GetWindowRect(old, &r)) return;
+  DWORD style = (DWORD)GetWindowLongW(old, GWL_STYLE), ex = (DWORD)GetWindowLongW(old, GWL_EXSTYLE);
+  bool front = GetForegroundWindow() == old;
+  HWND nw = CreateWindowExW(ex, L"" WINDOW_CLASS, L"" PROJECT_TITLE, WS_OVERLAPPEDWINDOW, r.left, r.top, r.right - r.left, r.bottom - r.top, NULL, NULL,
+                            GetModuleHandleW(NULL), NULL);
+  if (!nw) return; // (GDI's pictures stay hidden, but the program goes on)
+  dl_hwnd = nw;
+  if (is_fullscreen) { // made with a frame (a window without one gets a caption), then without, as dl_toggle_fullscreen does
+    SetWindowLongW(nw, GWL_STYLE, (LONG)(style & ~(DWORD)WS_VISIBLE));
+    SetWindowPos(nw, HWND_TOP, r.left, r.top, r.right - r.left, r.bottom - r.top, SWP_NOOWNERZORDER | SWP_FRAMECHANGED);
+  } else SetWindowPlacement(nw, &place); // (maximized too)
+  ui_window_icon();
+  ShowWindow(nw, IsWindowVisible(old) ? (IsZoomed(old) ? SW_SHOWMAXIMIZED : SW_SHOW) : SW_HIDE);
+  if (front) SetForegroundWindow(nw);
+  DestroyWindow(old);
+  dl_gpu_window_renewed();
+  dl_dirty = true;
+}
+#endif
+
 void dl_toggle_fullscreen(void) {
+  full_forced = false; // the player's choice from now on
   DWORD style = (DWORD)GetWindowLongW(dl_hwnd, GWL_STYLE);
   if (style & WS_OVERLAPPEDWINDOW) {
     MONITORINFO mi = {sizeof mi};
@@ -576,6 +759,12 @@ static void play_outside(void) {
 
 void dl_play(void) {
   if (DL_OUTSIDE) { play_outside(); return; }
+  if (dl_start_pending()) { // a row the game takes at start has changed: started again, then played
+    snprintf(relaunch_where, sizeof relaunch_where, "play");
+    relaunch = true;
+    dl_relaunch();
+    return;
+  }
   // begin: a first start from the game as it runs behind the setup screen, not from a state just
   // loaded (the session, a slot)
   if (!dl_started && !dl_state_taken && dl_game->begin) dl_game->begin();
@@ -781,20 +970,64 @@ bool dl_save_png(const char *path, const u32 *px, int w, int h) {
 
 // ---------------------------------------------------------------- window procedure
 static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
-  if (dl_no_mouse && (msg == WM_MOUSEMOVE || msg == WM_LBUTTONDOWN || msg == WM_RBUTTONDOWN || msg == WM_MOUSEWHEEL)) return 0;
+  if (dl_no_mouse && ((msg >= WM_MOUSEMOVE && msg <= WM_MBUTTONUP) || msg == WM_MOUSEWHEEL || msg == WM_MOUSELEAVE)) return 0;
   switch (msg) {
-    case WM_MOUSEMOVE:
-      if (dl_mode != M_GAME) dl_mouse((short)LOWORD(lp), (short)HIWORD(lp), false);
+    case WM_MOUSEMOVE: {
+      static LPARAM last = -1; // (Windows also sends one when nothing moved: the window changed under it)
+      if (lp != last && last != -1) {
+        mouse_moved = GetTickCount();
+        if (dl_console || dl_game->mouse_in_game) dl_pointer_hide(false);
+        if (dl_mode == M_GAME && dl_game->mouse_in_game) dl_mouse_used(); // the game's prompts show the mouse (2.94)
+      }
+      last = lp;
+      mouse_x = (short)LOWORD(lp), mouse_y = (short)HIWORD(lp);
+#ifdef _WIN32
+      if (!mouse_inside) { // told when it leaves the window (WM_MOUSELEAVE)
+        TRACKMOUSEEVENT t = {sizeof t, TME_LEAVE, h, 0};
+        TrackMouseEvent(&t);
+      }
+#endif
+      mouse_inside = true;
+      if (dl_mode != M_GAME) dl_menu_mouse((short)LOWORD(lp), (short)HIWORD(lp), false);
       return 0;
+    }
+    case WM_MOUSELEAVE:
+      mouse_inside = false;
+      return 0;
+    case WM_LBUTTONUP: mouse_button(1, false); return 0;
+    case WM_RBUTTONUP: mouse_button(2, false); return 0;
+    case WM_MBUTTONDOWN: mouse_button(4, true); return 0;
+    case WM_MBUTTONUP: mouse_button(4, false); return 0;
+#ifdef _WIN32
+    case WM_SETCURSOR:
+      if (pointer_hidden && LOWORD(lp) == HTCLIENT) {
+        SetCursor(NULL);
+        return TRUE;
+      }
+      break;
+    case 0x02CC: // WM_TABLET_QUERYSYSTEMGESTURESTATUS: a finger held on a touch screen stays the left button held
+      return 0x00010001; // (TABLET_DISABLE_PRESSANDHOLD: no right click at its release; TABLET_DISABLE_FLICKS)
+#endif
     case WM_LBUTTONDOWN:
       dl_input_used(DL_IN_KEYS);
-      if (dl_mode != M_GAME) dl_mouse((short)LOWORD(lp), (short)HIWORD(lp), true);
+      if (dl_mode == M_GAME && dl_game->mouse_in_game) dl_mouse_used();
+      if (dl_console || dl_game->mouse_in_game) dl_pointer_hide(false), mouse_moved = GetTickCount(); // (the mouse in use: its pointer stays)
+      mouse_x = (short)LOWORD(lp), mouse_y = (short)HIWORD(lp), mouse_inside = true;
+      mouse_button(1, true);
+      if (dl_mode != M_GAME) dl_menu_mouse((short)LOWORD(lp), (short)HIWORD(lp), true);
       return 0;
     case WM_RBUTTONDOWN:
+      if (dl_mode == M_GAME && dl_game->mouse_in_game) dl_mouse_used();
+      mouse_button(2, true);
       if (dl_mode != M_GAME) dl_key(VK_ESCAPE);
       return 0;
     case WM_MOUSEWHEEL:
       if (dl_mode != M_GAME) dl_key((short)HIWORD(wp) > 0 ? VK_UP : VK_DOWN);
+      else { // the game's (dl_mouse), in whole notches
+        mouse_wheel_part += (short)HIWORD(wp);
+        mouse_wheel += mouse_wheel_part / 120;
+        mouse_wheel_part %= 120;
+      }
       return 0;
     case WM_KEYDOWN:
       dl_input_used(DL_IN_KEYS);
@@ -802,7 +1035,7 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
         if (!(lp & (1 << 30))) dl_game_key((int)wp);
         return 0;
       }
-      if (!dl_wait && (int)wp == dl_hot_vk[HK_FULL]) { dl_toggle_fullscreen(); return 0; }
+      if (!dl_wait && !dl_over && (int)wp == dl_hot_vk[HK_FULL]) { dl_toggle_fullscreen(); return 0; } // over the game: its window
       if (!(lp & (1 << 30)) || wp == VK_UP || wp == VK_DOWN || wp == VK_LEFT || wp == VK_RIGHT) dl_key((int)wp);
       return 0;
     case WM_CHAR:
@@ -812,7 +1045,9 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       if (wp == VK_RETURN) { dl_toggle_fullscreen(); return 0; }
       break;
     case WM_CLOSE: dl_running = false; return 0;
-    case WM_DESTROY: PostQuitMessage(0); return 0;
+    case WM_DESTROY:
+      if (h == dl_hwnd) PostQuitMessage(0); // (not the window window_renew replaced)
+      return 0;
     case WM_SIZE: dl_dirty = true; break;
     case WM_DEVICECHANGE: dl_sony_rescan(); break; // a controller may have come
     case WM_PAINT: {
@@ -1071,6 +1306,7 @@ static int http_get(const char *url, char *out, int cap) { // the body, or -1
   MemSink m = {out, cap, 0};
   return http_fetch(url, mem_sink, &m, false) ? m.n : -1;
 }
+int dl_http_get(const char *url, char *out, int cap) { return http_get(url, out, cap); } // (the other games on line, dl_menu.c)
 
 // ---- SHA-256 (FIPS 180-4), for the release's file
 typedef struct { uint32_t h[8]; uint64_t len; unsigned char buf[64]; int n; } Sha256;
@@ -1290,6 +1526,7 @@ void dl_online_start(void) {
     RemoveDirectoryA(file);
   }
 #endif
+  if (DL_UPDATE_ON && dl_cfg.updates) dl_others_online(); // the other games' list on line, with the same leave
   if (!DL_UPDATE_ON || !dl_cfg.updates || upd_state == 1) return;
   InterlockedExchange(&upd_state, 1);
   HANDLE t = CreateThread(NULL, 0, update_thread, NULL, 0, NULL);
@@ -1494,43 +1731,121 @@ void dl_online_follow(void) {
 // The picture one or two frames ahead of the input (DlGame.run_ahead): the frame is played for good
 // (its sound is heard), its state kept, then the frames ahead are played with the same buttons (their
 // picture is shown, their sound is not), and the state put back.
-static bool ahead_now;
+static bool ahead_now, pic_unused;
 static void *ahead_state;
 static size_t ahead_cap;
 
 bool dl_running_ahead(void) { return ahead_now; }
-bool dl_ahead_ok(void) { return dl_game->frame && dl_game->run_ahead && dl_game->state_size && dl_game->state_to_mem && dl_game->state_from_mem; }
+bool dl_picture_unused(void) { return pic_unused; }
+
+// On a slow computer (2.97, asked for Kahna, which should play on very weak machines) run-ahead
+// lowers itself rather than slow the game: play_frame's time (the frame, the frames ahead and the two
+// copies of the state) is added up over a second of the game's pictures (or of the clock, when they come
+// slower); over 70 % of a picture's time, one frame ahead less for now (down to none); with the next
+// level's cost guessed under 45 % for three such seconds in a row, one more again, never above the
+// player's setting, which is not changed. A lone picture that took over four times its time (a state
+// loaded, the window moved) is not counted.
+static int ahead_level = -1, ahead_want = -1, ahead_n, ahead_calm, ahead_lowered, ahead_raised;
+static double ahead_sum;
+
+static int ahead_use(int want) {
+  if (want != ahead_want) { ahead_want = want; ahead_level = want; ahead_n = 0; ahead_sum = 0; ahead_calm = 0; }
+  return ahead_level;
+}
+
+static void ahead_cost(double ms) {
+  double fps = dl_game->fps > 0 ? dl_game->fps : 60.0, budget = 1000.0 / fps;
+  static bool spike;
+  if (ms > budget * 4 && !spike) { spike = true; return; }
+  spike = false;
+  ahead_sum += ms;
+  if (++ahead_n < (int)fps && (ahead_sum < 1000 || ahead_n < 4)) return;
+  double avg = ahead_sum / ahead_n;
+  ahead_n = 0;
+  ahead_sum = 0;
+  if (avg > budget * 0.7 && ahead_level > 0) {
+    ahead_level--;
+    ahead_lowered++;
+    ahead_calm = 0;
+  } else if (ahead_level < ahead_want && avg * (ahead_level + 2) / (ahead_level + 1) < budget * 0.45) {
+    if (++ahead_calm >= 3) { ahead_level++; ahead_raised++; ahead_calm = 0; }
+  } else ahead_calm = 0;
+}
+bool dl_ahead_ok(void) { return dl_game->frame && !dl_game->pace_by_game && dl_game->run_ahead && dl_game->state_size && dl_game->state_to_mem && dl_game->state_from_mem; }
 
 // dl_picture_same: the frame taken for good gave the picture of last time again (the frames run ahead
 // do not count)
-static bool pic_same;
-void dl_picture_same(void) { if (!ahead_now) pic_same = true; }
+static bool pic_same, frame_same; // (frame_same: this frame() gave no new picture, run ahead or not)
+void dl_picture_same(void) {
+  if (!ahead_now) pic_same = true;
+  frame_same = true;
+}
+
+// The game has not given a real picture yet since it started: only the same one again, or black ones
+// (a console still starting, a BIOS screen); the preview says so instead of staying black (2.55). Over
+// at the first picture with something in it (or in a shared texture), and after a minute at most.
+bool dl_pic_waiting = true;
+static void pic_wait_check(void) {
+  static DWORD first;
+  static bool timed;
+  if (!timed) { first = GetTickCount(); timed = true; }
+  bool real = dl_pic_shared;
+  if (!real && !frame_same && dl_pic_w > 0 && dl_pic_h > 0) {
+    size_t n = (size_t)dl_pic_w * (size_t)dl_pic_h;
+    for (size_t k = 0; k < n && !real; k++) real = (dl_pic[k] & 0xFFFFFF) != 0;
+  }
+  if (real || GetTickCount() - first > 60000) {
+    dl_pic_waiting = false;
+    dl_dirty = true; // the preview shown in its place
+  }
+}
 
 // The game's frame(): its picture is in dl_pic, unless it says the picture is in its shared texture.
 bool dl_pic_shared;
+u32 dl_pic_serial;
 int dl_frame(const DlInput *in, s16 *audio, int audio_max) {
+  dl_pic_release(); // the game may write its texture again
   dl_pic_shared = false;
-  return dl_game->frame(in, dl_pic, audio, audio_max);
+  frame_same = false;
+  int n = dl_game->frame(in, dl_pic, audio, audio_max);
+  if (!frame_same) dl_pic_serial++;
+  if (dl_pic_waiting && !pic_unused) pic_wait_check(); // (a picture not shown may be left undrawn)
+  return n;
 }
 
-static int play_frame(const DlInput *in, s16 *audio, int audio_max, int ahead) {
+// want: the frames ahead the player asked for (0 outside play at the normal speed); fewer on a slow
+// computer (ahead_use). dl_picture_unused() is true for the frames whose picture is not shown: the one
+// taken for good and the middle ones, when frames run ahead.
+static int play_frame(const DlInput *in, s16 *audio, int audio_max, int want) {
   pic_same = false;
-  int n = dl_frame(in, audio, audio_max);
-  if (ahead <= 0 || !dl_ahead_ok()) return n;
-  size_t size = dl_game->state_size();
-  if (!size) return n;
+  bool can = want > 0 && dl_ahead_ok();
+  size_t size = can ? dl_game->state_size() : 0;
   if (size > ahead_cap) {
     void *more = realloc(ahead_state, size);
-    if (!more) return n;
-    ahead_state = more;
-    ahead_cap = size;
+    if (more) ahead_state = more, ahead_cap = size;
+    else size = 0;
   }
-  static s16 silent[8192];
-  dl_game->state_to_mem(ahead_state);
-  ahead_now = true;
-  for (int k = 0; k < ahead; k++) dl_frame(in, silent, audio_max < 4096 ? audio_max : 4096);
-  ahead_now = false;
-  dl_game->state_from_mem(ahead_state);
+  if (!size) return dl_frame(in, audio, audio_max);
+  int ahead = ahead_use(want);
+  LARGE_INTEGER t0, t1, f;
+  QueryPerformanceCounter(&t0);
+  pic_unused = ahead > 0;
+  int n = dl_frame(in, audio, audio_max);
+  if (ahead > 0) {
+    static s16 silent[8192];
+    dl_game->state_to_mem(ahead_state);
+    ahead_now = true;
+    for (int k = 0; k < ahead; k++) {
+      pic_unused = k < ahead - 1;
+      dl_frame(in, silent, audio_max < 4096 ? audio_max : 4096);
+    }
+    ahead_now = false;
+    dl_game->state_from_mem(ahead_state);
+  }
+  pic_unused = false;
+  QueryPerformanceCounter(&t1);
+  QueryPerformanceFrequency(&f);
+  ahead_cost((double)(t1.QuadPart - t0.QuadPart) * 1000.0 / (double)f.QuadPart);
   return n;
 }
 
@@ -1575,6 +1890,7 @@ static void wait_ms(double ms, bool to_the_moment) {
 // from the screen): the setup screen, the Picture page, the game with each filter, "Try it full
 // size". Returns 0 when every picture was made, 3 when the graphics card could not be used.
 static int gpu_check(void) {
+  dl_no_fade = true; // the pictures as they are at once
   static s16 tmp[8192];
   SetWindowPos(dl_hwnd, NULL, 0, 0, 1280 + 16, 800 + 39, SWP_NOMOVE | SWP_NOZORDER);
   ShowWindow(dl_hwnd, SW_SHOWNOACTIVATE);
@@ -1598,7 +1914,8 @@ static int gpu_check(void) {
   dl_toast_sample(); // over the game's pictures, when it has achievements
   static const struct { const char *name; int mode, page, smooth, scan, crt, fps; } shots[] = {
       {"menu", M_SIDE, -1, 0, 0, 0, 0},     {"image_page", M_PAGE, DL_PAGE_IMAGE, 0, 0, 0, 0}, {"game_sharp", M_GAME, -1, 0, 0, 0, 1},
-      {"game_smooth", M_GAME, -1, 1, 0, 0, 0}, {"game_edges", M_GAME, -1, 2, 0, 0, 0},       {"game_scanlines", M_GAME, -1, 0, 3, 0, 0},
+      {"game_smooth", M_GAME, -1, 1, 0, 0, 0}, {"game_edges", M_GAME, -1, 2, 0, 0, 0},       {"game_xbr", M_GAME, -1, 3, 0, 0, 0},
+      {"game_scanlines", M_GAME, -1, 0, 3, 0, 0},
       {"game_crt_flat", M_GAME, -1, 0, 0, 1, 0}, {"game_crt_curved", M_GAME, -1, 0, 0, 2, 0}, {"try", M_TRY, -1, 0, 0, 0, 1},
       {"pause", M_PAUSE, -1, 0, 0, 0, 0},
   };
@@ -1627,7 +1944,12 @@ static int gpu_check(void) {
 }
 
 // ---------------------------------------------------------------- main
-int dl_run(const DlGame *game, int argc, char **argv) {
+static char start_back[256]; // started again by dl_relaunch: where to go
+static bool start_crashed;   // the last run did not close normally: safe mode
+
+// The start dl_run and dl_over_start share: the command line, the settings, the pages, safe mode, where
+// a relaunch goes. -1: go on; otherwise the exit code to end with at once.
+static int prepare(const DlGame *game, int argc, char **argv) {
   dl_game = game;
   GetModuleFileNameA(NULL, dl_base_dir, MAX_PATH);
   char *slash = strrchr(dl_base_dir, DL_SEPC);
@@ -1638,11 +1960,15 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (!strcmp(argv[k], "--ui-audit") && k + 1 < argc) dl_audit_dir = argv[++k];
     else if (!strcmp(argv[k], "--gpu-check") && k + 1 < argc) gpu_check_dir = argv[++k];
     else if (!strcmp(argv[k], "--bench") && k + 1 < argc) bench_secs = atoi(argv[++k]);
+    else if (!strcmp(argv[k], "--all-games")) dl_all_games = true;
     else if (!strcmp(argv[k], "--play")) play_now = true;
     else if (!strcmp(argv[k], "--nomouse")) dl_no_mouse = true;
     else if (!strcmp(argv[k], "--version")) version = true;
     else if (!strcmp(argv[k], "--ini") && k + 1 < argc) snprintf(ini_path, sizeof ini_path, "%s", argv[++k]);
   }
+  // the folders of the reports made when missing (the folder itself only, not its parents)
+  if (dl_audit_dir) CreateDirectoryA(dl_audit_dir, NULL);
+  if (gpu_check_dir) CreateDirectoryA(gpu_check_dir, NULL);
   { // started from a terminal: print there (--ui-audit reports)
     HANDLE ho = GetStdHandle(STD_OUTPUT_HANDLE);
     if ((!ho || ho == INVALID_HANDLE_VALUE || GetFileType(ho) == FILE_TYPE_UNKNOWN) && AttachConsole(ATTACH_PARENT_PROCESS)) {
@@ -1654,6 +1980,12 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     printf("DarkLauncher " DL_VERSION "\n");
     fflush(stdout);
     return 0;
+  }
+  console_detect();
+  if (dl_console) {
+    printf("console mode (%s)\n", console_why);
+    fflush(stdout);
+    dl_input_kind = DL_IN_XBOX; // the controller's buttons in the footer from the start
   }
   SetProcessDPIAware();
   int pw = game->width > 0 ? game->width : 1, ph = game->height > 0 ? game->height : 1; // a game outside DarkLauncher may give 0
@@ -1669,8 +2001,9 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   dl_cfg.ui_lang = dl_lang_default();
   add_setting("ui_lang", &dl_cfg.ui_lang, 0, DL_LANGS - 1, 0);
   add_setting("fullscreen", &dl_cfg.fullscreen, 0, 1, 0);
+  if (game->look == DL_LOOK_MODERN) dl_cfg.smooth = 1; // a high-definition picture: smoothed, also after "Defaults"
   add_setting("integer_scale", &dl_cfg.integer_scale, 0, 1, 1);
-  add_setting("smooth", &dl_cfg.smooth, 0, 2, 1);
+  add_setting("smooth", &dl_cfg.smooth, 0, 3, 1); // 3: xBR (2.65)
   add_setting("scanlines", &dl_cfg.scanlines, 0, 4, 1);
   add_setting("show_fps", &dl_cfg.show_fps, 0, 1, 1);
   add_setting("gpu", &dl_cfg.gpu, 0, 1, 1);
@@ -1679,6 +2012,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   add_setting("vsync", &dl_cfg.vsync, 0, 1, 1);
   add_setting("volume", &dl_cfg.volume, 0, 10, 2);
   add_setting("menu_sound", &dl_cfg.menu_sound, 0, 1, 2);
+  if (game->turbo_default == 2 || game->turbo_default == 4) dl_cfg.turbo = game->turbo_default; // the game's (2.96), also after "Defaults"
   add_setting("turbo", &dl_cfg.turbo, 0, 4, 2);
   add_setting("pause_menu", &dl_cfg.pause_menu, 0, 1, 2);
   add_setting("bg_pause", &dl_cfg.bg_pause, 0, 1, 2);
@@ -1702,10 +2036,109 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   if (game->setup) game->setup();
   dl_menu_finish();
   settings_load();
+  // what the game's look does not offer, as it leaves it (a settings file of another kind of game)
+  if (game->look == DL_LOOK_MODERN) dl_cfg.integer_scale = 0, dl_cfg.smooth = 1;
+  if (game->look == DL_LOOK_RETRO3D && dl_cfg.smooth > 1) dl_cfg.smooth = 1;
+  dl_start_values();
   if (!dl_lang_ok(dl_cfg.ui_lang)) dl_cfg.ui_lang = dl_lang_default(); // a language this game's texts do not have
   for (int k = 0; k < setting_n; k++) saved[k] = *settings[k].value; // as read: nothing to write yet
-  bool crashed = !dl_audit_dir && !gpu_check_dir && !bench_secs && last_run_failed();
-  if (crashed) { report_write(); safe_start(); }
+  start_crashed = !dl_audit_dir && !gpu_check_dir && !bench_secs && last_run_failed();
+  if (start_crashed) { report_write(); safe_start(); }
+  if (!dl_audit_dir && !gpu_check_dir && !bench_secs) {
+    char p[MAX_PATH + 16];
+    snprintf(p, sizeof p, "%s.relaunch", ini_path);
+    FILE *f = fopen(p, "r");
+    if (f) {
+      if (!fgets(start_back, sizeof start_back, f)) start_back[0] = 0;
+      fclose(f);
+      DeleteFileA(p);
+    }
+  }
+  return -1;
+}
+
+// The first page shown: safe mode after a crash, where a relaunch said, the first start's pages, the
+// news of a new version; or straight into the game (--play, --bench).
+static void first_page(void) {
+  if (start_crashed) dl_safe_page_open();
+  else if (!strncmp(start_back, "play", 4)) { if (!dl_session_resume()) dl_play(); } // as "Play": the session first
+  else if (start_back[0] && dl_menu_back(start_back)) {}
+  else if (first_start && !bench_secs && !play_now) dl_welcome_open();
+  else if (!bench_secs && !play_now) dl_news_open();
+  else if (bench_secs || play_now) dl_play();
+}
+
+// Each turn: where the player is, in the running mark, every ten seconds (and at once when they go
+// elsewhere), for a crash report; a note that has just ended goes away.
+static void mark_follow(void) {
+  static DWORD marked;
+  static int marked_mode = -1;
+  if (!bench_secs && (GetTickCount() - marked > 10000 || dl_mode != marked_mode)) {
+    marked = GetTickCount();
+    marked_mode = dl_mode;
+    run_mark_write();
+  }
+  static bool noted;
+  bool now_noted = dl_note_now() != NULL;
+  if (noted && !now_noted) dl_dirty = true;
+  noted = now_noted;
+}
+
+static int finish(void);
+
+// DL_PROFILE (tests only): the time each part of dl_run's loop took, and the main thread's processor
+// time in it, printed after --bench's line
+static bool prof_on;
+static double prof_ms[12], prof_cpu[12]; // the clock's time; the processor's (cycles on Windows, ns on Linux)
+static LARGE_INTEGER prof_t;
+static double prof_c;
+static u32 prof_turns, prof_msgs; // the turns of the loop, the messages dispatched
+static const char *const prof_name[12] = {"messages", "pads", "mouse", "gpu_follow", "follows", "game", "rewind", "sound", "show", "wait", "other"};
+enum { PR_MSG, PR_PADS, PR_MOUSE, PR_GPU, PR_FOLLOW, PR_GAME, PR_REWIND, PR_SOUND, PR_SHOW, PR_WAIT, PR_OTHER };
+static double prof_thread(void) { // the main thread's processor time so far, in ms (Linux) or cycles (Windows)
+#ifdef _WIN32
+  ULONG64 c = 0;
+  QueryThreadCycleTime(GetCurrentThread(), &c);
+  return (double)c;
+#else
+  struct timespec ts;
+  clock_gettime(CLOCK_THREAD_CPUTIME_ID, &ts);
+  return ts.tv_sec * 1e3 + ts.tv_nsec / 1e6;
+#endif
+}
+static double prof_thread_ms(void) { // the same in ms (GetThreadTimes: in steps of 15.6 ms, for the whole only)
+#ifdef _WIN32
+  FILETIME a, b, k, u;
+  GetThreadTimes(GetCurrentThread(), &a, &b, &k, &u);
+  return (((ULONG64)k.dwHighDateTime << 32 | k.dwLowDateTime) + ((ULONG64)u.dwHighDateTime << 32 | u.dwLowDateTime)) / 1e4;
+#else
+  return prof_thread();
+#endif
+}
+static void prof(int part) { // the time since the last call, counted to part
+  if (!prof_on) return;
+  LARGE_INTEGER t, fq;
+  QueryPerformanceCounter(&t);
+  QueryPerformanceFrequency(&fq);
+  double c = prof_thread();
+  if (prof_t.QuadPart) prof_ms[part] += (double)(t.QuadPart - prof_t.QuadPart) * 1000.0 / (double)fq.QuadPart, prof_cpu[part] += c - prof_c;
+  prof_t = t;
+  prof_c = c;
+}
+static void prof_print(u32 frames, double cpu_ms) { // cpu_ms: the main thread's processor time during the bench
+  double all = 0;
+  for (int k = 0; k <= PR_OTHER; k++) all += prof_cpu[k];
+  printf("profile: main thread %.0f ms of processor time, %.3f ms a picture; %.2f turns of the loop and %.2f messages a picture\n", cpu_ms, cpu_ms / (frames ? frames : 1),
+         (double)prof_turns / (frames ? frames : 1), (double)prof_msgs / (frames ? frames : 1));
+  for (int k = 0; k <= PR_OTHER; k++) {
+    double ms = all > 0 ? prof_cpu[k] / all * cpu_ms : 0;
+    printf("profile %-10s processor %7.1f ms (%.3f a picture), clock %7.1f ms\n", prof_name[k], ms, ms / (frames ? frames : 1), prof_ms[k]);
+  }
+}
+
+int dl_run(const DlGame *game, int argc, char **argv) {
+  int code = prepare(game, argc, argv);
+  if (code >= 0) return code;
 
   // window: where it was last time, otherwise 1280 x 800 in the middle of the screen
   WNDCLASSW wc = {0};
@@ -1743,9 +2176,11 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   if (!bench_secs) { run_mark_write(); crash_before = SetUnhandledExceptionFilter(crash_filter); } // the marker is removed when the program closes normally
   if (dl_cfg.gpu) dl_gpu_prepare(); // the shaders, on a second thread; GDI shows the first pictures
   ShowWindow(dl_hwnd, SW_SHOW);
-  bool want_full = dl_cfg.fullscreen;
+  bool want_full = dl_cfg.fullscreen || dl_console, forced = dl_console && !dl_cfg.fullscreen;
   dl_cfg.fullscreen = 0;
   if (want_full) dl_toggle_fullscreen();
+  full_forced = forced;
+  if (dl_console) dl_pointer_hide(true);
   if (game->start && !game->start()) { run_mark_clear(); return 1; } // the game said why: not a crash
   dl_start_done = true;
   ui_window_icon();
@@ -1757,52 +2192,61 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   QueryPerformanceCounter(&next);
   fps_t0 = next;
   int fps_frames = 0;
-  double period = fq.QuadPart / (game->fps > 0 ? game->fps : 60.0);
-  int audio_max = game->audio_rate > 0 ? (int)(game->audio_rate / (game->fps > 0 ? game->fps : 60.0)) * 2 + 64 : 0;
+  // the pace set by the game (DlGame.pace_by_game): frame() again at once, fps only the most a second
+  bool by_game = game->pace_by_game;
+  double period = by_game ? (game->fps > 0 ? fq.QuadPart / game->fps : 0) : fq.QuadPart / (game->fps > 0 ? game->fps : 60.0);
+  int audio_max = game->audio_rate > 0 ? (int)(game->audio_rate / (game->fps > 0 && !by_game ? game->fps : 20.0)) * 2 + 64 : 0;
+  LARGE_INTEGER game_shown = {0}; // by the game's pace: when its picture was last shown
+  bool unshown = false;            // and a newer one waits for the screen's next refresh
+  u32 bench_shown = 0;
   s16 *audio = audio_max ? malloc((size_t)audio_max * 4) : NULL;
   u32 bench_frames = 0, bench_gaps = 0, bench_new = 0; // bench_new: the pictures that were not the last one again (dl_picture_same)
   if (!bench_secs) dl_online_start();
-  if (crashed) dl_safe_page_open();
-  else if (first_start && !bench_secs && !play_now) dl_welcome_open();
-  else if (!bench_secs && !play_now) dl_news_open();
-  else if (bench_secs || play_now) dl_play();
+  first_page();
   LARGE_INTEGER bench_t0, menu_next = {0}; // menu_next: when the sky behind the setup screen moves next
+  bool paused_shown = false;               // the pause menu on screen as it is (drawn again only once it changes)
+  u32 paused_serial = 0;                   // and the game's picture under it (dl_pic_serial)
   QueryPerformanceCounter(&bench_t0);
+  prof_on = getenv("DL_PROFILE") != NULL;
+  double prof_start = prof_thread_ms();
   while (dl_running) {
     if (bench_secs) {
       QueryPerformanceCounter(&now);
       double t = (double)(now.QuadPart - bench_t0.QuadPart) / (double)fq.QuadPart;
       if (t >= bench_secs) {
-        printf("bench: %u pictures in %.1f s (%.2f per second), sound gaps %u, new pictures %u (%.2f per second)\n", bench_frames, t,
+        printf("bench: %u pictures in %.1f s (%.2f per second), sound gaps %u, new pictures %u (%.2f per second)", bench_frames, t,
                bench_frames / t, bench_gaps, bench_new, bench_new / t);
+        if (by_game) printf(", shown %u (%.2f per second, the screen %d Hz)", bench_shown, bench_shown / t, dl_screen_hz());
+        if (ahead_want > 0) printf(", run-ahead %d of %d (lowered %d, raised %d)", ahead_level, ahead_want, ahead_lowered, ahead_raised);
+        printf("\n");
+        if (prof_on) prof_print(bench_frames, prof_thread_ms() - prof_start);
         break;
       }
     }
+    prof(PR_OTHER);
+    prof_turns++;
     MSG msg;
     while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) {
       TranslateMessage(&msg);
       DispatchMessageW(&msg);
+      prof_msgs++;
     }
     if (!dl_running) break;
+#ifdef _WIN32
+    if (dl_gpu_window_stale()) window_renew(); // GDI from now on, in a window that showed the flip model
+#endif
+    prof(PR_MSG);
     dl_pad_poll();
+    prof(PR_PADS);
+    mouse_follow();
+    prof(PR_MOUSE);
     dl_gpu_follow(false);
+    prof(PR_GPU);
     if (!bench_secs) dl_online_follow();
-    { // where the player is, for a crash report (the marker), every ten seconds
-      static DWORD marked;
-      static int marked_mode = -1;
-      if (!bench_secs && (GetTickCount() - marked > 10000 || dl_mode != marked_mode)) { // and at once when the player goes elsewhere
-        marked = GetTickCount();
-        marked_mode = dl_mode;
-        run_mark_write();
-      }
-    }
+    mark_follow();
+    dl_others_follow();
     if (!bench_secs) settings_follow();
-    { // a note that has just ended goes away
-      static bool noted;
-      bool now_noted = dl_note_now() != NULL;
-      if (noted && !now_noted) dl_dirty = true;
-      noted = now_noted;
-    }
+    prof(PR_FOLLOW);
     // rewind: its key held while playing goes back, a step every 90 ms
     if (dl_mode == M_GAME && dl_started && dl_rewind_ok() && GetForegroundWindow() == dl_hwnd && GetAsyncKeyState(dl_hot_vk[HK_REWIND]) < 0) {
       if (dl_rewind_step() && !(dl_gpu_ready() && dl_gpu_show(false, false))) {
@@ -1826,8 +2270,10 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     // waits too (its title behind the setup screen as well)
     bool hidden = IsIconic(dl_hwnd);
     if (hidden && bg_pause) run = false;
+    if (dl_mode != M_PAUSE || hidden) paused_shown = false;
+    if (dl_mode != M_GAME || hidden || dl_gpu_ready()) present_stale = true;
     // fast forward: several pictures of the game for one, without their sound
-    bool turbo = dl_mode == M_GAME && !(game->hide & DL_HIDE_TURBO) && (dl_turbo_held() || (dl_started && game->turbo && game->turbo()));
+    bool turbo = dl_mode == M_GAME && !(dl_hides() & DL_HIDE_TURBO) && (dl_turbo_held() || (dl_started && game->turbo && game->turbo()));
     int speed = !turbo ? 1 : dl_cfg.turbo == 2 ? 2 : dl_cfg.turbo == 4 ? 4 : 12;
     // the menus' cushion of sound (menu_cushion) is dropped once the game is played: it would be heard
     // late otherwise
@@ -1842,11 +2288,11 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     bool sound_ok = !wave_out || queued >= 3;
     // paced by the sound: a picture whenever fewer than three buffers (about 50 ms) wait to be played,
     // in the menus fewer than their cushion
-    bool pace = game->pace_by_sound && wave_out && !turbo;
+    bool pace = game->pace_by_sound && wave_out && !turbo && !by_game;
     int ahead = menus ? menu_cushion() : 3;
     // smooth motion: each picture takes several screen refreshes, so the screen sets the pace; the
     // sound, a little short then, is stretched by a few samples, which cannot be heard
-    int steps = dl_mode == M_GAME && !turbo && !hidden && dl_gpu_ready() ? dl_gpu_steps() : 1;
+    int steps = dl_mode == M_GAME && !turbo && !hidden && !by_game && dl_gpu_ready() ? dl_gpu_steps() : 1;
     if (steps > 1) pace = false;
     audio_stretch = steps > 1 && wave_out && queued < 3 ? 8 : 0;
     if (bench_frames > 120 && wave_out && queued == 0 && run) bench_gaps++; // the sound card ran dry
@@ -1854,11 +2300,14 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (run && (steps > 1 || (pace ? queued < ahead : now.QuadPart >= next.QuadPart))) {
       DlInput in[2] = {{0}}; // the players' (in[1]: DlGame.players 2)
       if (dl_mode == M_GAME) dl_game_input(in);
+      prof(PR_OTHER);
       for (int k = 0; k < speed; k++) {
         // run-ahead only in play, at the normal speed
         int n = play_frame(in, audio, audio_max, dl_mode == M_GAME && dl_started && speed == 1 ? dl_cfg.ahead : 0);
         if (n > 0 && audio && !turbo) audio_add(audio, n);
+        prof(PR_GAME);
         if (dl_mode == M_GAME && dl_started) dl_rewind_snap();
+        prof(PR_REWIND);
         fps_frames++;
         bench_frames++;
         if (!pic_same) bench_new++;
@@ -1868,7 +2317,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
       // in the menus, more pictures of the game until the sound has its cushion again (after a turn
       // spent drawing the setup screen): the music and the preview keep their pace however long the
       // drawing takes; the game stays that much ahead of the clock
-      for (int k = 0; menus && wave_out && k < 12; k++) {
+      for (int k = 0; menus && wave_out && !by_game && k < 12; k++) { // (a game at its own pace makes its sound in its own time)
         audio_pump();
         if (audio_queued() >= ahead) break;
         int n = play_frame(in, audio, audio_max, 0);
@@ -1883,10 +2332,12 @@ int dl_run(const DlGame *game, int argc, char **argv) {
       // sound: counted before it, a game paced by the sound (a picture made whenever fewer than three
       // buffers wait) never had the sync, and on Linux, where the sound is read in larger packets, its
       // pictures came unevenly and the screen showed some of them only (40 of 60 under Steam's gamescope)
+      prof(PR_OTHER);
       if (wave_out) {
         audio_pump();
         sound_ok = audio_queued() >= 2;
       }
+      prof(PR_SOUND);
       // a refresh the screen does not give (a window it does not show: on Linux the wait for the sync can
       // then last a second): without the sync for two seconds, so that neither the sound nor the game waits
       // In the menus (the game running behind them) always, as over a paused game: unsynced, the pictures
@@ -1895,7 +2346,16 @@ int dl_run(const DlGame *game, int argc, char **argv) {
       bool vsync = (dl_mode == M_GAME ? dl_cfg.vsync : 1) && sound_ok && !turbo && (int)(GetTickCount() - sync_back) >= 0;
       LARGE_INTEGER shown_at;
       QueryPerformanceCounter(&shown_at);
-      if (hidden) { // minimized: nothing drawn
+      // by the game's pace, in play: the newest picture once a screen refresh; one that comes sooner
+      // waits (unshown), and the one before it is never shown
+      bool show = true;
+      dl_present_latest = by_game && !menus;
+      if (dl_present_latest) {
+        show = shown_at.QuadPart - game_shown.QuadPart >= (LONGLONG)(fq.QuadPart / dl_screen_hz()) - fq.QuadPart / 1000;
+        unshown = !show;
+        if (show) game_shown = shown_at, bench_shown++;
+      }
+      if (hidden || !show) { // minimized: nothing drawn
       } else if (menus && dl_gpu_ready()) {
         // the menus over the game running behind them: at the screen's pace (60 at most), the game's last
         // picture in the preview, not once for each of its pictures (they come in bursts while the sound
@@ -1910,23 +2370,41 @@ int dl_run(const DlGame *game, int argc, char **argv) {
         LARGE_INTEGER t;
         QueryPerformanceCounter(&t);
         if (vsync && t.QuadPart - shown_at.QuadPart > fq.QuadPart / 10) sync_back = GetTickCount() + 2000;
-      } else {
+      } else if (dl_mode != M_GAME || present_needed()) { // (Linux: ReleaseDC sends the window's picture)
         HDC dc = GetDC(dl_hwnd);
         if (dl_mode == M_GAME) present(dc);
         else if (dl_dirty) { dl_draw_menu(dc); dl_dirty = false; }
         else dl_draw_preview(dc);
         ReleaseDC(dl_hwnd, dc);
-        if (vsync) DwmFlush();
+        if (vsync && !dl_present_latest) DwmFlush();
+      } else if (vsync && !dl_present_latest) DwmFlush(); // the same picture: the screen's pace kept
+    } else if (by_game && unshown && !menus && !hidden &&
+               now.QuadPart - game_shown.QuadPart >= (LONGLONG)(fq.QuadPart / dl_screen_hz()) - fq.QuadPart / 1000) {
+      // the game's newest picture, which waited for this refresh
+      game_shown = now, unshown = false, bench_shown++;
+      dl_present_latest = true;
+      if (dl_gpu_ready() && dl_gpu_show(dl_dirty, dl_cfg.vsync)) dl_dirty = false;
+      else {
+        HDC dc = GetDC(dl_hwnd);
+        present(dc);
+        ReleaseDC(dl_hwnd, dc);
       }
     } else if (hidden) { // minimized: nothing drawn
     } else if ((!run || menus) && dl_gpu_ready()) {
       // the setup screen over a paused game: the sky moves at 60 pictures a second at most, however
       // fast the screen; a change shows at once. Over the game running behind it too, between its
       // pictures (its sound has its cushion: the game waits, the screen does not)
+      // The pause menu has no sky and the game is paused: drawn again only when something changed, as
+      // GDI does (2.98; before, 60 times a second, the game's picture sent to the graphics card each time)
       QueryPerformanceCounter(&now);
-      if (dl_dirty || now.QuadPart >= menu_next.QuadPart) {
-        menu_next.QuadPart = now.QuadPart + (LONGLONG)(fq.QuadPart / 60.0) - fq.QuadPart / 1000; // a little early: the refresh after it
-        if (dl_gpu_show(dl_dirty, true)) dl_dirty = false;
+      bool still = dl_mode == M_PAUSE && paused_shown && !dl_dirty && paused_serial == dl_pic_serial;
+      bool due = dl_dirty || now.QuadPart >= menu_next.QuadPart;
+      if (due) menu_next.QuadPart = now.QuadPart + (LONGLONG)(fq.QuadPart / 60.0) - fq.QuadPart / 1000; // a little early: the refresh after it
+      if (due && !still) {
+        bool shown = dl_gpu_show(dl_dirty, true);
+        if (shown) dl_dirty = false;
+        paused_shown = shown && dl_mode == M_PAUSE;
+        paused_serial = dl_pic_serial;
       }
     } else if (!run && dl_dirty) {
       HDC dc = GetDC(dl_hwnd);
@@ -1934,41 +2412,55 @@ int dl_run(const DlGame *game, int argc, char **argv) {
       dl_dirty = false;
       ReleaseDC(dl_hwnd, dc);
     }
+    prof(PR_SHOW);
     audio_pump();
+    prof(PR_SOUND);
     QueryPerformanceCounter(&now);
     if (run && pace && audio_event && !menus) { // paced by the sound: until a buffer has been played (one lasts 10 to 16 ms)
       // (not while the sound is short already: on Linux it is read in packets of several buffers, whose
       // one signal left the game a picture behind each time)
       if (audio_queued() < ahead) continue;
       MsgWaitForMultipleObjects(1, &audio_event, FALSE, (DWORD)(ABUF_FRAMES * 1000 / dl_game->audio_rate + 2), QS_ALLINPUT);
+      prof(PR_WAIT);
       continue;
     }
     // in the menus the screen's next picture sets the wait (the sound's signals come every 43 ms on
     // Linux with large packets: the menus were shown 40 times a second), the game's next one if sooner
     double to_frame = pace ? 2 : (next.QuadPart - now.QuadPart) * 1000.0 / fq.QuadPart, to_sky = (menu_next.QuadPart - now.QuadPart) * 1000.0 / fq.QuadPart;
+    double to_show = (game_shown.QuadPart + fq.QuadPart / dl_screen_hz() - now.QuadPart) * 1000.0 / fq.QuadPart;
+    if (by_game && unshown && !menus && to_show < to_frame) to_frame = to_show; // the waiting picture's refresh, if sooner
     double left_ms = run && !menus ? (steps > 1 ? 0 : to_frame)
                    : hidden ? 100
                    : dl_gpu_ready() ? (run && !pace && to_frame < to_sky ? to_frame : to_sky)
                    : run ? to_frame
                    : 10;
+    prof(PR_OTHER);
     wait_ms(left_ms, run);
+    prof(PR_WAIT);
   }
   wait_stop();
   if (bench_secs) { dl_gpu_stop(); if (wave_out) { waveOutReset(wave_out); waveOutClose(wave_out); } return 0; } // nothing is saved
-  if (!is_fullscreen) {
+  return finish();
+}
+
+// The end dl_run and dl_over_end share: the window's place, the session and the settings kept, the
+// running mark removed, then an update's installer or the program again if asked for. Over the game
+// (dl_over) the window and the end are the game's: neither its place, nor its quit(), nor destroyed here.
+static int finish(void) {
+  if (!is_fullscreen && !dl_over) {
     RECT wr;
     if (GetWindowRect(dl_hwnd, &wr)) { dl_cfg.win_x = wr.left; dl_cfg.win_y = wr.top; dl_cfg.win_w = wr.right - wr.left; dl_cfg.win_h = wr.bottom - wr.top; }
   }
   dl_rumble_stop();
   dl_session_keep();
-  if (game->quit) game->quit();
+  if (dl_game->quit && !dl_over) dl_game->quit();
   settings_save();
-  dl_gpu_stop();
+  if (!dl_over) dl_gpu_stop();
   if (wave_out) { waveOutReset(wave_out); waveOutClose(wave_out); }
   run_mark_clear(); // a normal close
 #ifdef _WIN32
   if (update_run) { // the release's installer, silent, over this folder: it waits for this program to end, then starts it again
-    DestroyWindow(dl_hwnd);
+    if (!dl_over) DestroyWindow(dl_hwnd);
     wchar_t file[MAX_PATH], dir[MAX_PATH], cmd[3 * MAX_PATH];
     MultiByteToWideChar(CP_ACP, 0, upd_file, -1, file, MAX_PATH);
     MultiByteToWideChar(CP_ACP, 0, dl_base_dir, -1, dir, MAX_PATH);
@@ -1986,15 +2478,250 @@ int dl_run(const DlGame *game, int argc, char **argv) {
   }
 #endif
   if (relaunch) { // the same program with the same command line, once this window is gone
-    DestroyWindow(dl_hwnd);
+    if (!dl_over) DestroyWindow(dl_hwnd);
     wchar_t exe[MAX_PATH];
     STARTUPINFOW si = {sizeof si};
     PROCESS_INFORMATION pi;
     GetModuleFileNameW(NULL, exe, MAX_PATH);
+    char back[MAX_PATH + 16];
+    snprintf(back, sizeof back, "%s.relaunch", ini_path);
+    FILE *f = relaunch_where[0] ? fopen(back, "w") : NULL;
+    if (f) { fputs(relaunch_where, f); fclose(f); }
     if (CreateProcessW(exe, GetCommandLineW(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
       CloseHandle(pi.hThread);
       CloseHandle(pi.hProcess);
-    }
+    } else if (f) DeleteFileA(back); // not started: the next start is an ordinary one
   }
   return 0;
+}
+
+// ---------------------------------------------------------------- the menus over the game (2.80)
+// dl.h's dl_over_*: no window, loop or picture of DarkLauncher's; the game's loop calls it, and lays its
+// menus, its notes and "Achievement unlocked" over its own picture, as a layer with opacity.
+
+int dl_over_start(const DlGame *game, int argc, char **argv, void *window) {
+  dl_over = true;
+  for (int k = 1; k < argc; k++) // the audit in a window of its own, its pages as over the game
+    if (!strcmp(argv[k], "--ui-audit")) return dl_run(game, argc, argv);
+  int code = prepare(game, argc, argv);
+  if (code >= 0) return code;
+  if (gpu_check_dir || bench_secs) {
+    printf("over the game: no picture of DarkLauncher's to check or measure\n");
+    return 0;
+  }
+#ifdef _WIN32
+  dl_hwnd = (HWND)window;
+#else
+  dl_hwnd = dl_win32_adopt(window); // the game's SDL window, or one of the stand-ins' (the demo's --over)
+#endif
+  if (!dl_hwnd) return 1;
+  run_mark_write(); // removed by dl_over_end, as a normal close
+  crash_before = SetUnhandledExceptionFilter(crash_filter);
+  if (dl_console) dl_pointer_hide(true);
+  if (game->start && !game->start()) { run_mark_clear(); return 1; } // the game said why: not a crash
+  dl_start_done = true;
+  dl_online_start();
+  first_page();
+  dl_dirty = true;
+  return -1;
+}
+
+// The layer, and what it was made of (a change of one of them makes it again).
+static u32 *over_buf, *over_black;
+static size_t over_cap;
+static int over_w, over_h, over_mode = -1;
+static wchar_t over_note[160], over_toast[96];
+static bool over_made;
+
+static bool over_layer_stale(void) {
+  RECT rc;
+  GetClientRect(dl_hwnd, &rc);
+  const wchar_t *n = dl_note_now(), *t = dl_toast_now();
+  return !over_made || dl_dirty || rc.right != over_w || rc.bottom != over_h || dl_mode != over_mode ||
+         lstrcmpW(n ? n : L"", over_note) || lstrcmpW(t ? t : L"", over_toast);
+}
+
+// Linux, the game's own SDL window: the messages waiting for DarkLauncher (from its events, or the
+// test keys) given to dl_over_message; true when it took one.
+static bool over_take(void) {
+  bool took = false;
+#ifndef _WIN32
+  MSG m;
+  while (dl_win32_take(&m, dl_mode != M_GAME)) took |= dl_over_message(m.hwnd, m.message, m.wParam, m.lParam);
+#endif
+  return took;
+}
+
+unsigned dl_over_turn(void) {
+  if (!dl_over || !dl_hwnd) return DL_OVER_QUIT;
+  over_take();
+  dl_pad_poll();
+  mouse_follow();
+  dl_online_follow();
+  mark_follow();
+  dl_others_follow();
+  settings_follow();
+  bool menus = dl_mode != M_GAME;
+  unsigned f = menus ? DL_OVER_MENU : 0;
+  if ((menus && dl_started) || (!menus && dl_cfg.bg_pause && GetForegroundWindow() != dl_hwnd)) f |= DL_OVER_PAUSE;
+  if (!dl_running) f |= DL_OVER_QUIT;
+  if (over_layer_stale()) f |= DL_OVER_LAYER;
+  return f;
+}
+
+// A pixel drawn once over black and once over white: its colour multiplied by its opacity, and that
+// opacity (as layer_merge in dl_gpu.c).
+static u32 over_merge(u32 b, u32 w) {
+  int d = (int)((w >> 16) & 255) - (int)((b >> 16) & 255) + (int)((w >> 8) & 255) - (int)((b >> 8) & 255) + (int)(w & 255) - (int)(b & 255);
+  int a = 255 - d / 3;
+  return ((u32)(a < 0 ? 0 : a > 255 ? 255 : a) << 24) | (b & 0xFFFFFF);
+}
+
+// Something small (a note, "Achievement unlocked") drawn by draw(dc, 0, 0, h) in a bw x bh box, put
+// into the layer at x, y.
+static void over_box(HDC wdc, int x, int y, int bw, int bh, int h, void (*draw)(HDC dc, int x, int y, int h)) {
+  if (bw <= 0 || bh <= 0) return;
+  BITMAPINFO bi = {{sizeof(BITMAPINFOHEADER), bw, -bh, 1, 32}};
+  u32 *bits = NULL, *black = malloc((size_t)bw * bh * 4);
+  HDC mem = CreateCompatibleDC(wdc);
+  HBITMAP bmp = CreateDIBSection(wdc, &bi, DIB_RGB_COLORS, (void **)&bits, NULL, 0);
+  if (mem && bmp && black && bits) {
+    HGDIOBJ old = SelectObject(mem, bmp);
+    RECT r = {0, 0, bw, bh};
+    for (int pass = 0; pass < 2; pass++) {
+      FillRect(mem, &r, GetStockObject(pass ? WHITE_BRUSH : BLACK_BRUSH));
+      draw(mem, 0, 0, h);
+      GdiFlush();
+      if (!pass) memcpy(black, bits, (size_t)bw * bh * 4);
+    }
+    SelectObject(mem, old);
+    for (int row = 0; row < bh; row++) {
+      int yy = y + row;
+      if (yy < 0 || yy >= over_h) continue;
+      for (int col = 0; col < bw; col++) {
+        int xx = x + col;
+        if (xx >= 0 && xx < over_w) over_buf[(size_t)yy * over_w + xx] = over_merge(black[(size_t)row * bw + col], bits[(size_t)row * bw + col]);
+      }
+    }
+  }
+  if (bmp) DeleteObject(bmp);
+  if (mem) DeleteDC(mem);
+  free(black);
+}
+
+const uint32_t *dl_over_layer(int *w, int *h) {
+  if (w) *w = 0;
+  if (h) *h = 0;
+  if (!dl_over || !dl_hwnd) return NULL;
+  RECT rc;
+  GetClientRect(dl_hwnd, &rc);
+  int cw = rc.right, ch = rc.bottom;
+  if (cw <= 0 || ch <= 0) return NULL;
+  size_t n = (size_t)cw * ch;
+  if (n > over_cap) {
+    u32 *a = realloc(over_buf, n * 4), *b = a ? realloc(over_black, n * 4) : NULL;
+    if (a) over_buf = a;
+    if (b) over_black = b;
+    if (!a || !b) return NULL;
+    over_cap = n;
+  }
+  over_w = cw, over_h = ch, over_mode = dl_mode;
+  HDC wdc = GetDC(dl_hwnd);
+  if (dl_mode != M_GAME) { // the setup screen or the pause menu, over a dark veil
+    dl_layer = 1;
+    dl_draw_menu(wdc);
+    if (dl_menu_bits) memcpy(over_black, dl_menu_bits, n * 4);
+    dl_layer = 2;
+    dl_draw_menu(wdc);
+    dl_layer = 0;
+    if (dl_menu_bits)
+      for (size_t k = 0; k < n; k++) over_buf[k] = over_merge(over_black[k], dl_menu_bits[k]);
+    else memset(over_buf, 0, n * 4);
+  } else { // in play: clear, but for a note at the bottom left and "Achievement unlocked" at the top right
+    memset(over_buf, 0, n * 4);
+    int bw, bh, fh = ch / 22 < 14 ? 14 : ch / 22;
+    if (dl_note_now()) {
+      dl_note_size(wdc, ch, &bw, &bh);
+      over_box(wdc, fh, ch - fh * 5 / 2, bw, bh, ch, dl_draw_note);
+    }
+    if (dl_toast_now()) {
+      dl_toast_size(wdc, ch, &bw, &bh);
+      over_box(wdc, cw - bw - ch / 30, ch / 30, bw, bh, ch, dl_draw_toast);
+    }
+  }
+  ReleaseDC(dl_hwnd, wdc);
+  const wchar_t *note = dl_note_now(), *toast = dl_toast_now();
+  lstrcpynW(over_note, note ? note : L"", 160);
+  lstrcpynW(over_toast, toast ? toast : L"", 96);
+  dl_dirty = false;
+  over_made = true;
+  if (w) *w = cw;
+  if (h) *h = ch;
+  return over_buf;
+}
+
+bool dl_over_message(void *window, unsigned msg, uintptr_t wparam, intptr_t lparam) {
+  if (!dl_over) return false;
+  HWND h = (HWND)window;
+  WPARAM wp = (WPARAM)wparam;
+  LPARAM lp = (LPARAM)lparam;
+  bool menus = dl_mode != M_GAME;
+  switch (msg) {
+#ifdef _WIN32
+    case WM_SETCURSOR: // the pointer hidden (console mode, DlGame.mouse_in_game)
+      if (pointer_hidden && LOWORD(lp) == HTCLIENT) {
+        SetCursor(NULL);
+        return true;
+      }
+      return false;
+#endif
+    case WM_SIZE: dl_dirty = true; return false;
+    case WM_DEVICECHANGE: dl_sony_rescan(); return false;
+    case WM_KEYDOWN:
+      if (!menus) { // in play: DarkLauncher's shortcuts only (its pause key...)
+        dl_input_used(DL_IN_KEYS);
+        return !(lp & (1 << 30)) && dl_game_key((int)wp);
+      }
+      wnd_proc(h, msg, wp, lp);
+      return true;
+    case WM_CHAR:
+      if (menus) wnd_proc(h, msg, wp, lp);
+      return menus;
+    case WM_KEYUP:
+    case WM_SYSKEYDOWN:
+    case WM_SYSKEYUP: return menus;
+    case WM_MOUSEMOVE:
+    case WM_LBUTTONDOWN:
+    case WM_LBUTTONUP:
+    case WM_RBUTTONDOWN:
+    case WM_RBUTTONUP:
+    case WM_MBUTTONDOWN:
+    case WM_MBUTTONUP:
+    case WM_MOUSEWHEEL:
+    case WM_MOUSELEAVE: // followed in play too (dl_mouse), taken in the menus
+      wnd_proc(h, msg, wp, lp);
+      return menus;
+  }
+  return false;
+}
+
+bool dl_over_sdl_event(const void *event) {
+#ifdef _WIN32
+  (void)event;
+  return false;
+#else
+  if (!dl_over || !dl_hwnd) return false;
+  dl_win32_event(event);
+  return over_take();
+#endif
+}
+
+void dl_over_input(DlInput in[2]) {
+  memset(in, 0, sizeof(DlInput) * 2);
+  if (dl_over && dl_mode == M_GAME) dl_game_input(in);
+}
+
+int dl_over_end(void) {
+  if (!dl_over) return 0;
+  return finish();
 }

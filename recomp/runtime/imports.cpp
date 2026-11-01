@@ -24,6 +24,9 @@ static bool IsCodeAddress(uint32_t address)
 
 static void TimeStampThread(uint32_t bundle)
 {
+#ifdef _WIN32
+    SetThreadDescription(GetCurrentThread(), L"Cristalis timestamps"); // (named for profiling)
+#endif
     // KeTimeStampBundle: interrupt time, system time (100 ns units), tick count (ms).
     for (;;)
     {

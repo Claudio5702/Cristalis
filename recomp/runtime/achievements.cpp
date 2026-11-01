@@ -10,6 +10,7 @@
 #endif
 #include "content.h"
 #include "guest.h"
+#include "png.h"
 #include "xex_header.h"
 
 #include <windows.h>
@@ -28,6 +29,7 @@ struct Achievement
     std::wstring name;
     std::wstring description; // once unlocked
     std::wstring howTo;       // while locked
+    uint32_t image{};         // its picture in the title data
 };
 
 static std::mutex g_mutex;
@@ -126,6 +128,7 @@ static std::vector<Achievement> ReadAchievements(uint32_t language)
             achievement.name = strings[Load16(entry + 2)];
             achievement.description = strings[Load16(entry + 4)];
             achievement.howTo = strings[Load16(entry + 6)];
+            achievement.image = Load32(entry + 8);
             achievement.score = Load16(entry + 12);
             result.push_back(achievement);
         }
@@ -142,6 +145,26 @@ static const std::vector<Achievement>& Achievements()
         return result;
     }();
     return list;
+}
+
+std::vector<uint32_t> AchievementPicture(uint32_t id, int& width, int& height)
+{
+    uint32_t xdbf = FindTitleData();
+    for (const Achievement& achievement : Achievements())
+    {
+        uint32_t length = 0;
+        uint32_t png = achievement.id == id && xdbf != 0 ? FindEntry(xdbf, 2, achievement.image, length) : 0;
+        if (png == 0)
+            continue;
+        std::vector<uint32_t> pixels = DecodePng(g_base + png, length, width, height);
+        for (uint32_t& p : pixels) // colours multiplied by their opacity
+        {
+            uint32_t a = p >> 24;
+            p = a << 24 | ((p >> 16 & 255) * a / 255) << 16 | ((p >> 8 & 255) * a / 255) << 8 | (p & 255) * a / 255;
+        }
+        return pixels;
+    }
+    return {};
 }
 
 // ---- Storage ----

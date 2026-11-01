@@ -3,6 +3,8 @@
 #ifdef CD_DARKLAUNCHER
 #include "dl_bridge.h"
 #endif
+#include "game_state.h"
+#include "gpu.h"
 #include "translations.h"
 #include "guest.h"
 #include "xex_header.h"
@@ -16,6 +18,7 @@
 #include <atomic>
 #include <cmath>
 #include <map>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -31,8 +34,12 @@ static ID3D11PixelShader* g_pixelShaders[2]; // plain, sharp
 static ID3D11RasterizerState* g_rasterStates[8];
 static uint32_t g_halves;                    // the frame is 1280x720 times this, counted in halves
                                              // (2: 1280x720, 3: 1920x1080, 4: 2560x1440, 6: 3840x2160)
-static uint32_t FrameWidth() { return kHostWidth * g_halves / 2; }
-static uint32_t FrameHeight() { return kHostHeight * g_halves / 2; }
+// With DarkLauncher's "Fill the screen" the frame has columns or lines more (in the console's pixels, half on
+// each side, DlBridgeFill): the console's picture stays in its middle, and the draws that cover its whole
+// height (or width), the game's backgrounds, are stretched over the frame's.
+static uint32_t g_extraWidth, g_extraHeight;
+static uint32_t FrameWidth() { return (kHostWidth + g_extraWidth) * g_halves / 2; }
+static uint32_t FrameHeight() { return (kHostHeight + g_extraHeight) * g_halves / 2; }
 static std::map<uint32_t, ID3D11DepthStencilState*> g_depthStates;
 static ID3D11Buffer* g_vertexBuffer;
 static ID3D11SamplerState* g_samplers[2]; // point, linear
@@ -414,7 +421,7 @@ HostPad RendererPad()
 #ifdef CD_DARKLAUNCHER
     // DarkLauncher reads the keyboard and the controllers (CD_AUTOPAD still taps by itself).
     static const bool autoPad = getenv("CD_AUTOPAD") != nullptr;
-    pad.buttons = autoPad ? KeyboardButtons() : DlBridgeButtons();
+    pad.buttons = autoPad ? uint16_t(KeyboardButtons() | DlBridgeButtons()) : DlBridgeButtons();
     return pad;
 #endif
     pad.buttons = KeyboardButtons();
@@ -580,8 +587,13 @@ bool RendererInit()
 {
 #ifdef CD_DARKLAUNCHER
     // DarkLauncher has the window: the game draws off screen, and each picture is read back for it.
-    HRESULT result = D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0, D3D11_SDK_VERSION, &g_device, nullptr,
-        &g_context);
+    // CD_WARP=1: drawn by Windows' software rasterizer (WARP), on the processor: the weakest graphics there
+    // can be (tests); its pictures cannot be shared with DarkLauncher's device, so they go as pixels.
+    static const bool warp = getenv("CD_WARP") != nullptr;
+    HRESULT result = D3D11CreateDevice(nullptr, warp ? D3D_DRIVER_TYPE_WARP : D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, nullptr, 0,
+        D3D11_SDK_VERSION, &g_device, nullptr, &g_context);
+    if (warp && SUCCEEDED(result))
+        Log("Renderer: drawing with WARP, the software rasterizer (CD_WARP)");
     if (FAILED(result))
     {
         Log("Renderer: D3D11CreateDevice failed (%08lX)", result);
@@ -757,6 +769,9 @@ static ID3D11ShaderResourceView* GetTexture(const HostTexture& info)
     uint32_t step = byteSize / 4 > 4096 ? (byteSize / 4 / 4096) * 4 : 4;
     for (uint32_t i = 0; i < byteSize; i += step)
         contentHash = (contentHash ^ *(const uint32_t*)(g_base + info.address + i)) * 0x100000001B3ull;
+#ifdef CD_DARKLAUNCHER
+    contentHash ^= uint64_t(DlBridgePromptGeneration()) << 40; // the button pictures changed: upload again
+#endif
 
     if (cached.view != nullptr && cached.contentHash == contentHash)
         return cached.view;
@@ -776,6 +791,39 @@ static ID3D11ShaderResourceView* GetTexture(const HostTexture& info)
             pixels[size_t(y) * info.width + x] = Load32(info.address + offset);
         }
     }
+
+    // CD_TEXLOG=1: each small texture's whole-content hash, to recognise the game's pictures (tests)
+    static const bool texLog = getenv("CD_TEXLOG") != nullptr;
+    if (texLog && info.width <= 64 && info.height <= 64)
+    {
+        uint64_t hash = 0xCBF29CE484222325ull;
+        for (uint32_t p : pixels)
+            hash = (hash ^ p) * 0x100000001B3ull;
+        Log("Texture %ux%u at %08X: hash %016llX", info.width, info.height, info.address, (unsigned long long)hash);
+        // and the picture itself, textures\<hash>.bmp (32-bit, top-down)
+        char name[64];
+        snprintf(name, sizeof(name), "textures\\%016llX.bmp", (unsigned long long)hash);
+        CreateDirectoryA("textures", nullptr);
+        if (FILE* file = fopen(name, "wb"))
+        {
+            uint32_t bytes = uint32_t(pixels.size() * 4);
+            uint8_t header[54]{ 'B', 'M' };
+            *(uint32_t*)(header + 2) = 54 + bytes;
+            *(uint32_t*)(header + 10) = 54;
+            *(uint32_t*)(header + 14) = 40;
+            *(int32_t*)(header + 18) = int32_t(info.width);
+            *(int32_t*)(header + 22) = -int32_t(info.height);
+            *(uint16_t*)(header + 26) = 1;
+            *(uint16_t*)(header + 28) = 32;
+            fwrite(header, 1, sizeof(header), file);
+            fwrite(pixels.data(), 1, bytes, file);
+            fclose(file);
+        }
+    }
+
+#ifdef CD_DARKLAUNCHER
+    DlBridgePrompt(pixels.data(), info.width, info.height); // a button picture: the player's device's
+#endif
 
     // Pending draws may still sample the old contents of this texture.
     FlushBatch();
@@ -881,8 +929,25 @@ struct Batch
     bool sharp{};
     uint32_t cull{};
     int scissor[4]{};
+    int stretch{}; // bit 0: across the frame's width, bit 1: down its height (see g_extraWidth), bit 2: at
+                   // the frame's bottom (the stage's bar of gold and crystals, see RendererDraw)
 };
 static Batch g_batch;
+
+// Where the draws of a batch go in the frame: the console's picture in its middle, stretched to the frame's
+// width or height when the batch's stretch says so, or put down to its bottom.
+[[maybe_unused]] static D3D11_VIEWPORT BatchViewport(int stretch)
+{
+    float scale = g_halves / 2.0f;
+    D3D11_VIEWPORT viewport{ g_extraWidth / 2 * scale, g_extraHeight / 2 * scale, kHostWidth * scale, kHostHeight * scale, 0, 1 };
+    if (stretch & 1)
+        viewport.TopLeftX = 0, viewport.Width = float(FrameWidth());
+    if (stretch & 2)
+        viewport.TopLeftY = 0, viewport.Height = float(FrameHeight());
+    if (stretch & 4)
+        viewport.TopLeftY = g_extraHeight / 2 * 2 * scale;
+    return viewport;
+}
 static uint32_t g_vertexCursor; // first free vertex in g_vertexBuffer
 
 static void FlushBatch()
@@ -906,6 +971,10 @@ static void FlushBatch()
         g_context->Unmap(g_vertexBuffer, 0);
 
         D3D11_RECT scissor{ g_batch.scissor[0], g_batch.scissor[1], g_batch.scissor[2], g_batch.scissor[3] };
+#ifdef CD_DARKLAUNCHER
+        D3D11_VIEWPORT viewport = BatchViewport(g_batch.stretch);
+        g_context->RSSetViewports(1, &viewport);
+#endif
         g_context->PSSetShaderResources(0, 1, &g_batch.texture);
         g_context->PSSetShader(g_pixelShaders[g_batch.sharp], nullptr, 0);
         g_context->RSSetState(g_rasterStates[g_batch.cull & 7]);
@@ -935,8 +1004,42 @@ void RendererDraw(const HostDraw& draw)
     for (int i = 0; i < 4; i++)
         scissor[i] = (draw.scissor[i] * int(g_halves) + 1) / 2; // the far edges round up at 1.5 times
 
+    // Filling the screen: a draw from edge to edge of the console's picture (a background) is stretched over
+    // the frame that way; the others keep their place in the middle. The scissor moves with the picture, and
+    // a side on the picture's edge goes to the frame's: the game draws the picture in three bands (y 0-256,
+    // 256-512, 512-720, each with all its draws), and a stretched background must stay in its own band.
+    int stretch = 0;
+    if (g_extraWidth != 0 || g_extraHeight != 0)
+    {
+        float left = 2, right = -2, top = -2, bottom = 2;
+        for (const HostVertex& vertex : draw.vertices)
+        {
+            left = std::min(left, vertex.x), right = std::max(right, vertex.x);
+            top = std::max(top, vertex.y), bottom = std::min(bottom, vertex.y);
+        }
+        stretch = (g_extraWidth != 0 && left <= -0.995f && right >= 0.995f ? 1 : 0) |
+            (g_extraHeight != 0 && bottom <= -0.995f && top >= 0.995f ? 2 : 0);
+        int offsetX = int(g_extraWidth / 2 * g_halves / 2), offsetY = int(g_extraHeight / 2 * g_halves / 2);
+        // lines added above and below: in a stage (the map, its row of units, a unit's menu) what lies wholly
+        // below line 570 and right of the button guide (from x 230, or across the whole width: what hides the
+        // map under the bar), the bar of gold and crystals and its messages, goes down to the frame's bottom
+        bool belowBar = (1 - top) / 2 * kHostHeight >= kBottomBarTop &&
+            ((left + 1) / 2 * kHostWidth >= kBottomBarLeft || (left <= -0.99f && right >= 0.99f));
+        if (stretch == 0 && g_extraHeight != 0 && belowBar && GameStateBottomBarShown())
+        {
+            stretch = 4;
+            offsetY *= 2;
+        }
+        int width = int(kHostWidth * g_halves / 2), height = int(kHostHeight * g_halves / 2);
+        scissor[0] = scissor[0] <= 0 ? 0 : scissor[0] + offsetX;
+        scissor[2] = scissor[2] >= width ? int(FrameWidth()) : scissor[2] + offsetX;
+        scissor[1] = scissor[1] <= 0 ? 0 : scissor[1] + offsetY;
+        scissor[3] = scissor[3] >= height ? int(FrameHeight()) : scissor[3] + offsetY;
+    }
+
     bool sameState = texture == g_batch.texture && blend == g_batch.blend && depth == g_batch.depth && sampler == g_batch.sampler &&
-        sharp == g_batch.sharp && draw.cull == g_batch.cull && memcmp(scissor, g_batch.scissor, sizeof(scissor)) == 0;
+        sharp == g_batch.sharp && draw.cull == g_batch.cull && memcmp(scissor, g_batch.scissor, sizeof(scissor)) == 0 &&
+        stretch == g_batch.stretch;
     if (!sameState || g_batch.vertices.size() + draw.vertices.size() > kMaxVertices)
     {
         FlushBatch();
@@ -946,6 +1049,7 @@ void RendererDraw(const HostDraw& draw)
         g_batch.sampler = sampler;
         g_batch.sharp = sharp;
         g_batch.cull = draw.cull;
+        g_batch.stretch = stretch;
         memcpy(g_batch.scissor, scissor, sizeof(scissor));
     }
     g_batch.vertices.insert(g_batch.vertices.end(), draw.vertices.begin(), draw.vertices.end());
@@ -984,7 +1088,7 @@ static void SaveFrame(const char* path)
             for (uint32_t y = 0; y < desc.Height; y++)
                 fwrite((const uint8_t*)mapped.pData + size_t(y) * mapped.RowPitch, 4, desc.Width, file);
             fclose(file);
-            Log("Renderer: frame saved to %s", path);
+            Log("Renderer: frame saved to %s (GPU frame %u)", path, GpuFrameCount());
         }
         g_context->Unmap(staging, 0);
     }
@@ -1729,6 +1833,15 @@ static bool SharedPresent()
     return true;
 }
 
+static std::mutex g_shotMutex;
+static std::string g_shotName; // a picture to save as <name>.bmp, at the next present (debug mode)
+
+void RendererRequestShot(const char* name)
+{
+    std::lock_guard lock(g_shotMutex);
+    g_shotName = name;
+}
+
 // The picture just drawn goes to DarkLauncher (which waits for it); the game is held there until
 // DarkLauncher asks for the next one.
 static void DarkLauncherPresent()
@@ -1744,10 +1857,19 @@ static void DarkLauncherPresent()
         snprintf(path, sizeof(path), "frame_%u.bmp", shotStep - 1);
         SaveFrame(path);
     }
+    // the debug mode's "shot" (RendererRequestShot)
+    {
+        std::lock_guard lock(g_shotMutex);
+        if (!g_shotName.empty())
+        {
+            SaveFrame((g_shotName + ".bmp").c_str());
+            g_shotName.clear();
+        }
+    }
     static ID3D11Texture2D* staging;
-    static uint32_t stagingHalves;
+    static uint32_t stagingSize; // its width << 16 | height
     bool shared = SharedPresent();
-    if (!shared && (staging == nullptr || stagingHalves != g_halves))
+    if (!shared && (staging == nullptr || stagingSize != (FrameWidth() << 16 | FrameHeight())))
     {
         if (staging != nullptr)
             staging->Release();
@@ -1761,7 +1883,7 @@ static void DarkLauncherPresent()
         desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
         staging = nullptr;
         g_device->CreateTexture2D(&desc, nullptr, &staging);
-        stagingHalves = g_halves;
+        stagingSize = FrameWidth() << 16 | FrameHeight();
     }
     D3D11_MAPPED_SUBRESOURCE mapped{};
     if (!shared && staging != nullptr)
@@ -1775,9 +1897,12 @@ static void DarkLauncherPresent()
     }
 
     g_context->ClearDepthStencilView(g_depthView, D3D11_CLEAR_DEPTH, 1.0f, 0);
-    uint32_t wanted = DlBridgeHalves();
-    if (wanted != g_halves)
+    uint32_t wanted = DlBridgeHalves(), extraWidth, extraHeight;
+    DlBridgeFill(extraWidth, extraHeight);
+    if (wanted != g_halves || extraWidth != g_extraWidth || extraHeight != g_extraHeight)
     {
+        g_extraWidth = extraWidth;
+        g_extraHeight = extraHeight;
         CreateFrameTargets(wanted);
         Log("Renderer: drawing at %ux%u", FrameWidth(), FrameHeight());
     }

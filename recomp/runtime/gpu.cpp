@@ -9,7 +9,9 @@
 #include <windows.h>
 
 #include <atomic>
+#include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <filesystem>
 #include <map>
 #include <mutex>
@@ -781,6 +783,66 @@ static void ExecuteType3(uint32_t opcode, uint32_t address, uint32_t count)
         RendererPresent();
         g_statPresentMicros += Micros() - before;
         ++g_frameCount;
+        // CD_MEMDUMP=<frame>: the game's heap (0x40000000-0x50000000) and image (0x82000000-0x84000000) at that frame, in memdump.bin as
+        // (address, 4 KB page) pairs of the committed pages, to compare runs (tests).
+        // CD_DRAWLOG=s<seconds>: the draws of the frame that many seconds after the first picture
+        static const char* drawLogWhen = getenv("CD_DRAWLOG");
+        static const uint64_t drawLogMicros = drawLogWhen && drawLogWhen[0] == 's' ? Micros() + uint64_t(atof(drawLogWhen + 1) * 1e6) : 0;
+        if (drawLogMicros != 0 && g_drawLogFrame == 0 && Micros() >= drawLogMicros)
+            g_drawLogFrame = g_frameCount + 2;
+        // (or CD_MEMDUMP=s<seconds>: that many seconds after the first picture)
+        static const char* dumpWhen = getenv("CD_MEMDUMP");
+        static const uint32_t dumpFrame = dumpWhen && dumpWhen[0] != 's' ? uint32_t(atoi(dumpWhen)) : 0;
+        static const uint64_t dumpMicros = dumpWhen && dumpWhen[0] == 's' ? Micros() + uint64_t(atof(dumpWhen + 1) * 1e6) : 0;
+        static bool dumped;
+        if (!dumped && ((dumpFrame != 0 && g_frameCount == dumpFrame) || (dumpMicros != 0 && Micros() >= dumpMicros)))
+        {
+            dumped = true;
+            if (FILE* file = fopen("memdump.bin", "wb"))
+            {
+                for (uint32_t page = 0x40000000; page != 0x84000000; page = page == 0x4FFFF000 ? 0x82000000 : page + 0x1000)
+                {
+                    MEMORY_BASIC_INFORMATION info;
+                    if (VirtualQuery(g_base + page, &info, sizeof(info)) == 0 || info.State != MEM_COMMIT)
+                        continue;
+                    fwrite(&page, 4, 1, file);
+                    fwrite(g_base + page, 1, 0x1000, file);
+                }
+                fclose(file);
+            }
+        }
+        // CD_POKE=<frame>:<hex address>=<value>,...: from that frame on, 32-bit words written into the
+        // game's memory at each picture (tests).
+        static const char* poke = getenv("CD_POKE");
+        if (poke != nullptr && g_frameCount >= uint32_t(atoi(poke)))
+        {
+            for (const char* p = strchr(poke, ':'); p != nullptr; p = strchr(p, ','))
+            {
+                char* end;
+                uint32_t address = uint32_t(strtoul(p + 1, &end, 16));
+                if (*end != '=')
+                    break;
+                Store32(address, uint32_t(strtol(end + 1, &end, 10)));
+                p = end;
+            }
+        }
+        // CD_WORDS=<hex address>,...: each 32-bit word logged when it changes, once a picture (tests)
+        static const char* peek = getenv("CD_WORDS");
+        if (peek != nullptr)
+        {
+            static uint32_t seen[16];
+            int k = 0;
+            for (const char* p = peek; p != nullptr && *p != 0 && k < 16; k++)
+            {
+                char* end;
+                uint32_t address = uint32_t(strtoul(p, &end, 16));
+                uint32_t value = Load32(address);
+                if (value != seen[k])
+                    Log("Peek: %08X = %u (frame %u)", address, value, g_frameCount.load());
+                seen[k] = value;
+                p = *end == ',' ? end + 1 : nullptr;
+            }
+        }
         g_drawCount = 0;
         break;
     }
@@ -869,8 +931,28 @@ static void ExecuteRange(uint32_t address, uint32_t wordCount)
     }
 }
 
+// The command thread sleeps until the game kicks new commands (GpuKicked), rather than looking a thousand
+// times a second: in play the game kicks about ten times a picture, so that changes little, but paused,
+// in the menus or behind another window the thread now wakes 60 times a second instead of 1000. It still
+// looks every 16 ms, in case.
+static std::mutex g_kickMutex;
+static std::condition_variable g_kick;
+static bool g_kicked;
+
+void GpuKicked()
+{
+    {
+        std::lock_guard lock(g_kickMutex);
+        g_kicked = true;
+    }
+    g_kick.notify_one();
+}
+
 static void CommandThread()
 {
+#ifdef _WIN32
+    SetThreadDescription(GetCurrentThread(), L"Cristalis GPU"); // (named for profiling)
+#endif
     // The device belongs to this thread: every draw and present happens here.
     if (!RendererInit())
         Log("GPU: no host renderer, running without display");
@@ -881,7 +963,15 @@ static void CommandThread()
         if (g_ringBase == 0 || writeIndex == g_readIndex || writeIndex >= g_ringWordCount)
         {
             uint64_t before = Micros();
-            Sleep(1);
+            static const bool poll = getenv("CD_SPIN") != nullptr; // as before: a look every millisecond (tests)
+            if (poll)
+                Sleep(1);
+            else
+            {
+                std::unique_lock lock(g_kickMutex);
+                g_kick.wait_for(lock, std::chrono::milliseconds(16), [] { return g_kicked; });
+                g_kicked = false;
+            }
             g_statIdleMicros += Micros() - before;
             continue;
         }
@@ -912,6 +1002,9 @@ static void CommandThread()
 
 static void VBlankThread()
 {
+#ifdef _WIN32
+    SetThreadDescription(GetCurrentThread(), L"Cristalis vblank");
+#endif
     for (;;)
     {
         Sleep(16);

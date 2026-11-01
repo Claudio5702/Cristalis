@@ -1,6 +1,7 @@
 // Host implementations of xboxkrnl.exe imports: memory, synchronisation, TLS and
 // the small informational calls the CRT startup needs.
 #include "config.h"
+#include "gpu.h"
 #include "guest.h"
 #include "xex_header.h"
 
@@ -428,6 +429,37 @@ GUEST_IMPORT(KeDelayExecutionThread)
     else
         SwitchToThread();
     ctx.r3.u64 = STATUS_SUCCESS;
+}
+
+// The game's Direct3D waits for the graphics processor (room in its ring buffer, a picture presented...)
+// by asking sub_820F3110 again and again whether it may stop (read with Ghidra): on the console a core
+// spun there; here the picture waits for the screen, so a whole core of the computer went to it (16 ms of
+// every 17). sub_820F3018 starts such a wait; after a few questions, each one now waits a millisecond.
+static thread_local uint32_t t_gpuWaitPolls;
+
+PPC_FUNC_IMPL(__imp__sub_820F3018);
+PPC_FUNC(sub_820F3018)
+{
+    t_gpuWaitPolls = 0;
+    __imp__sub_820F3018(ctx, base);
+}
+
+PPC_FUNC_IMPL(__imp__sub_820F3110);
+PPC_FUNC(sub_820F3110)
+{
+    __imp__sub_820F3110(ctx, base);
+    static const bool spin = getenv("CD_SPIN") != nullptr; // as before (tests)
+    if (ctx.r3.u32 != 0 && ++t_gpuWaitPolls > 16 && !spin)
+        Sleep(1);
+}
+
+// The game's Direct3D kicks the graphics processor here, the only code that writes its ring buffer's write
+// pointer (found with CD_WATCH): the command thread is woken at once.
+PPC_FUNC_IMPL(__imp__sub_820F8B30);
+PPC_FUNC(sub_820F8B30)
+{
+    __imp__sub_820F8B30(ctx, base);
+    GpuKicked();
 }
 
 // ---- String conversion (the code page is treated as Latin-1) ----

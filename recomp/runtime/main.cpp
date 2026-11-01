@@ -13,6 +13,7 @@
 #include <windows.h>
 #ifdef _WIN32
 #include <shellapi.h>
+#include <tlhelp32.h>
 #endif
 
 #include <filesystem>
@@ -22,6 +23,7 @@
 #include <iterator>
 #include <map>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -497,13 +499,27 @@ uint32_t GuestCall(uint32_t address, uint32_t r3, uint32_t r4, int processor)
 }
 
 #ifdef _WIN32
-// CD_SAMPLE=<seconds>: after that delay, log where every guest thread is.
-static void SamplerThread(int seconds)
+static uint32_t GuestFunctionAt(uintptr_t instruction, uintptr_t& start);
+static void SampleOnce(bool first);
+
+// CD_SAMPLE=<seconds>[,<times>]: after that delay, log where every guest thread is, that many times (one
+// every 37 ms: where the processor time goes).
+static void SamplerThread(int seconds, int times)
 {
     Sleep(DWORD(seconds) * 1000);
+    for (int time = 0; time < std::max(times, 1); time++)
+    {
+        if (time > 0)
+            Sleep(37);
+        SampleOnce(time == 0);
+    }
+}
+
+static void SampleOnce(bool first)
+{
 
     // CD_PEEK=<hex>,<hex>,...: guest words to print, following one pointer level.
-    if (const char* peek = getenv("CD_PEEK"))
+    if (const char* peek = getenv("CD_PEEK"); first && peek != nullptr)
     {
         for (const char* p = peek; *p != 0;)
         {
@@ -584,31 +600,88 @@ static void SamplerThread(int seconds)
         char trace[24 * 9 + 1] = "";
         for (int k = 0; k < snapshot.traceCount; k++)
             snprintf(trace + k * 9, 10, " %08X", snapshot.trace[k]);
-        Log("SAMPLE thread %lu: image offset 0x%zX r3=%08X r4=%08X r5=%08X r31=%08X r1=%08X lr=%08X; returns:%s",
-            snapshot.threadId, size_t(snapshot.rip - imageBase), snapshot.r3, snapshot.r4, snapshot.r5, snapshot.r31,
+        uintptr_t start;
+        uint32_t function = GuestFunctionAt(snapshot.rip, start);
+        Log("SAMPLE thread %lu: in sub_%08X, image offset 0x%zX r3=%08X r4=%08X r5=%08X r31=%08X r1=%08X lr=%08X; returns:%s",
+            snapshot.threadId, function, size_t(snapshot.rip - imageBase), snapshot.r3, snapshot.r4, snapshot.r5, snapshot.r31,
             snapshot.r1, snapshot.lr, trace);
+    }
+}
+
+// The recompiled function containing a host instruction: the one with the closest preceding host address.
+static uint32_t GuestFunctionAt(uintptr_t instruction, uintptr_t& start)
+{
+    uint32_t guestFunction = 0;
+    start = 0;
+    for (size_t i = 0; PPCFuncMappings[i].guest != 0; i++)
+    {
+        uintptr_t host = uintptr_t(PPCFuncMappings[i].host);
+        if (host <= instruction && host > start)
+        {
+            start = host;
+            guestFunction = uint32_t(PPCFuncMappings[i].guest);
+        }
+    }
+    return guestFunction;
+}
+
+// CD_WATCH=<hex guest address>[,<seconds>]: from that many seconds on, a hardware breakpoint on writes to
+// that word in every thread; each recompiled function that writes it is logged once, with the guest
+// function that called it (tests: to find in the game's code what changes a value found in its memory).
+static uint32_t g_watchAddress;
+
+static void WatchThread(uint32_t address, int seconds)
+{
+    Sleep(DWORD(seconds) * 1000);
+    g_watchAddress = address;
+    for (;;)
+    {
+        HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+        THREADENTRY32 entry{ sizeof(entry) };
+        for (BOOL more = Thread32First(snapshot, &entry); more; more = Thread32Next(snapshot, &entry))
+        {
+            if (entry.th32OwnerProcessID != GetCurrentProcessId() || entry.th32ThreadID == GetCurrentThreadId())
+                continue;
+            if (HANDLE thread = OpenThread(THREAD_GET_CONTEXT | THREAD_SET_CONTEXT | THREAD_SUSPEND_RESUME, FALSE, entry.th32ThreadID))
+            {
+                SuspendThread(thread);
+                CONTEXT context{};
+                context.ContextFlags = CONTEXT_DEBUG_REGISTERS;
+                if (GetThreadContext(thread, &context) && context.Dr0 != uintptr_t(g_base + address))
+                {
+                    context.Dr0 = uintptr_t(g_base + address);
+                    context.Dr7 = 1 | (1 << 16) | (3 << 18); // breakpoint 0 on, on writes, 4 bytes
+                    SetThreadContext(thread, &context);
+                }
+                ResumeThread(thread);
+                CloseHandle(thread);
+            }
+        }
+        CloseHandle(snapshot);
+        Sleep(2000); // threads started since
     }
 }
 
 static LONG CALLBACK CrashHandler(EXCEPTION_POINTERS* info)
 {
     auto* record = info->ExceptionRecord;
+    if (record->ExceptionCode == EXCEPTION_SINGLE_STEP && g_watchAddress != 0)
+    {
+        static std::mutex mutex;
+        static std::set<uint32_t> seen;
+        uintptr_t start;
+        uint32_t function = GuestFunctionAt(uintptr_t(record->ExceptionAddress), start);
+        std::lock_guard lock(mutex);
+        if (seen.size() < 64 && seen.insert(function).second)
+            Log("WATCH %08X = %08X written by sub_%08X+0x%zX (host), lr=%08X", g_watchAddress, Load32(g_watchAddress), function,
+                size_t(uintptr_t(record->ExceptionAddress) - start), t_guestContext ? uint32_t(t_guestContext->lr) : 0);
+        return EXCEPTION_CONTINUE_EXECUTION;
+    }
     if (record->ExceptionCode != EXCEPTION_ACCESS_VIOLATION)
         return EXCEPTION_CONTINUE_SEARCH;
 
-    // The recompiled function containing the faulting host instruction is the
-    // one with the closest preceding host address.
-    uint32_t guestFunction = 0;
-    uintptr_t best = 0;
-    for (size_t i = 0; PPCFuncMappings[i].guest != 0; i++)
-    {
-        uintptr_t host = uintptr_t(PPCFuncMappings[i].host);
-        if (host <= uintptr_t(record->ExceptionAddress) && host > best)
-        {
-            best = host;
-            guestFunction = uint32_t(PPCFuncMappings[i].guest);
-        }
-    }
+    uintptr_t best;
+    uint32_t guestFunction = GuestFunctionAt(uintptr_t(record->ExceptionAddress), best);
 
     // Feed this to: llvm-symbolizer --obj=crystal_defenders.exe --relative-address <rva>
     Log("Crash at image offset 0x%zX", size_t(uintptr_t(record->ExceptionAddress) - uintptr_t(GetModuleHandleW(nullptr))));
@@ -634,7 +707,7 @@ static LONG CALLBACK CrashHandler(EXCEPTION_POINTERS* info)
 // Linux: no sampler; a bad access is reported with the guest state and ends the game.
 #include <csignal>
 
-static void SamplerThread(int)
+static void SamplerThread(int, int)
 {
 }
 
@@ -662,7 +735,16 @@ static void RunGuest()
     ctx.fpscr.loadFromHost();
     GuestRegisterContext(&ctx);
     if (const char* sample = getenv("CD_SAMPLE"))
-        std::thread(SamplerThread, atoi(sample)).detach();
+        std::thread(SamplerThread, atoi(sample), strchr(sample, ',') ? atoi(strchr(sample, ',') + 1) : 1).detach();
+#ifdef _WIN32
+    if (const char* watch = getenv("CD_WATCH"))
+    {
+        unsigned address = 0;
+        int seconds = 0;
+        if (sscanf(watch, "%x,%d", &address, &seconds) >= 1)
+            std::thread(WatchThread, uint32_t(address), seconds).detach();
+    }
+#endif
     ctx.r1.u64 = g_mainStackTop - 0x100;
     ctx.r13.u64 = g_mainPcr;
     (PPC_LOOKUP_FUNC(g_base, g_xex.entryPoint))(ctx, g_base);
@@ -812,6 +894,24 @@ int main(int argc, char* argv[])
         return 1;
     }
     memcpy(g_base + PPC_IMAGE_BASE, image.data.get(), image.size);
+    // CD_IMAGEDUMP=<folder>: the game's loaded image (image.bin, at PPC_IMAGE_BASE) and the start of each
+    // of its functions (functions.txt), for a disassembler (analysis of the player's own copy, kept local)
+    if (const char* dump = getenv("CD_IMAGEDUMP"))
+    {
+        std::filesystem::path folder(dump);
+        if (FILE* out = _wfopen((folder / "image.bin").c_str(), L"wb"))
+        {
+            fwrite(image.data.get(), 1, image.size, out);
+            fclose(out);
+        }
+        if (FILE* out = _wfopen((folder / "functions.txt").c_str(), L"w"))
+        {
+            for (size_t i = 0; PPCFuncMappings[i].guest != 0; i++)
+                fprintf(out, "%08X\n", unsigned(PPCFuncMappings[i].guest));
+            fclose(out);
+        }
+        Log("Image dumped to %s (base %08X, %zu bytes)", dump, unsigned(PPC_IMAGE_BASE), size_t(image.size));
+    }
 
     size_t functionCount = 0;
     for (size_t i = 0; PPCFuncMappings[i].guest != 0; i++)

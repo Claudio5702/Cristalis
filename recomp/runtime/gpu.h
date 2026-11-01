@@ -11,6 +11,8 @@ void GpuSetInterruptCallback(uint32_t callback, uint32_t context);
 // Fills the 64-word slot VdSwap is given with a swap packet.
 void GpuWriteSwapPacket(uint32_t buffer, uint32_t frontBuffer, uint32_t width, uint32_t height);
 uint32_t GpuFrameCount();
+// The game has moved its ring buffer's write pointer (sub_820F8B30, its only writer): new commands.
+void GpuKicked();
 
 // Runs a guest function on the calling host thread, creating a guest thread
 // block for it on first use. A non-negative processor is written to the PCR as

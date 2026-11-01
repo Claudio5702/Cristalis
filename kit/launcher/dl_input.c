@@ -145,10 +145,20 @@ static bool joy_ps;      // that controller is a PlayStation one (by its name)
 static bool joy_zr;      // it has the Z and R axes (a right stick)
 int dl_input_kind;
 
+static bool input_mouse; // the mouse used last in play (dl_mouse_used): DL_DEVICE_MOUSE, the footer the keyboard's
+
 void dl_input_used(int kind) {
+  if (dl_console) dl_pointer_hide(true); // a key or a controller: the pointer out of the way again
+  input_mouse = false;
   if (kind == dl_input_kind) return;
   dl_input_kind = kind;
   dl_dirty = true;
+}
+
+void dl_mouse_used(void) {
+  if (dl_input_kind != DL_IN_KEYS) dl_dirty = true;
+  dl_input_kind = DL_IN_KEYS;
+  input_mouse = true;
 }
 
 // The button that chooses (or goes back) in the menus, as a picture: A and B of an Xbox pad; on another
@@ -161,6 +171,156 @@ int dl_pad_glyph(bool confirm) {
   if (n < 0) n = confirm ? 1 : 0;
   if (dl_input_kind == DL_IN_PS && n < 4) return GL_PS_SQUARE + n;
   return GL_NUM + n;
+}
+
+// ---- the game's own button prompts (2.94)
+int dl_input_device(void) {
+  switch (dl_input_kind) {
+    case DL_IN_XBOX: return DL_DEVICE_XBOX;
+    case DL_IN_PS: case DL_IN_PS_HID: return DL_DEVICE_PLAYSTATION;
+    case DL_IN_PAD: return DL_DEVICE_OTHER;
+  }
+  return input_mouse ? DL_DEVICE_MOUSE : DL_DEVICE_KEYBOARD;
+}
+
+// Changes when what dl_button_picture draws would: the device, an assignment, the WinMM mode.
+unsigned dl_input_serial(void) {
+  static u32 last;
+  static unsigned serial = 1;
+  u32 h = 2166136261u;
+  const int *parts[3] = {dl_key_vk, dl_pad_code, dl_joy_code};
+  const int counts[3] = {DL_BTNS, DL_BTNS, DL_BTNS};
+  for (int p = 0; p < 3; p++)
+    for (int k = 0; k < counts[p]; k++) h = (h ^ (u32)parts[p][k]) * 16777619u;
+  h = (h ^ (u32)(dl_input_device() * 4 + dl_joy_mode() * 2 + joy_ps)) * 16777619u;
+  if (h != last) last = h, serial++;
+  return serial;
+}
+
+// What a game's button (bit k of DlInput.buttons) looks like on the device used now.
+static DlButtonLook button_look(int k) {
+  static const wchar_t *const arrows[4] = {L"\u2191", L"\u2193", L"\u2190", L"\u2192"};
+  int device = dl_input_device();
+  if (device == DL_DEVICE_MOUSE && (k == 4 || k == 5)) return (DlButtonLook){BP_MOUSE, k - 4, NULL};
+  if (device == DL_DEVICE_KEYBOARD || device == DL_DEVICE_MOUSE) {
+    int vk = dl_key_vk[k];
+    if (!vk) return (DlButtonLook){BP_NONE, 0, NULL};
+    bool arrow = vk >= VK_LEFT && vk <= VK_DOWN; // VK_LEFT, VK_UP, VK_RIGHT, VK_DOWN
+    static const int order[4] = {2, 0, 3, 1};
+    return (DlButtonLook){BP_KEY, 0, arrow ? arrows[order[vk - VK_LEFT]] : dl_key_name(vk)};
+  }
+  if (dl_joy_mode()) { // WinMM: the button's number, or a PlayStation symbol (DirectInput order)
+    static wchar_t num[DL_BTNS][8];
+    int n = dl_joy_code[k];
+    if (n < 0) return k < 4 ? (DlButtonLook){BP_DPAD, k, NULL} : (DlButtonLook){BP_NONE, 0, NULL};
+    if (joy_ps && n < 4) return (DlButtonLook){BP_PS, n, NULL};
+    wsprintfW(num[k], L"%d", n + 1);
+    return (DlButtonLook){BP_DISC, 0, num[k]};
+  }
+  int code = dl_pad_code[k]; // XInput codes (PlayStation pads read directly too)
+  if (code < 0) return (DlButtonLook){BP_NONE, 0, NULL};
+  if (code < 4) return (DlButtonLook){BP_DPAD, code, NULL};
+  bool ps = device == DL_DEVICE_PLAYSTATION;
+  if (code >= 12 && code <= 15) {
+    static const int ps_of[4] = {1, 2, 0, 3}; // A cross, B circle, X square, Y triangle
+    return ps ? (DlButtonLook){BP_PS, ps_of[code - 12], NULL} : (DlButtonLook){BP_XBOX, code - 12, NULL};
+  }
+  static const wchar_t *const xbox[18] = {NULL, NULL, NULL, NULL, L"Start", L"Back", L"LS", L"RS", L"LB", L"RB", L"?", L"?", NULL, NULL, NULL, NULL, L"LT", L"RT"};
+  static const wchar_t *const sony[18] = {NULL, NULL, NULL, NULL, L"Options", L"Share", L"L3", L"R3", L"L1", L"R1", L"PS", L"Touch", NULL, NULL, NULL, NULL, L"L2", L"R2"};
+  const wchar_t *label = code < 18 ? (ps ? sony : xbox)[code] : NULL;
+  return label ? (DlButtonLook){BP_PILL, 0, label} : (DlButtonLook){BP_NONE, 0, NULL};
+}
+
+// Kept per button and size until the serial changes.
+const uint32_t *dl_button_picture(unsigned button, int size, int *w, int *h) {
+  static struct { int k, size, w, h; unsigned serial; u32 *px; } cache[32];
+  if (w) *w = 0;
+  if (h) *h = 0;
+  if (!button || (button & (button - 1)) || button >= 1u << DL_BTNS) return NULL;
+  int k = 0;
+  while (!(button & (1u << k))) k++;
+  size = size < 8 ? 8 : size > 256 ? 256 : size;
+  unsigned serial = dl_input_serial();
+  int slot = -1;
+  for (int n = 0; n < 32 && slot < 0; n++)
+    if (cache[n].px && cache[n].k == k && cache[n].size == size) slot = n;
+  if (slot >= 0 && cache[slot].serial != serial) { free(cache[slot].px); cache[slot].px = NULL; }
+  if (slot < 0 || !cache[slot].px) {
+    if (slot < 0) {
+      static int next;
+      for (int n = 0; n < 32 && slot < 0; n++)
+        if (!cache[n].px) slot = n;
+      if (slot < 0) { slot = next++ & 31; free(cache[slot].px); cache[slot].px = NULL; } // (a game asking for many sizes)
+    }
+    DlButtonLook look = button_look(k);
+    if (look.shape == BP_NONE) return NULL;
+    cache[slot].px = ui_button_draw(look, size, &cache[slot].w, &cache[slot].h);
+    cache[slot].k = k, cache[slot].size = size, cache[slot].serial = serial;
+    if (!cache[slot].px) return NULL;
+  }
+  if (w) *w = cache[slot].w;
+  if (h) *h = cache[slot].h;
+  return cache[slot].px;
+}
+
+// --ui-audit: the pictures of every button the game offers, on each device, at three sizes, over a
+// grey (the WinMM controllers stood for by the flags dl_joy_mode reads); a button without one is an issue.
+void dl_buttons_audit(const char *dir) {
+  static const char *const names[] = {"keys", "mouse", "xbox", "ps", "ps_winmm", "pad_winmm"};
+  static const int sizes[3] = {24, 32, 64};
+  int keep_kind = dl_input_kind;
+  bool keep_mouse = input_mouse, keep_xi = xinput_present, keep_joy = joy_present, keep_ps = joy_ps;
+  for (int dev = 0; dev < 6; dev++) {
+    static const int kinds[6] = {DL_IN_KEYS, DL_IN_KEYS, DL_IN_XBOX, DL_IN_PS_HID, DL_IN_PS, DL_IN_PAD};
+    dl_input_kind = kinds[dev];
+    input_mouse = dev == 1;
+    bool winmm = dev >= 4;
+    xinput_present = !winmm, joy_present = winmm, joy_ps = dev == 4;
+    int sw = 8, sh = 8;
+    for (int z = 0; z < 3; z++) {
+      int row = 8;
+      for (int k = 0; k < DL_BTNS; k++) {
+        if (k >= DL_BTNS_CLASSIC && !(dl_game->extra_buttons & (1u << k))) continue;
+        int w, h;
+        if (dl_button_picture(1u << k, sizes[z], &w, &h)) row += w + 6;
+        else if (!z) {
+          wchar_t what[64];
+          wsprintfW(what, L"%hs, button %d", names[dev], k);
+          ui_audit_note("button without picture", what);
+        }
+      }
+      if (row > sw) sw = row;
+      sh += sizes[z] + 8;
+    }
+    u32 *sheet = malloc((size_t)sw * sh * 4);
+    if (!sheet) continue;
+    for (int n = 0; n < sw * sh; n++) sheet[n] = 0xFF3C4254;
+    int y = 8;
+    for (int z = 0; z < 3; z++) {
+      int x = 8;
+      for (int k = 0; k < DL_BTNS; k++) {
+        if (k >= DL_BTNS_CLASSIC && !(dl_game->extra_buttons & (1u << k))) continue;
+        int w, h;
+        const u32 *px = dl_button_picture(1u << k, sizes[z], &w, &h);
+        if (!px) continue;
+        for (int j = 0; j < h; j++)
+          for (int i = 0; i < w; i++) { // the picture over the grey
+            u32 p = px[j * w + i], a = p >> 24, *d = &sheet[(size_t)(y + j) * sw + x + i];
+            u32 out = 0xFF000000;
+            for (int c = 0; c < 24; c += 8) out |= (((p >> c) & 255) + ((*d >> c) & 255) * (255 - a) / 255) << c;
+            *d = out;
+          }
+        x += w + 6;
+      }
+      y += sizes[z] + 8;
+    }
+    char path[MAX_PATH];
+    snprintf(path, sizeof path, "%s" DL_SEP "buttons_%s.png", dir, names[dev]);
+    dl_save_png(path, sheet, sw, sh);
+    free(sheet);
+  }
+  dl_input_kind = keep_kind;
+  input_mouse = keep_mouse, xinput_present = keep_xi, joy_present = keep_joy, joy_ps = keep_ps;
 }
 static u32 joy_dirs;     // its stick and hat, as DL_UP..DL_RIGHT
 
@@ -202,7 +362,12 @@ static u32 xinput_poll(void) {
     if (g->sThumbLX < -16000) r |= STICK_LEFT;
     if (g->sThumbLX > 16000) r |= STICK_RIGHT;
     raw |= r;
-    if (pads_n < PADS_MAX) pads_now[pads_n++] = (DlPadRead){r, g->sThumbLX, g->sThumbLY, g->sThumbRX, g->sThumbRY};
+#ifdef _WIN32
+    int id = (int)slot;
+#else
+    int id = dl_xinput_id(slot);
+#endif
+    if (pads_n < PADS_MAX) pads_now[pads_n++] = (DlPadRead){r, g->sThumbLX, g->sThumbLY, g->sThumbRX, g->sThumbRY, id};
   }
   return raw;
 }
@@ -254,7 +419,7 @@ static bool joy_poll(void) {
     if (a >= 20250 && a <= 33750) joy_hat |= DL_LEFT;
   }
   joy_dirs |= joy_hat;
-  joy_sticks = (DlPadRead){0, joy_axis(ji.dwXpos, false), joy_axis(ji.dwYpos, true), joy_zr ? joy_axis(ji.dwZpos, false) : 0, joy_zr ? joy_axis(ji.dwRpos, true) : 0};
+  joy_sticks = (DlPadRead){0, joy_axis(ji.dwXpos, false), joy_axis(ji.dwYpos, true), joy_zr ? joy_axis(ji.dwZpos, false) : 0, joy_zr ? joy_axis(ji.dwRpos, true) : 0, 32 + id};
   joy_present = true;
   joy_raw = ji.dwButtons;
   return true;
@@ -306,21 +471,60 @@ static void sticks_take(DlInput *in, const DlPadRead *p) { // the controller pus
   if (abs(v.rx) + abs(v.ry) >= abs(in->rx) + abs(in->ry)) in->rx = v.rx, in->ry = v.ry;
 }
 
+// Two players (DlGame.players 2): each one's controller by its id (-1: none yet). The first controller
+// used takes player 1's place, the next one player 2's; with p2_pad, the first one used is player 2's
+// (player 1 keeps the keyboard) and no other plays. A controller that goes gives its place back, and one
+// never used plays for no one: a device that never presses anything, which Windows may count before the
+// real pad, takes nobody's place.
+static int seat[2] = {-1, -1};
+static void seats_follow(const int *ids, const u32 *used, int n, bool p2_first) {
+  for (int s = 0; s < 2; s++) {
+    bool here = false;
+    for (int i = 0; i < n && !here; i++) here = ids[i] == seat[s];
+    if (!here) seat[s] = -1;
+  }
+  for (int i = 0; i < n; i++) {
+    if (!used[i] || ids[i] == seat[0] || ids[i] == seat[1]) continue;
+    int s = p2_first || seat[0] >= 0 ? 1 : 0;
+    if (seat[s] < 0) seat[s] = ids[i];
+  }
+}
+
+// Each turn, from dl_pad_poll: the controllers that press something take their places.
+static void seats_now(void) {
+  static int p2_was = -1;
+  if (dl_game->players < 2) return;
+  if (dl_cfg.p2_pad != p2_was) seat[0] = seat[1] = -1; // the places taken again
+  p2_was = dl_cfg.p2_pad;
+  int ids[PADS_MAX];
+  u32 used[PADS_MAX];
+  int n = 0;
+  if (pads_n == 0 && joy_present) {
+    ids[0] = joy_sticks.id;
+    used[0] = joy_raw | joy_dirs;
+    n = 1;
+  }
+  for (int i = 0; i < pads_n; i++, n++) {
+    ids[n] = pads_now[i].id;
+    used[n] = pads_now[i].raw;
+  }
+  seats_follow(ids, used, n, dl_cfg.p2_pad != 0);
+}
+
 void dl_game_input(DlInput in[2]) {
   memset(in, 0, 2 * sizeof *in);
   u32 offered = ((1u << DL_BTNS_CLASSIC) - 1) | (dl_game->extra_buttons & ~((1u << DL_BTNS_CLASSIC) - 1));
   if (GetForegroundWindow() == dl_hwnd)
     for (int k = 0; k < DL_BTNS; k++)
       if (dl_key_vk[k] && GetAsyncKeyState(dl_key_vk[k]) < 0) in[0].buttons |= 1u << k;
-  // the controllers in their order (the XInput slots, then the PlayStation pads; a WinMM one alone);
-  // one player has them all, two share them: the first to player 1, the second to player 2, or the first
-  // to player 2 when player 1 keeps the keyboard (p2_pad)
+  // the controllers (the XInput slots, the PlayStation pads; a WinMM one alone): one player has them all,
+  // two have the one each took (seats_now)
   bool two = dl_game->players >= 2, joy = pads_n == 0 && joy_present;
   int n = joy ? 1 : pads_n;
   for (int i = 0; i < n; i++) {
-    int p = !two ? 0 : dl_cfg.p2_pad ? (i == 0 ? 1 : -1) : (i < 2 ? i : -1);
-    if (p < 0) continue;
     const DlPadRead *pr = joy ? &joy_sticks : &pads_now[i];
+    int p = !two ? 0 : pr->id == seat[0] ? 0 : pr->id == seat[1] ? 1 : -1;
+    if (p < 0) continue;
     in[p].buttons |= joy ? pad_buttons(joy_raw, true, joy_dirs & ~joy_hat) | joy_hat : pad_buttons(pr->raw, false, 0);
     if (dl_game->analog) sticks_take(&in[p], pr);
   }
@@ -449,6 +653,7 @@ void dl_pad_poll(void) {
   pad_raw |= sony_raw;
   if (!xinput_present && !sony_present) joy_poll(); // a PlayStation pad read directly is not read again by WinMM
   else joy_present = false;
+  seats_now();
   rumble_follow();
   static u32 prev_sony;
   bool from_sony = (sony_raw & ~prev_sony) != 0;
@@ -487,7 +692,7 @@ void dl_pad_poll(void) {
     if (menu) dl_pause_open();
     else if (FN_PRESSED(FN_SAVE)) dl_quick_save();
     else if (FN_PRESSED(FN_LOAD)) dl_quick_load();
-    else if (FN_PRESSED(FN_SHOT)) dl_screenshot();
+    else if (FN_PRESSED(FN_SHOT) && !dl_over) dl_screenshot();
     else
       for (int k = 0; k < dl_func_n; k++)
         if (FN_PRESSED(FN_COUNT + k)) { dl_funcs[k].run(); break; }
@@ -527,8 +732,8 @@ bool dl_game_key(int vk) {
     if (vk == dl_hot_vk[HK_PREV]) { dl_slot_step(-1); return true; }
     if (vk == dl_hot_vk[HK_NEXT]) { dl_slot_step(1); return true; }
   }
-  if (vk == dl_hot_vk[HK_SHOT]) { dl_screenshot(); return true; }
-  if (vk == dl_hot_vk[HK_FULL]) { dl_toggle_fullscreen(); return true; }
+  if (vk == dl_hot_vk[HK_SHOT] && !dl_over) { dl_screenshot(); return true; } // over the game: its own picture, window and keys
+  if (vk == dl_hot_vk[HK_FULL] && !dl_over) { dl_toggle_fullscreen(); return true; }
   for (int k = 0; k < dl_func_n; k++)
     if (dl_funcs[k].key && vk == dl_funcs[k].key) { dl_funcs[k].run(); return true; }
   return false;

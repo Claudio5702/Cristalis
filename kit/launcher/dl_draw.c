@@ -24,7 +24,7 @@ void ui_audit_note(const char *what, const wchar_t *text) {
 static const DlTheme *theme(void) { return dl_game ? dl_game->theme : NULL; }
 
 static const wchar_t *face(void) {
-  if (dl_cfg.ui_lang == 0) return L"Yu Gothic UI";
+  if (dl_lang_face()) return dl_lang_face();
   return theme() && theme()->text_font ? theme()->text_font : L"Verdana";
 }
 
@@ -115,6 +115,10 @@ bool ui_theme_hsl(float *turn_out, float *strength_out) {
 static int frame_style(void) { return theme() ? theme()->frame : DL_FRAME_ROUND; }
 static int title_style(void) { return theme() ? theme()->title : DL_TITLE_METAL; }
 int ui_sky_style(void) { return theme() ? theme()->sky : DL_SKY_CLOUDS; }
+double ui_sky_rows(void) {
+  double s = theme() ? theme()->sky_pixel : 0;
+  return s > 0 ? 400.0 / (s < 0.5 ? 0.5 : s) : 120;
+}
 
 // A corner of r logical pixels in the theme's frame style.
 static double ui_corner(double r) {
@@ -180,6 +184,16 @@ static void pic_draw(HDC dc, UiPic *p, int bx, int by, int bw, int bh) {
   }
   BLENDFUNCTION bf = {AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
   AlphaBlend(dc, bx + (bw - w) / 2, by + (bh - h) / 2, w, h, p->dc, 0, 0, w, h, bf);
+}
+
+// A picture of the game's (0xAARRGGBB, premultiplied, valid while the program runs) drawn whole in the
+// box (window pixels), kept at its last size under 'slot' (0 to 255; each user its own slots).
+void ui_picture(HDC dc, int slot, const u32 *src, int sw, int sh, int bx, int by, int bw, int bh) {
+  static UiPic got[256];
+  if (slot < 0 || slot >= 256 || !src) return;
+  UiPic *p = &got[slot];
+  if (p->src != src || p->sw != sw || p->sh != sh) { p->src = src; p->sw = sw; p->sh = sh; p->dw = p->dh = 0; } // (made again)
+  pic_draw(dc, p, bx, by, bw, bh);
 }
 
 bool ui_theme_icon(HDC dc, unsigned icon, double x0, double y0, double x1, double y1) {
@@ -290,7 +304,7 @@ void ui_fonts(void) {
   f_title_small = CreateFontW(-PX(33), PX(11.5), 0, 0, FW_BOLD, slant, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
   f_item = CreateFontW(-PX(15), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
   f_small = CreateFontW(-PX(11), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
-  f_help = CreateFontW(-PX(dl_cfg.big_help ? 15.5 : 13), 0, 0, 0, FW_NORMAL, dl_cfg.ui_lang != 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
+  f_help = CreateFontW(-PX(dl_cfg.big_help ? 15.5 : 13), 0, 0, 0, FW_NORMAL, !dl_lang_face(), 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face()); // no italics in CJK
 }
 
 void ui_rect(HDC dc, double x0, double y0, double x1, double y1, COLORREF c) {
@@ -452,6 +466,45 @@ void ui_panel(HDC dc, double x0, double y0, double x1, double y1, COLORREF fill,
   }
 }
 
+// A text to wrap (DrawTextW with DT_WORDBREAK) in width pixels with dc's font: the spaces French puts
+// before : ; ! ? » and after « made non-breaking (U+00A0), so that a line never starts with ": «
+// Redémarrer »" (2.57); in Korean, the lines ended at the spaces (2.90: GDI ends them between any two
+// syllables, inside a word). The result lives until the next call.
+const wchar_t *ui_wrap_text(HDC dc, const wchar_t *s, int width) {
+  static wchar_t out[4096];
+  size_t n = 0;
+  for (size_t k = 0; s[k] && n < sizeof out / sizeof out[0] - 1; k++) {
+    wchar_t c = s[k], next = s[k + 1], prev = k ? s[k - 1] : 0;
+    bool keep = c == L' ' && (next == L':' || next == L';' || next == L'!' || next == L'?' || next == 0xBB || prev == 0xAB);
+    out[n++] = keep ? 0xA0 : c;
+  }
+  out[n] = 0;
+  if (dl_cfg.ui_lang == DL_LANG_KO) ui_break_words(dc, out, width);
+  return out;
+}
+
+// The lines of s (in place) ended at its spaces so that each fits in width pixels with dc's font: a
+// space becomes a line's end where the next word would not fit (a word wider than the line is left
+// to DrawTextW).
+void ui_break_words(HDC dc, wchar_t *s, int width) {
+  wchar_t *line = s, *last_space = NULL;
+  for (wchar_t *p = s;; p++) {
+    if (*p == L' ' || *p == L'\n' || !*p) {
+      SIZE sz;
+      if (GetTextExtentPoint32W(dc, line, (int)(p - line), &sz) && sz.cx > width && last_space) {
+        *last_space = L'\n';
+        line = last_space + 1;
+        last_space = NULL;
+        p = line - 1; // this word measured again on its new line
+        continue;
+      }
+      if (!*p) break;
+      if (*p == L'\n') line = p + 1, last_space = NULL;
+      else last_space = p;
+    }
+  }
+}
+
 void ui_text(HDC dc, HFONT f, double x, double y, const wchar_t *s, COLORREF c, UINT align) {
   SelectObject(dc, f);
   SetBkMode(dc, TRANSPARENT);
@@ -489,25 +542,36 @@ void ui_text_fit(HDC dc, double x, double y, const wchar_t *s, COLORREF c, UINT 
 }
 
 // ---- the project's name, tall serif capitals with a larger initial, in white with a night-blue edge
-static double title_path(HDC dc, double x, double base) {
+// The path of the characters from..to-1 of the name (counted from its start, the initial first), each
+// where it is in the whole name; returns where the whole name ends.
+static double title_path_of(HDC dc, double x, double base, int from, int to) {
   static const struct { const wchar_t *text; bool big; } part[] = {{L"" PROJECT_LOGO_FIRST, true}, {L"" PROJECT_LOGO_REST, false}};
   SetBkMode(dc, TRANSPARENT);
   SetTextAlign(dc, TA_LEFT | TA_BASELINE);
   SetTextCharacterExtra(dc, PX(2.2));
-  int px = ui_ox + PX(x);
+  int px = ui_ox + PX(x), at = 0; // at: the name's characters before this part
   BeginPath(dc);
   for (int k = 0; k < 2; k++) {
     SIZE sz;
-    int n = lstrlenW(part[k].text);
+    int n = lstrlenW(part[k].text), a = from - at, b = to - at;
+    a = a < 0 ? 0 : a;
+    b = b > n ? n : b;
     SelectObject(dc, part[k].big ? f_title : f_title_small);
-    TextOutW(dc, px, ui_oy + PX(base), part[k].text, n);
+    if (a < b) {
+      SIZE skip = {0, 0};
+      if (a > 0) GetTextExtentPoint32W(dc, part[k].text, a, &skip);
+      TextOutW(dc, px + skip.cx, ui_oy + PX(base), part[k].text + a, b - a);
+    }
     GetTextExtentPoint32W(dc, part[k].text, n, &sz);
     px += sz.cx;
+    at += n;
   }
   EndPath(dc);
   SetTextCharacterExtra(dc, 0);
   return (px - ui_ox) / ui_s;
 }
+
+static double title_path(HDC dc, double x, double base) { return title_path_of(dc, x, base, 0, 1 << 30); }
 
 static void title_extra(HDC dc, double end, double base);
 
@@ -523,18 +587,38 @@ void ui_title(HDC dc, double x, double base) {
     return;
   }
   if (title_style() == DL_TITLE_FLAT) { // a shadow, the letters in the value colour, a rule of that colour
-    HBRUSH shadow = CreateSolidBrush(ui_tint(RGB(4, 14, 60))), face = CreateSolidBrush(ui_value());
+    // (or the theme's own colour for the name, or for its first title_split characters; the value
+    // colour in high contrast, the most readable)
+    u32 tc = theme() && !dl_cfg.contrast ? theme()->title_colour : 0;
+    int split = tc ? theme()->title_split : 0;
+    COLORREF v = ui_value(), fade = ui_tint(RGB(0x10, 0x38, 0xA0));
+    HBRUSH shadow = CreateSolidBrush(ui_tint(RGB(4, 14, 60))), face = CreateSolidBrush(v);
+    HBRUSH own = tc ? CreateSolidBrush(RGB(tc >> 16 & 255, tc >> 8 & 255, tc & 255)) : NULL;
     HGDIOBJ ob = SelectObject(dc, shadow), op = SelectObject(dc, GetStockObject(NULL_PEN));
     title_path(dc, x + 2, base + 2);
     FillPath(dc);
-    SelectObject(dc, face);
-    double end = title_path(dc, x, base);
-    FillPath(dc);
+    double end;
+    if (own) {
+      SelectObject(dc, own);
+      end = title_path_of(dc, x, base, 0, split > 0 ? split : 1 << 30);
+      FillPath(dc);
+      if (split > 0) {
+        SelectObject(dc, face);
+        title_path_of(dc, x, base, split, 1 << 30);
+        FillPath(dc);
+      }
+    } else {
+      SelectObject(dc, face);
+      end = title_path(dc, x, base);
+      FillPath(dc);
+    }
     SelectObject(dc, ob);
     SelectObject(dc, op);
     DeleteObject(shadow);
     DeleteObject(face);
-    COLORREF v = ui_value(), fade = ui_tint(RGB(0x10, 0x38, 0xA0));
+    if (own) DeleteObject(own);
+    // the rule under the name: in the value colour, or the theme's when the whole name has it
+    if (tc && split <= 0) v = RGB(tc >> 16 & 255, tc >> 8 & 255, tc & 255);
     TRIVERTEX r[2] = {{ui_ox + PX(x), ui_oy + PX(base + 6.5), GetRValue(v) << 8, GetGValue(v) << 8, GetBValue(v) << 8, 0},
                       {ui_ox + PX(end + 40), ui_oy + PX(base + 6.5) + (PX(1.5) < 1 ? 1 : PX(1.5)), GetRValue(fade) << 8, GetGValue(fade) << 8, GetBValue(fade) << 8, 0}};
     GRADIENT_RECT rr = {0, 1};
@@ -583,9 +667,10 @@ static void title_extra(HDC dc, double end, double base) {
   if (sub_px != font_px || sub_lang != dl_cfg.ui_lang) {
     if (f_sub1) DeleteObject(f_sub1);
     if (f_sub2) DeleteObject(f_sub2);
-    bool jp = dl_cfg.ui_lang == 0;
+    const wchar_t *cjk = dl_lang_face(); // in Japanese Yu Mincho, in Chinese and Korean their face (no italics in either)
+    bool jp = dl_cfg.ui_lang == DL_LANG_JP;
     f_sub1 = CreateFontW(-PX(16), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, title_face());
-    f_sub2 = CreateFontW(-PX(13), 0, 0, 0, FW_NORMAL, jp ? 0 : 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, jp ? L"Yu Mincho" : title_face());
+    f_sub2 = CreateFontW(-PX(13), 0, 0, 0, FW_NORMAL, cjk ? 0 : 1, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, jp ? L"Yu Mincho" : cjk ? cjk : title_face());
     sub_px = font_px;
     sub_lang = dl_cfg.ui_lang;
   }
@@ -714,6 +799,178 @@ void ui_pad_glyph(HDC dc, int g, double cx, double cy, double d) {
   DeleteObject(pen);
 }
 
+// ---- a button's picture for the game's own prompts (dl_button_picture, 2.94), in the footer's colours:
+// drawn four times larger, on black then on white (the opacity is the difference), then reduced
+#define BS 4 // the drawing's scale
+static void bp_fill(HDC dc, int shape, int x0, int y0, int x1, int y1, int round, COLORREF c) { // 0 rectangle, 1 ellipse, 2 rounded
+  HBRUSH b = CreateSolidBrush(c);
+  HGDIOBJ ob = SelectObject(dc, b), op = SelectObject(dc, GetStockObject(NULL_PEN));
+  if (shape == 1) Ellipse(dc, x0, y0, x1 + 1, y1 + 1);
+  else if (shape == 2) RoundRect(dc, x0, y0, x1 + 1, y1 + 1, round, round);
+  else {
+    RECT r = {x0, y0, x1, y1};
+    FillRect(dc, &r, b);
+  }
+  SelectObject(dc, ob);
+  SelectObject(dc, op);
+  DeleteObject(b);
+}
+
+static void bp_text(HDC dc, HFONT f, int cx, int cy, const wchar_t *s, COLORREF c) {
+  SIZE sz;
+  HGDIOBJ of = SelectObject(dc, f);
+  GetTextExtentPoint32W(dc, s, lstrlenW(s), &sz);
+  SetTextAlign(dc, TA_LEFT | TA_TOP);
+  SetBkMode(dc, TRANSPARENT);
+  SetTextColor(dc, c);
+  TextOutW(dc, cx - sz.cx / 2, cy - sz.cy / 2, s, lstrlenW(s));
+  SelectObject(dc, of);
+}
+
+static void bp_draw(HDC dc, DlButtonLook b, HFONT f, int W, int H) {
+  const COLORREF dark = RGB(34, 36, 44), light = RGB(240, 242, 248);
+  int d = H, cx = W / 2, cy = H / 2;
+  switch (b.shape) {
+    case BP_XBOX: {
+      static const COLORREF fill[4] = {RGB(76, 168, 64), RGB(214, 58, 52), RGB(46, 110, 214), RGB(226, 178, 22)};
+      static const wchar_t *const letter[4] = {L"A", L"B", L"X", L"Y"};
+      bp_fill(dc, 1, 0, 0, d - 1, d - 1, 0, fill[b.which]);
+      bp_text(dc, f, cx, cy, letter[b.which], RGB(255, 255, 255));
+      break;
+    }
+    case BP_PS: {
+      static const COLORREF ink[4] = {RGB(232, 128, 186), RGB(124, 168, 236), RGB(236, 96, 104), RGB(64, 200, 160)}; // square, cross, circle, triangle
+      bp_fill(dc, 1, 0, 0, d - 1, d - 1, 0, dark);
+      HPEN pen = CreatePen(PS_SOLID, d / 11 > 1 ? d / 11 : 1, ink[b.which]);
+      HGDIOBJ op = SelectObject(dc, pen), ob = SelectObject(dc, GetStockObject(NULL_BRUSH));
+      int r = d * 24 / 100, x0 = cx - r, y0 = cy - r, x1 = cx + r, y1 = cy + r;
+      if (b.which == 0) Rectangle(dc, x0, y0, x1 + 1, y1 + 1);
+      else if (b.which == 2) Ellipse(dc, x0, y0, x1 + 1, y1 + 1);
+      else if (b.which == 1) {
+        MoveToEx(dc, x0, y0, NULL);
+        LineTo(dc, x1, y1);
+        MoveToEx(dc, x1, y0, NULL);
+        LineTo(dc, x0, y1);
+      } else {
+        POINT p[3] = {{cx, cy - r * 105 / 100}, {x1, cy + r * 75 / 100}, {x0, cy + r * 75 / 100}};
+        Polygon(dc, p, 3);
+      }
+      SelectObject(dc, op);
+      SelectObject(dc, ob);
+      DeleteObject(pen);
+      break;
+    }
+    case BP_DISC:
+      bp_fill(dc, 1, 0, 0, d - 1, d - 1, 0, dark);
+      bp_text(dc, f, cx, cy, b.label, light);
+      break;
+    case BP_PILL:
+      bp_fill(dc, 2, 0, d / 10, W - 1, d - 1 - d / 10, d * 7 / 10, dark);
+      bp_text(dc, f, cx, cy, b.label, light);
+      break;
+    case BP_DPAD: { // the cross, the direction lit
+      bp_fill(dc, 1, 0, 0, d - 1, d - 1, 0, dark);
+      int a = d * 36 / 100, t = d * 12 / 100; // arm length and half width
+      bp_fill(dc, 0, cx - a, cy - t, cx + a, cy + t, 0, RGB(110, 116, 130));
+      bp_fill(dc, 0, cx - t, cy - a, cx + t, cy + a, 0, RGB(110, 116, 130));
+      if (b.which == 0) bp_fill(dc, 0, cx - t, cy - a, cx + t, cy - t, 0, light);
+      else if (b.which == 1) bp_fill(dc, 0, cx - t, cy + t, cx + t, cy + a, 0, light);
+      else if (b.which == 2) bp_fill(dc, 0, cx - a, cy - t, cx - t, cy + t, 0, light);
+      else bp_fill(dc, 0, cx + t, cy - t, cx + a, cy + t, 0, light);
+      break;
+    }
+    case BP_KEY: { // a key cap: its edge, its top, the name
+      int e = d / 14 > 1 ? d / 14 : 1;
+      bp_fill(dc, 2, 0, 0, W - 1, d - 1, d / 4, RGB(120, 124, 136));
+      bp_fill(dc, 2, e, e, W - 1 - e, d - 1 - e * 3, d / 5, RGB(238, 240, 244));
+      bp_text(dc, f, cx, cy - e, b.label, RGB(30, 32, 40));
+      break;
+    }
+    case BP_MOUSE: { // the body, its two buttons, the one lit
+      int mw = W, e = d / 14 > 1 ? d / 14 : 1, split = d * 44 / 100;
+      bp_fill(dc, 2, 0, 0, mw - 1, d - 1, mw * 9 / 10, dark);
+      HRGN body = CreateRoundRectRgn(e, e, mw - e + 1, d - e + 1, mw * 8 / 10, mw * 8 / 10);
+      SelectClipRgn(dc, body);
+      bp_fill(dc, 0, e, e, mw - e, d - e, 0, RGB(226, 229, 236));
+      if (b.which == 0) bp_fill(dc, 0, e, e, mw / 2, split, 0, RGB(64, 150, 255));
+      else bp_fill(dc, 0, mw / 2, e, mw - e, split, 0, RGB(64, 150, 255));
+      bp_fill(dc, 0, mw / 2 - e / 2, e, mw / 2 - e / 2 + e, split, 0, dark); // between the buttons
+      bp_fill(dc, 0, e, split, mw - e, split + e, 0, dark);                  // under them
+      SelectClipRgn(dc, NULL);
+      DeleteObject(body);
+      break;
+    }
+  }
+}
+
+u32 *ui_button_draw(DlButtonLook b, int size, int *pw, int *ph) {
+  HDC dc = CreateCompatibleDC(NULL);
+  if (!dc) return NULL;
+  int H = size * BS, W = H;
+  int text = b.shape == BP_XBOX || b.shape == BP_DISC ? H * 58 / 100 : H * 42 / 100;
+  if (b.shape == BP_DISC && b.label && lstrlenW(b.label) > 1) text = H * 46 / 100;
+  HFONT f = CreateFontW(-text, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face());
+  if (b.shape == BP_PILL || b.shape == BP_KEY) { // as wide as its name
+    SIZE sz;
+    HGDIOBJ of = SelectObject(dc, f);
+    GetTextExtentPoint32W(dc, b.label, lstrlenW(b.label), &sz);
+    SelectObject(dc, of);
+    int need = sz.cx + H * (b.shape == BP_PILL ? 55 : 45) / 100;
+    if (need > W) W = need;
+  }
+  if (b.shape == BP_MOUSE) W = H * 68 / 100;
+  W = (W + BS - 1) / BS * BS;
+  BITMAPINFO bi = {{sizeof(BITMAPINFOHEADER), W, -H, 1, 32}};
+  void *bits = NULL;
+  HBITMAP bmp = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
+  u32 *black = malloc((size_t)W * H * 4), *out = malloc((size_t)(W / BS) * size * 4);
+  if (!bmp || !bits || !black || !out) {
+    if (bmp) DeleteObject(bmp);
+    DeleteObject(f);
+    DeleteDC(dc);
+    free(black);
+    free(out);
+    return NULL;
+  }
+  HGDIOBJ ob = SelectObject(dc, bmp);
+  for (int pass = 0; pass < 2; pass++) {
+    memset(bits, pass ? 0xFF : 0, (size_t)W * H * 4);
+    bp_draw(dc, b, f, W, H);
+    GdiFlush();
+    if (!pass) memcpy(black, bits, (size_t)W * H * 4);
+  }
+  const u32 *white = bits;
+  int ow = W / BS;
+  for (int y = 0; y < size; y++)
+    for (int x = 0; x < ow; x++) {
+      u32 sum[4] = {0};
+      for (int j = 0; j < BS; j++)
+        for (int i = 0; i < BS; i++) {
+          size_t at = (size_t)(y * BS + j) * W + x * BS + i;
+          u32 k = black[at], w = white[at];
+          int g = (int)((w >> 8) & 255) - (int)((k >> 8) & 255); // what shows through, on green
+          sum[0] += 255 - (g < 0 ? 0 : g);
+          sum[1] += (k >> 16) & 255;
+          sum[2] += (k >> 8) & 255;
+          sum[3] += k & 255;
+        }
+      u32 a = sum[0] / (BS * BS), r = sum[1] / (BS * BS), gg = sum[2] / (BS * BS), bb = sum[3] / (BS * BS);
+      if (r > a) r = a;
+      if (gg > a) gg = a;
+      if (bb > a) bb = a;
+      out[(size_t)y * ow + x] = a << 24 | r << 16 | gg << 8 | bb;
+    }
+  SelectObject(dc, ob);
+  DeleteObject(bmp);
+  DeleteObject(f);
+  DeleteDC(dc);
+  free(black);
+  *pw = ow;
+  *ph = size;
+  return out;
+}
+#undef BS
+
 // ---- the backdrop: a deep blue sky over a sea of clouds, computed (layered value noise)
 static double sky_cell(int x, int y) {
   u32 h = (u32)x * 374761393u + (u32)y * 668265263u;
@@ -797,6 +1054,76 @@ static void sky_other(int style, double u, double v, double aspect, double *rgb)
   }
 }
 
+// A theme's backdrop that is not opaque everywhere (2.52): scaled to cover the window (bilinear, its
+// colours already multiplied by their opacity) when the size changes, then laid over the sky, which shows
+// through where it is clear. Drawn straight into the setup screen's bitmap (dl_menu_bits, top down, which
+// dc holds): over the sky in GDI; as a layer for the graphics card, which draws the moving sky under it,
+// over black then over white (Windows: the two give the opacity), or with its opacity in the top byte
+// (Linux, dl_gdi_alpha).
+static void backdrop_clear(HDC dc, const u32 *src, int iw, int ih, int cw, int ch) {
+  static u32 *fit;
+  static int fit_w, fit_h;
+  if (cw != fit_w || ch != fit_h) {
+    u32 *n = realloc(fit, (size_t)cw * (size_t)ch * 4);
+    if (!n) return;
+    fit = n;
+    fit_w = cw;
+    fit_h = ch;
+    double sw = iw, sh = (double)iw * ch / cw; // "cover", as below
+    if (sh > ih) { sh = ih; sw = (double)ih * cw / ch; }
+    double ox = (iw - sw) / 2, oy = (ih - sh) / 2;
+    for (int y = 0; y < ch; y++) {
+      double fy = oy + (y + 0.5) * sh / ch - 0.5;
+      int y0 = (int)floor(fy), wy = (int)((fy - y0) * 256);
+      int ya = y0 < 0 ? 0 : y0 >= ih ? ih - 1 : y0, yb = y0 + 1 < 0 ? 0 : y0 + 1 >= ih ? ih - 1 : y0 + 1;
+      const u32 *ra = src + (size_t)ya * iw, *rb = src + (size_t)yb * iw;
+      u32 *out = fit + (size_t)y * cw;
+      for (int x = 0; x < cw; x++) {
+        double fx = ox + (x + 0.5) * sw / cw - 0.5;
+        int x0 = (int)floor(fx), wx = (int)((fx - x0) * 256);
+        int xa = x0 < 0 ? 0 : x0 >= iw ? iw - 1 : x0, xb = x0 + 1 < 0 ? 0 : x0 + 1 >= iw ? iw - 1 : x0 + 1;
+        u32 p00 = ra[xa], p01 = ra[xb], p10 = rb[xa], p11 = rb[xb], v = 0;
+        for (int s = 0; s <= 24; s += 8) {
+          u32 top = (p00 >> s & 255) * (u32)(256 - wx) + (p01 >> s & 255) * (u32)wx;
+          u32 bottom = (p10 >> s & 255) * (u32)(256 - wx) + (p11 >> s & 255) * (u32)wx;
+          v |= ((top * (u32)(256 - wy) + bottom * (u32)wy + 32768) >> 16) << s;
+        }
+        u32 a = v >> 24; // (a colour never above its opacity, whatever the game gave)
+        for (int s = 0; s <= 16; s += 8)
+          if ((v >> s & 255) > a) v = (v & ~(255u << s)) | a << s;
+        out[x] = v;
+      }
+    }
+  }
+  // at 4K each layer must stay quick: over black a copy (its opacity in the top byte, which Linux keeps
+  // and Windows' layer_merge leaves out), over white one sum (no carry: a colour is never above its
+  // opacity); over the sky in GDI, made once for each size
+  static u32 *over_sky;
+  static int sky_w, sky_h;
+  size_t n = (size_t)cw * (size_t)ch;
+  u32 *bits = dl_menu_bits;
+  if (dl_layer == 1) memcpy(bits, fit, n * 4);
+  else if (dl_layer == 2)
+    for (size_t k = 0; k < n; k++) bits[k] = fit[k] + (255 - (fit[k] >> 24)) * 0x010101u;
+  else if (over_sky && sky_w == cw && sky_h == ch) memcpy(bits, over_sky, n * 4);
+  else {
+    sky_draw(dc, cw, ch);
+    GdiFlush(); // the sky in the bitmap
+    for (size_t k = 0; k < n; k++) {
+      u32 p = fit[k], na = 255 - (p >> 24), d = bits[k];
+      bits[k] = ((p >> 16 & 255) + ((d >> 16 & 255) * na + 127) / 255) << 16 | ((p >> 8 & 255) + ((d >> 8 & 255) * na + 127) / 255) << 8 |
+                ((p & 255) + ((d & 255) * na + 127) / 255);
+    }
+    u32 *keep = realloc(over_sky, n * 4);
+    if (keep) {
+      over_sky = keep;
+      memcpy(over_sky, bits, n * 4);
+      sky_w = cw;
+      sky_h = ch;
+    }
+  }
+}
+
 // The player's own backdrop instead of the sky: launcher_bg.png (or .jpg, .bmp, .gif) next to the
 // program; otherwise the theme's. Scaled to cover the window with its proportions kept (made again when
 // the size changes). False when there is none.
@@ -804,6 +1131,7 @@ bool backdrop_draw(HDC dc, int cw, int ch) {
   static bool tried, theme_tried;
   static HBITMAP pic;
   static int iw, ih;
+  static const u32 *clear; // the theme's, when not opaque everywhere (backdrop_clear)
   if (!tried) {
     tried = true;
     static const char *const names[] = {"launcher_bg.png", "launcher_bg.jpg", "launcher_bg.bmp", "launcher_bg.gif"};
@@ -816,12 +1144,20 @@ bool backdrop_draw(HDC dc, int cw, int ch) {
   if (!pic && !theme_tried && dl_start_done && theme() && theme()->backdrop) {
     theme_tried = true;
     const u32 *src = theme()->backdrop(&iw, &ih);
-    if (src && iw > 0 && ih > 0) {
+    size_t n = src && iw > 0 && ih > 0 ? (size_t)iw * (size_t)ih : 0;
+    for (size_t k = 0; k < n && !clear; k++)
+      if (src[k] >> 24 != 255) clear = src;
+    if (clear) {
+    } else if (n) {
       BITMAPINFO bi = {{sizeof(BITMAPINFOHEADER), iw, -ih, 1, 32}};
       void *bits = NULL;
       pic = CreateDIBSection(dc, &bi, DIB_RGB_COLORS, &bits, NULL, 0);
       if (pic) memcpy(bits, src, (size_t)iw * ih * 4);
     }
+  }
+  if (clear && dl_menu_bits) {
+    backdrop_clear(dc, clear, iw, ih, cw, ch);
+    return true;
   }
   if (!pic || iw <= 0 || ih <= 0) return false;
   static HDC cache, src;
@@ -866,11 +1202,11 @@ void sky_draw(HDC dc, int cw, int ch) {
         for (int x = 0; x < w; x++) {
           double rgb[3], u = (x + 0.5) / w, v = (y + 0.5) / h, grain = -1;
           int st = ui_sky_style();
-          if (st == DL_SKY_PIXEL) { // blocks 1/120 of the height, few colours with an ordered dither
-            double nx = aspect * 120;
-            int bx = (int)(u * nx), by = (int)(v * 120);
+          if (st == DL_SKY_PIXEL) { // blocks 1/120 of the height (DlTheme.sky_pixel), few colours with an ordered dither
+            double ny = ui_sky_rows(), nx = aspect * ny;
+            int bx = (int)(u * nx), by = (int)(v * ny);
             u = (bx + 0.5) / nx;
-            v = (by + 0.5) / 120;
+            v = (by + 0.5) / ny;
             grain = (((bx & 1) * 2 + (by & 1) * 3) % 4 + 0.5) / 4;
           }
           if (st == DL_SKY_GRADIENT || st == DL_SKY_STARS) sky_other(st, u, v, aspect, rgb);

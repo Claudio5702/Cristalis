@@ -1,21 +1,22 @@
-DarkLauncher 2.41 (commit 4661d3a), copied from W:\project\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
-file dl.h 3ABF68A19BA986FD
-file dl_achieve.c 7717926FD2027AF9
-file dl_app.c 08292268429B2516
-file dl_draw.c F459B52D9FE25DEC
-file dl_gpu.c A277D3430176098A
-file dl_input.c 39B7D7BA83A0F11F
-file dl_int.h 58B641FD97CC6F36
-file dl_menu.c F929011AF7DD2ABC
+DarkLauncher 2.98 (commit bec49bb), copied from W:\project\DarkLauncher by tools\sync_to_project.ps1. Do not change these files here.
+file dl.h 1AA62B8D81A4781E
+file dl_achieve.c 937AD2482DD30D5D
+file dl_app.c 6E245C1D0D53B87F
+file dl_draw.c A50EFF0C5A2169B2
+file dl_games.h B0DE9F032C8CC3AF
+file dl_gpu.c 6834E7D90D23BA94
+file dl_input.c 985BE3229D08BD4D
+file dl_int.h CD4330889BB06193
+file dl_menu.c E44B65FB037807E3
 file dl_packs.c D33C2C3DAD33859C
-file dl_saves.c E50955967902F444
-file dl_sony.c 0672F70CEF3B93BE
-file dl_text.c D24DDD5922195E6A
-file linux/dl_gdi.c 4445316EB68C2965
-file linux/dl_gl.c AA52249E48B36A1E
-file linux/dl_icons.c FE251828245398E6
-file linux/dl_pads.c DC8A7361AA75E3F0
-file linux/dl_win32.c F30C4B0B33F9B0A9
+file dl_saves.c EDE5D41F2AB5E60F
+file dl_sony.c 43E85EE3A67BA430
+file dl_text.c 8FF0BFC70E16B9A3
+file linux/dl_gdi.c C73DA128AA7173B6
+file linux/dl_gl.c 1C228D42C2F8BA39
+file linux/dl_icons.c 92D00F0672BE49D2
+file linux/dl_pads.c BDD6FF9A7C493B21
+file linux/dl_win32.c 904197C74BB352AA
 file linux/include/d3d11.h EF0A93442CA98BBA
 file linux/include/dwmapi.h EF0A93442CA98BBA
 file linux/include/dxgi1_6.h EF0A93442CA98BBA
@@ -24,6 +25,6 @@ file linux/include/setupapi.h EF0A93442CA98BBA
 file linux/include/shellapi.h EF0A93442CA98BBA
 file linux/include/windows.h EF0A93442CA98BBA
 file linux/include/xinput.h EF0A93442CA98BBA
-file linux/win32.h 7C2EE18EF620C957
+file linux/win32.h C629D381F68CB039
 file LICENSE F440F3176A720F9F
 source github.com/Claudio5702/Cristalis

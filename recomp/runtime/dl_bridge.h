@@ -32,3 +32,12 @@ uint16_t DlBridgeButtons();
 void DlBridgeAudio(const int16_t* samples, uint32_t frames);
 // An achievement the game has just unlocked (its id in the game), passed on to DarkLauncher's thread.
 void DlBridgeUnlock(uint32_t id);
+// The game's button pictures (A, B, X, Y and RB in its prompts, 32 x 32) as DarkLauncher draws them for the
+// player's device (keys, mouse, PlayStation symbols; on an Xbox controller the game's own): the number
+// changes whenever they do, and DlBridgePrompt replaces a picture of the game's it recognises (by its
+// texels, 0xAARRGGBB as the texture reads) and says so.
+uint32_t DlBridgePromptGeneration();
+bool DlBridgePrompt(uint32_t* pixels, uint32_t width, uint32_t height);
+// The picture at the proportions of where it is shown ("Fill the screen"): the console's 1280 x 720 with
+// extraWidth columns or extraHeight lines more (in its pixels, half on each side; 0, 0: as the console).
+void DlBridgeFill(uint32_t& extraWidth, uint32_t& extraHeight);

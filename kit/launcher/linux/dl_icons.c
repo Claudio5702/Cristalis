@@ -127,6 +127,13 @@ static bool icon_shapes(unsigned code) {
       outline(box, 6);
       line(0.12, 0.3, 0.5, 0.46), line(0.5, 0.46, 0.88, 0.3), line(0.5, 0.46, 0.5, 0.88);
       break;
+    case 0xE71D: // other games (Segoe's "All apps"): a list, a small square before each line
+      for (int k = 0; k < 3; k++) {
+        double y = 0.24 + k * 0.26;
+        rrect(0.12, y - 0.07, 0.26, y + 0.07, 0.02);
+        line(0.38, y, 0.9, y);
+      }
+      break;
     default: return false;
   }
   return true;

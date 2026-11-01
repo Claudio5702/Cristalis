@@ -104,8 +104,11 @@ extern int dl_pic_w, dl_pic_h; // its size
 extern double dl_pic_aspect; // its proportions on screen (width / height)
 extern int dl_pic_scale;     // its pixels per pixel of the console (dl_picture_scale)
 extern bool dl_pic_shared;   // the last picture is in the game's shared texture, not in dl_pic (dl_picture_shared)
+extern bool dl_pic_waiting;  // no real picture from the game yet (still starting): the preview says so
+extern u32 dl_pic_serial;    // one more whenever dl_pic's pixels change (the graphics card takes them again only then)
 int dl_frame(const DlInput *in, s16 *audio, int audio_max); // the game's frame() into dl_pic
 void dl_pic_fetch(void);     // dl_pic made to hold the last picture when it is in the shared texture
+void dl_pic_release(void);   // done reading the picture in DarkLauncher's target (dl_picture_target): before frame()
 extern bool dl_started;      // the player has started the game (it is paused while the menu is shown)
 extern bool dl_running;
 extern bool dl_start_done;   // the game's start() has run (the theme's pictures may be asked for)
@@ -114,6 +117,15 @@ void dl_safe_restart(void);  // the player's settings back, then the program sta
 void dl_settings_sibling(char *out, const char *ext); // the settings file's path with another extension (MAX_PATH)
 bool dl_packs_key(int vk);   // Page Up / Page Down on the Packs page (dl_packs.c); true: used
 extern bool dl_no_mouse;
+extern bool dl_console;            // started by Steam's Big Picture or Game Mode (2.56): console defaults
+void dl_pointer_hide(bool hide);   // the pointer hidden over the window, or shown (dl_app.c; Linux: dl_win32.c)
+#ifndef _WIN32
+// linux/dl_win32.c, the menus over a game with its own SDL window (2.92): that window as DarkLauncher's,
+// one of the SDL events the game polls as messages, and the next of them (text: typed text taken)
+HWND dl_win32_adopt(void *window);
+void dl_win32_event(const void *event);
+bool dl_win32_take(MSG *m, bool text);
+#endif
 extern const char *dl_audit_dir;
 extern int dl_fps_shown;
 void dl_fit(int cw, int ch, bool integer, int *w, int *h);
@@ -126,6 +138,11 @@ void dl_toggle_fullscreen(void);
 void dl_play(void);      // start or resume the game
 // The game runs outside DarkLauncher (DlGame.play): the setup screen alone, no game inside it.
 #define DL_OUTSIDE (dl_game->play != NULL)
+extern bool dl_over; // the menus over the game (dl_over_start, 2.80): the game's window and picture
+extern bool dl_present_latest; // DlGame.pace_by_game in play (2.82): the newest picture, no wait for the screen
+// no picture of the game in DarkLauncher's hands (outside, or over the game): no preview, no Picture,
+// Sound or Controls pages, no screenshots
+#define DL_NOFRAME (DL_OUTSIDE || dl_over)
 void dl_menu_open(void); // from the game to the setup screen
 void dl_pause_open(void); // from the game to the pause menu (or the setup screen, as chosen)
 bool dl_save_png(const char *path, const u32 *px, int w, int h);
@@ -153,13 +170,22 @@ bool dl_joy_mode(void);
 enum { DL_IN_KEYS, DL_IN_XBOX, DL_IN_PS, DL_IN_PAD, DL_IN_PS_HID }; // DL_IN_PS: by WinMM, DL_IN_PS_HID: read directly (dl_sony.c)
 extern int dl_input_kind;
 void dl_input_used(int kind);
+void dl_mouse_used(void);  // a mouse move or click in play, for a game with mouse_in_game (dl_input_device)
+// A button's picture for the game's prompts (dl_button_picture, 2.94): its shape (which: A B X Y of an
+// Xbox pad; square cross circle triangle; up down left right; the mouse's left or right) and its words.
+enum { BP_NONE, BP_XBOX, BP_PS, BP_DISC, BP_PILL, BP_DPAD, BP_KEY, BP_MOUSE };
+typedef struct { int shape, which; const wchar_t *label; } DlButtonLook;
+u32 *ui_button_draw(DlButtonLook look, int size, int *w, int *h); // dl_draw.c: malloc'd, premultiplied
+void dl_buttons_audit(const char *dir); // --ui-audit: buttons_<device>.png, every button the game offers at 24, 32 and 64
 // Pictures of controller buttons (ui_pad_glyph): GL_NUM + n is button n + 1 of another controller.
 enum { GL_DPAD, GL_XA, GL_XB, GL_XX, GL_XY, GL_PS_SQUARE, GL_PS_CROSS, GL_PS_CIRCLE, GL_PS_TRIANGLE, GL_NUM };
 int dl_pad_glyph(bool confirm); // the button that chooses (true) or goes back in the menus, for dl_input_kind
 void dl_rumble_stop(void);      // at closing time
 // One controller as read this turn: its XInput codes held (bit n: code n; 16 LT, 17 RT; 18-21 the left
 // stick pushed up, down, left, right), its sticks as XInput's.
-typedef struct { u32 raw; s16 lx, ly, rx, ry; } DlPadRead;
+// id: the controller's own while it stays connected (XInput: its slot; PlayStation pads read directly:
+// 16 + theirs; WinMM: 32 + its number; Linux: 1000 + SDL's), for the players' controllers
+typedef struct { u32 raw; s16 lx, ly, rx, ry; int id; } DlPadRead;
 // PlayStation pads read directly (dl_sony.c): each one's buttons as XInput codes and sticks (returns how
 // many, at most max), their rumble (0-255), and looking for them again (Windows says devices came or went).
 int dl_sony_poll(DlPadRead *out, int max);
@@ -256,6 +282,16 @@ void dl_page_insert(int page, int at, const DlRow *row);
 void dl_menu_init(void);   // the kit's pages and the first entry, before the game's setup()
 void dl_menu_finish(void); // the kit's entries after the game's ones
 void dl_safe_page_open(void); // the safe mode page, at the start of a run after a crash
+extern bool dl_all_games;     // --all-games: the "Other games" page with the games not released yet (dl_games.h)
+void dl_others_follow(void);  // each turn: another game started from that page closes this one (dl_menu.c)
+void dl_others_online(void);  // the list on line read on a thread (once; dl_others_follow takes it)
+int dl_http_get(const char *url, char *out, int cap); // a page's body (at most cap bytes), or -1 (dl_app.c)
+void dl_start_values(void);   // the values of the rows taken at start (DlRow.at_start), once the settings are read
+bool dl_start_pending(void);  // one of them differs: the program must start again to take it
+void dl_menu_where(char *out, int n); // where the setup screen is ("" in the game), for dl_relaunch
+int dl_menu_view(void);       // the page the setup screen shows (-1: none), for the soft change of page
+extern bool dl_no_fade;       // --gpu-check: no soft change of page (its pictures come at once)
+bool dl_menu_back(const char *where); // back there in the program started again; false: not a place
 void dl_online_start(void);      // dl_app.c: the look for a newer version, at start (if the player wants it)
 void dl_online_follow(void);     // from the main loop: Discord's status, the result of that look
 const wchar_t *dl_update_text(void); // "Version 1.4 is out." when a newer version was found, else NULL
@@ -275,7 +311,7 @@ void dl_draw_menu(HDC wdc);
 void dl_draw_preview(HDC wdc);
 void dl_key(int vk);
 void dl_menu_reread(void); // list pages read their contents again when next shown
-void dl_mouse(int x, int y, bool click);
+void dl_menu_mouse(int x, int y, bool click);
 int dl_audit(void);
 
 // ---- graphics card output (dl_gpu.c); GDI does everything when it is off or fails
@@ -287,6 +323,8 @@ bool dl_gpu_ready(void);          // the graphics card is chosen and works (fals
 bool dl_gpu_show(bool rebuild, bool vsync);
 int dl_gpu_steps(void);           // screen refreshes for each picture of the game played (smooth motion)
 void dl_gpu_restart(void);        // after a change of the Display setting or of the kind of output
+bool dl_gpu_window_stale(void);   // GDI to draw in a window that has shown the flip model: make it again
+void dl_gpu_window_renewed(void); // (done)
 void dl_gpu_stop(void);
 void dl_gpu_follow(bool now);     // HDR on or off as Windows shows the window's screen (each second)
 bool dl_windows_hdr(void);
@@ -295,9 +333,9 @@ const wchar_t *dl_hdr_value(int v);
 // ---- texts (dl_text.c): each is a DlText
 enum {
   T_FOOTER, T_BACK, T_H_BACK, T_YES, T_NO, T_EMPTY,
-  T_PLAY, T_H_PLAY, T_H_RESUME, T_PREVIEW,
+  T_PLAY, T_H_PLAY, T_H_RESUME, T_PREVIEW, T_STARTING,
   T_LANGS, T_TAB_LANGS, T_H_LANGS, T_UILANG, T_H_UILANG,
-  T_IMAGE, T_TAB_IMAGE, T_H_IMAGE, T_FULL, T_H_FULL, T_INT, T_H_INT, T_FILTER, T_H_FILTER, T_SHARP, T_SMOOTH,
+  T_IMAGE, T_TAB_IMAGE, T_H_IMAGE, T_FULL, T_H_FULL, T_INT, T_H_INT, T_FILTER, T_H_FILTER, T_SHARP, T_SMOOTH, T_XBR,
   T_SCAN, T_H_SCAN, T_FPS, T_H_FPS, T_TRY, T_H_TRY, T_TRY_BACK, T_GFXDEF, T_H_GFXDEF, T_EDGES,
   T_GPU, T_H_GPU, T_GPU_ON, T_GPU_OFF, T_CRT, T_H_CRT, T_CRT_FLAT, T_CRT_CURVED, T_HDR, T_H_HDR, T_HDR_WIN_ON, T_HDR_WIN_OFF,
   T_VSYNC, T_H_VSYNC,
@@ -328,15 +366,19 @@ enum {
   T_SAFE_REPORT, T_H_SAFE_REPORT, T_M_REPORT,
   T_SVH_X, T_SVH_OSK,
   T_H_SETTINGS, T_TAB_SETTINGS,
-  T_NET, T_H_NET, T_H_NET_ON, T_H_NET_DISCORD, T_H_NET_UPD_OFF, T_H_NET_UPD_ON, T_TAB_NET, T_DISCORD, T_H_DISCORD, T_DS_PLAYING, T_DS_MENUS, T_UPDATES, T_H_UPDATES, T_UPD_NEW, T_UPD_NONE, T_UPD_OPEN, T_H_UPD_OPEN,
+  T_NET, T_H_NET, T_H_NET_ON, T_H_NET_DISCORD, T_H_NET_UPD_OFF, T_H_NET_UPD_ON, T_TAB_NET, T_DISCORD, T_H_DISCORD, T_DS_PLAYING, T_DS_MENUS, T_UPDATES, T_H_UPDATES, T_H_UPDATES_GAMES, T_UPD_NEW, T_UPD_NONE, T_UPD_OPEN, T_H_UPD_OPEN,
   T_UPD_INSTALL, T_H_UPD_INSTALL, T_UPD_ST_NONE, T_UPD_ST_PAGE, T_UPD_ST_READY, T_UPD_ST_FAIL, T_UPD_FAIL_NOTE, T_UPD_RESTART,
-  T_TAB_NEWS, T_H_NEWS, T_TAB_WELCOME, T_W_NEXT, T_H_W_LANG, T_H_W_CTRL, T_W_PLAY, T_H_W_PLAY,
+  T_TAB_NEWS, T_H_NEWS, T_TAB_WELCOME, T_W_NEXT, T_H_W_LANG, T_H_W_CTRL, T_W_PLAY, T_H_W_PLAY, T_H_W_GAME,
   T_H_CTRL_NT, T_H_KEYS_NT, T_PH_FN_NT, T_KH_DEFAULTS_NT, // without fast forward (DL_HIDE_TURBO)
   T_PRESET, T_H_PRESET, T_H_PRESET_NOCRT, T_PRE_CUSTOM, T_PRE_ORIGINAL, T_PRE_LARGE, T_PRE_CRT, T_PRE_FAST,
   T_BACKUPS, T_H_BACKUPS, T_TAB_BACKUPS, T_BKH, T_BKH_GAME, T_BKH_CONFIRM, T_BK_NONE, T_BK_SESSION, T_BK_RESTORED,
   T_H_PLAY_OUT, T_H_W_PLAY_OUT, T_M_PLAY_FAIL, // the game outside DarkLauncher (DlGame.play)
   T_P2, T_H_P2, T_P2_SECOND, T_P2_FIRST,       // two players (DlGame.players)
   T_PH_BTN_ANALOG,                             // DlGame.analog
+  T_H_START_RESTART,                           // rows taken at start (DlRow.at_start)
+  T_GAMES, T_TAB_GAMES, T_H_GAMES, T_GAME_INSTALLED, T_H_GAME_PLAY, T_H_GAME_PAGE, T_M_GAME_FAIL, // the author's other games (dl_games.h)
+  T_H_FILTER_3D, T_H_PRESET_3D, T_H_PRESET_3D_NOCRT, // an old console's 3D (DL_LOOK_RETRO3D)
+  T_M_GAME_STARTING, // another game being started (Other games)
   T_COUNT
 };
 extern const wchar_t *const dl_texts[T_COUNT][DL_LANGS];
@@ -347,6 +389,7 @@ extern const wchar_t *const dl_lang_names[DL_LANGS];
 #define DL_SEP_W DL_WIDEN(DL_SEP)
 bool dl_lang_ok(int lang); // one of the game's languages (DlGame.langs)
 int dl_lang_default(void); // the language of Windows if the game has it, otherwise English (or its first)
+const wchar_t *dl_lang_face(void); // the face of the texts in Japanese, Chinese and Korean (NULL: another language)
 
 // ---- drawing on the logical 640 x 400 canvas (dl_draw.c)
 extern double ui_s;
@@ -361,6 +404,8 @@ void ui_rect_alpha(HDC dc, double x0, double y0, double x1, double y1, COLORREF 
 void ui_round(HDC dc, double x0, double y0, double x1, double y1, COLORREF c, double r);
 void ui_panel(HDC dc, double x0, double y0, double x1, double y1, COLORREF fill, const wchar_t *tab);
 void ui_text(HDC dc, HFONT f, double x, double y, const wchar_t *s, COLORREF c, UINT align);
+const wchar_t *ui_wrap_text(HDC dc, const wchar_t *s, int width); // French spaces before : ; ! ? » and after « made non-breaking, Korean lines ended at spaces
+void ui_break_words(HDC dc, wchar_t *s, int width); // lines ended at the spaces to fit width pixels (in place)
 void ui_text_fit(HDC dc, double x, double y, const wchar_t *s, COLORREF c, UINT align, double max_w);
 void ui_title(HDC dc, double x, double base);
 void ui_bar(HDC dc, double x0, double y, double x1, int value, int max);
@@ -375,9 +420,11 @@ COLORREF ui_tint(COLORREF c); // one of DarkLauncher's colours in the theme's hu
 COLORREF ui_value(void);      // the colour of values and bars
 bool ui_theme_hsl(float *turn, float *strength); // the theme's colour as dl_gpu.c's sky needs it; false: none
 int ui_sky_style(void);       // DL_SKY_*
+double ui_sky_rows(void);     // DL_SKY_PIXEL: its rows of blocks over the height (DlTheme.sky_pixel)
 void ui_box(HDC dc, double x0, double y0, double x1, double y1, COLORREF c, double r); // ui_round in the theme's frame style
 void ui_cursor(HDC dc, double x0, double y0, double x1, double y1);                   // the selected row
 bool ui_theme_icon(HDC dc, unsigned icon, double x0, double y0, double x1, double y1); // false: the theme has none
+void ui_picture(HDC dc, int slot, const u32 *src, int sw, int sh, int bx, int by, int bw, int bh); // a game's picture in a box (window pixels)
 void ui_window_icon(void);    // the theme's icon 0 on the window, if any
 // The theme's sound for dl_beep (kind 0 moving, 1 choosing) as a WAV in memory at that volume (0-10); NULL: none.
 const void *ui_theme_sound(int kind, int volume);
@@ -403,5 +450,7 @@ const void *ui_theme_sound(int kind, int volume);
 // The CRT filter and the scanlines as they are applied: 0 when the game hides their row (DlGame.hide).
 int dl_crt(void);
 int dl_scanlines(void);
+int dl_filter(void);
+unsigned dl_hides(void); // DlGame.hide, with what its look leaves out (DL_LOOK_MODERN: the CRT filter and the scanlines)   // the shader's filt: dl_cfg.smooth, 4 for xBR with the game's mask (DlGame.xbr_mask)
 
 #endif

@@ -1,0 +1,45 @@
+# W1 played to the stage's end with the crystals kept at 20: the end screen and what follows, by mouse.
+tapuntil 1000 title 1 60
+wait 1
+tapuntil 1000 title 12 20
+wait 1
+tapuntil 1000 title 4 20
+wait 1
+tap 1000
+wait 1
+tapuntil 1000 pack 1 30
+until stage 3 30
+tapuntil 1000 stage 9 20
+gold 999 keep
+keep 40065EA8 20
+clickuntil 478 466 stage 11 3
+clickuntil 397 257 stage 9 3
+wait 1
+click 478 466
+wait 1
+mclick 640 650
+repeat 60
+tapuntil 4000 stage 9 5
+tap 4000
+wait 2
+until stage 13|12 120
+jumpif stage 12 over
+tapuntil 1000 stage 9 10
+endrepeat
+label over
+log stage over
+wait 4
+shot v01_end
+dump v_end
+wait 6
+shot v02_later
+move 640 330
+wait 1
+shot v03_a
+move 640 420
+wait 1
+shot v04_b
+clickuntil 640 400 stage 9|11|3 20
+wait 3
+shot v05_next
+log end

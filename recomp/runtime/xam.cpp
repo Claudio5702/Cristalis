@@ -2,6 +2,7 @@
 // XAudio render driver registration. Also the two CRT formatting imports.
 #include "achievements.h"
 #include "config.h"
+#include "game_state.h"
 #include "kernel_objects.h"
 #include "renderer.h"
 #include "xex_header.h"
@@ -423,6 +424,7 @@ GUEST_IMPORT(XamInputGetState)
         // X_INPUT_STATE: packet number, then buttons, triggers and sticks.
         static HostPad previous;
         static uint32_t packetNumber;
+        GameStateApplyCursor(ctx); // the mouse's move, before the buttons that may follow it
         HostPad pad = RendererPad();
         if (memcmp(&pad, &previous, sizeof(pad)) != 0)
         {

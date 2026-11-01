@@ -1,0 +1,6 @@
+backdrop.png: a backdrop for a DarkLauncher theme, made 2026-10-22 by tools\art\backdrop.ps1
+Model: FLUX.2 [klein] 4B (flux-2-klein-4b-fp8), Black Forest Labs, Apache 2.0 licence (commercial use and redistribution allowed); text encoder qwen_3_4b, VAE flux2-vae; run locally in ComfyUI.
+Seed 3, 4 steps, Euler, CFG 1.0, 1280 x 800.
+Prompt: A peaceful fantasy kingdom landscape seen from a hill: green meadows, a winding dirt road, a small stone watchtower, tall glowing blue crystals rising from the grass, a distant castle and mountains on the horizon, 16-bit fantasy tactics RPG pixel art, bright jewel colours, sapphire blue and gold. A clear, plain, cloudless sky in the upper half of the picture. No people, no text.
+Then: sky made clear: 42 % of the picture (a flood from the top through sky-coloured pixels), haze over 60 pixels near the land, a soft edge.
+Nothing taken from the game or its cover: a new picture in its art direction.

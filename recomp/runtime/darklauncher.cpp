@@ -11,7 +11,9 @@
 #include "dl_bridge.h"
 
 #include "achievements.h"
+#include "art.h"
 #include "config.h"
+#include "debug_script.h"
 #include "game_state.h"
 #include "guest.h"
 #include "xex_header.h"
@@ -31,6 +33,7 @@ extern "C"
 #include <condition_variable>
 #include <cstring>
 #include <deque>
+#include <map>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -43,6 +46,12 @@ constexpr uint32_t kWidth = 1280, kHeight = 720; // the console's picture
 constexpr uint32_t kSizeHalves[] = { 2, 3, 4, 6 };
 constexpr int kSizeCount = int(sizeof(kSizeHalves) / sizeof(kSizeHalves[0]));
 constexpr uint32_t kMaxHalves = 6;
+// Filling the screen (DlBridgeFill): at most half the picture's width again (2.67:1), a third of its height
+// (4:3)
+constexpr uint32_t kMaxExtraWidth = kWidth / 2, kMaxExtraHeight = kHeight / 3;
+// the largest picture (DlGame.width and height): the largest size, with the most columns or lines added
+constexpr uint32_t kMaxPictureWidth = (kWidth + kMaxExtraWidth) * kMaxHalves / 2;
+constexpr uint32_t kMaxPictureHeight = (kHeight + kMaxExtraHeight) * kMaxHalves / 2;
 constexpr int kRate = 48000;
 
 // ---- Bridge ----
@@ -62,6 +71,7 @@ std::atomic<uint16_t> g_buttons;
 
 std::mutex g_soundMutex;
 std::deque<int16_t> g_sound;       // interleaved stereo frames waiting to be played
+std::condition_variable g_soundRoom; // DarkLauncher took some of it (the mixer may add more)
 constexpr size_t kSoundReserve = 3072; // frames (64 ms): the mixer waits beyond this
 
 std::mutex g_unlockMutex;
@@ -72,6 +82,10 @@ void (*g_runGuest)();
 // ---- Settings ----
 
 int g_scaleSetting = 0;        // an index in kSizeHalves: 1280 x 720, 1920 x 1080, 2560 x 1440, 3840 x 2160
+// The game's own fast forward is RB held on the map; this keeps it held for the player, from one press
+// of its function (dl_function in Setup) or of the middle button to the next, or until the stage ends.
+std::atomic<bool> g_fastForward;
+int g_fillSetting = 1;       // the picture at the screen's proportions, the game's backgrounds stretched (DlBridgeFill)
 int g_languageSetting = 0;     // 0: Windows, then kGameLanguages
 int g_liveNotice = 0, g_storageChoice = 0;
 std::atomic<uint32_t> g_motors; // the game's rumble, left << 16 | right, passed on in Frame
@@ -137,6 +151,27 @@ const DlText t_hResolution = { L"ゲームが画像を描く大きさです。�
     L"El tamaño al que el juego dibuja sus imágenes: más grande es más nítido en una pantalla grande, pero más pesado.",
     L"O tamanho em que o jogo desenha as imagens: maior fica mais nítido numa tela grande, mas mais pesado.",
     L"Die Größe, in der das Spiel seine Bilder zeichnet: größer ist auf großen Bildschirmen schärfer, aber aufwendiger.", L"La dimensione a cui il gioco disegna le immagini: più grande è più nitida su un grande schermo, ma più pesante." };
+
+const DlText t_fill = { L"画面いっぱいに表示", L"Remplir l'écran", L"Fill the screen", L"Llenar la pantalla", L"Preencher a tela",
+    L"Bildschirm füllen", L"Riempi lo schermo" };
+const DlText t_hFill = { L"16:9 以外の画面（Steam Deck の 16:10 など）で、黒帯の代わりに背景を引き伸ばします。マップや文字はそのままの形です。",
+    L"Sur un écran qui n'est pas en 16:9 (le 16:10 du Steam Deck…), les fonds du jeu s'étirent au lieu des bandes noires. La carte, les unités et les textes gardent leur forme.",
+    L"On a screen that is not 16:9 (a Steam Deck's 16:10...), the game's backgrounds stretch instead of black bands. The map, the units and the texts keep their shape.",
+    L"En una pantalla que no es 16:9 (el 16:10 de Steam Deck...), los fondos del juego se estiran en lugar de las franjas negras. El mapa, las unidades y los textos conservan su forma.",
+    L"Numa tela que não é 16:9 (o 16:10 do Steam Deck...), os fundos do jogo se esticam em vez das faixas pretas. O mapa, as unidades e os textos mantêm a forma.",
+    L"Auf einem Bildschirm, der nicht 16:9 ist (das 16:10 des Steam Deck ...), werden die Hintergründe des Spiels gestreckt statt schwarzer Balken. Karte, Einheiten und Texte behalten ihre Form.",
+    L"Su uno schermo che non è 16:9 (il 16:10 dello Steam Deck...), gli sfondi del gioco si allungano al posto delle bande nere. La mappa, le unità e i testi mantengono la loro forma." };
+
+const DlText t_fastForward = { L"早送りを続ける", L"Avance rapide continue", L"Fast forward on", L"Avance rápido fijo",
+    L"Avanço rápido fixo", L"Dauerhafter Vorlauf", L"Avanti veloce fisso" };
+const DlText t_hFastForward = {
+    L"ゲームの早送り（RB を押し続ける）を、押さずに続けます。押すたびにオン・オフ（マウスの中ボタンでも）。ステージを出ると止まります。",
+    L"Garde l'avance rapide du jeu (RB, à maintenir) sans tenir le bouton : un appui l'active, un autre la coupe (le clic du milieu aussi). Elle s'arrête en quittant l'étape.",
+    L"Keeps the game's fast forward (RB, held) on without holding the button: one press turns it on, another off (the middle click too). It stops when the stage ends.",
+    L"Mantiene el avance rápido del juego (RB, mantenido) sin sujetar el botón: una pulsación lo activa, otra lo quita (también el clic central). Se detiene al salir de la fase.",
+    L"Mantém o avanço rápido do jogo (RB, segurado) sem segurar o botão: um toque liga, outro desliga (o clique do meio também). Para ao sair da fase.",
+    L"Hält den Vorlauf des Spiels (RB, gehalten) an, ohne die Taste zu halten: ein Druck schaltet ihn ein, ein weiterer aus (auch die mittlere Maustaste). Er endet mit der Stage.",
+    L"Mantiene l'avanti veloce del gioco (RB, tenuto premuto) senza tenere il pulsante: una pressione lo attiva, un'altra lo toglie (anche il clic centrale). Si ferma uscendo dalla fase." };
 
 const DlText t_game = { L"ゲーム", L"Jeu", L"Game", L"Juego", L"Jogo", L"Spiel", L"Opzioni" };
 const DlText t_tabGame = { L"ゲーム", L"JEU", L"GAME", L"JUEGO", L"JOGO", L"SPIEL", L"OPZIONI" };
@@ -217,8 +252,9 @@ std::string AchievementKey(uint32_t id)
 // game in each of its languages (Portuguese, which it does not have, in English), the points after it.
 void DeclareAchievements()
 {
-    // DarkLauncher's languages (jp fr en es br de it) as the game's Xbox language ids
-    static const uint32_t ids[DL_LANGS] = { 2, 4, 1, 5, 1, 3, 6 };
+    // DarkLauncher's languages (jp fr en es br de it zh ko) as the game's Xbox language ids (Chinese and
+    // Korean, not offered, in English)
+    static const uint32_t ids[DL_LANGS] = { 2, 4, 1, 5, 1, 3, 6, 1, 1 };
     static std::deque<std::wstring> texts; // they stay where they are while the program runs
     static std::vector<std::array<const wchar_t*, DL_LANGS>> names, descriptions;
     static std::vector<std::string> keys;
@@ -246,6 +282,28 @@ void DeclareAchievements()
         dl_achievements(list.data(), int(count));
 }
 
+// Each achievement's own picture, read from the player's copy of the game (64 x 64 pixel art), as the
+// console showed it; nothing of it is in this project.
+const uint32_t* AchievementPictureOf(const char* key, int* w, int* h)
+{
+    static std::map<std::string, std::pair<std::vector<uint32_t>, std::array<int, 2>>> pictures;
+    auto found = pictures.find(key);
+    if (found == pictures.end())
+    {
+        unsigned id = 0;
+        int width = 0, height = 0;
+        std::vector<uint32_t> pixels;
+        if (sscanf(key, "ach%u", &id) == 1)
+            pixels = AchievementPicture(id, width, height);
+        found = pictures.emplace(key, std::make_pair(std::move(pixels), std::array<int, 2>{ width, height })).first;
+    }
+    if (found->second.first.empty())
+        return nullptr;
+    *w = found->second.second[0];
+    *h = found->second.second[1];
+    return found->second.first.data();
+}
+
 // ---- Picture page: the internal resolution ----
 
 const wchar_t* ScaleText(int value)
@@ -257,6 +315,7 @@ const wchar_t* ScaleText(int value)
 const DlRow kPictureRows[] =
 {
     { DL_CHOICE, t_resolution, t_hResolution, &g_scaleSetting, kSizeCount - 1, nullptr, ScaleText },
+    { DL_SWITCH, t_fill, t_hFill, &g_fillSetting, 1 },
 };
 
 // ---- The game's page ----
@@ -290,6 +349,10 @@ void Setup()
     DeclareAchievements();
 
     dl_setting("internal_size", &g_scaleSetting, 0, kSizeCount - 1, false);
+    // the game's fast forward kept on (F, a controller button chosen on the Controls page, the middle
+    // click, the pause menu)
+    dl_function(t_fastForward, t_hFastForward, "key_fast", 'F', "_fast", [] { g_fastForward = !g_fastForward; }, true);
+    dl_setting("fill_screen", &g_fillSetting, 0, 1, false);
     dl_setting("game_language", &g_languageSetting, 0, kGameLanguageCount, true);
     dl_setting("live_notice", &g_liveNotice, 0, 1, false);
     dl_setting("storage_choice", &g_storageChoice, 0, 1, false);
@@ -300,15 +363,17 @@ void Setup()
 // rounded corners and a bright rim, the choice lit by a bar; its backdrops are luminous veils over
 // dark blue; its logo is tall upright serif capitals; the texts of its menus a narrow sans serif; its
 // world is one of crystals. So: that blue, the cream gold of its crystals for the values, rounded
-// frames, a bar for the selection, a starry night behind (the sparkle of its crystals), an upright title,
-// a crystal chime.
+// frames, a bar for the selection, an upright title, a crystal chime; and since 1.11 the project's own
+// painted pictures (art.cpp): a land of crystals in pixel art under DarkLauncher's moving clouds (soft
+// ones: its clouds in pixels looked too coarse above it, even at their finest), the bar's icons in blue
+// and gold.
 const DlTheme kTheme = {
     0x32617F,                     // colour: the blue of the game's windows
     0xDFD296,                     // value: the cream gold of its crystals and gold windows
     L"Constantia",                // title_font: upright serif capitals, as the logo
     L"Bahnschrift SemiCondensed", // text_font: a narrow sans serif, as the texts of its menus
-    nullptr, nullptr, nullptr, nullptr,
-    DL_FRAME_ROUND, DL_CURSOR_BAR, DL_SKY_STARS, DL_TITLE_FLAT, DL_BEEP_CRYSTAL,
+    ArtBackdrop, nullptr, ArtIcon, nullptr,
+    DL_FRAME_ROUND, DL_CURSOR_BAR, DL_SKY_CLOUDS, DL_TITLE_FLAT, DL_BEEP_CRYSTAL,
 };
 
 // ---- Safe mode ----
@@ -352,13 +417,41 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"高解像度でより軽く|画像をグラフィックカード上で直接 DarkLauncher に渡すようになりました。4K でのプロセッサ使用量が約 17% 減り、720p と同じ程度になりました。",
-    L"Plus léger en haute résolution|L'image passe maintenant directement par la carte graphique. En 4K, le jeu utilise environ 17 % de processeur en moins, autant qu'en 720p.",
-    L"Lighter at high resolutions|The picture now goes straight through the graphics card. At 4K the game uses about 17% less processor time, as little as at 720p.",
-    L"Más ligero en alta resolución|La imagen pasa ahora directamente por la tarjeta gráfica. En 4K, el juego usa un 17 % menos de procesador, lo mismo que en 720p.",
-    L"Mais leve em alta resolução|A imagem agora passa direto pela placa de vídeo. Em 4K, o jogo usa cerca de 17% menos processador, o mesmo que em 720p.",
-    L"Leichter in hohen Auflösungen|Das Bild geht jetzt direkt über die Grafikkarte. In 4K braucht das Spiel etwa 17 % weniger Prozessorzeit, so wenig wie in 720p.",
-    L"Più leggero ad alta risoluzione|L'immagine ora passa direttamente dalla scheda grafica. In 4K il gioco usa circa il 17% di processore in meno, come in 720p." };
+    L"マウスで遊べるように|カーソルはポインターの下のマスへすぐに移動し、クリックでユニットを配置します。ユニットの列やメニューもマウスで選べます。タッチ画面でも遊べます。\n"
+    L"早送りを続ける|ゲームの早送り（RB）を、F キーやマウスの中ボタンなどで押さずに続けられます。\n"
+    L"もっと軽く|プロセッサの使用量が約 10 分の 1 になりました。ノート PC や Steam Deck で発熱が減り、電池が長持ちします。\n"
+    L"画面いっぱいに|Steam Deck の 16:10 など、別の比率の画面では背景が広がり、黒い帯なしで画面を埋めます。設定の「画面」でオフにできます。\n"
+    L"新しい画像|ランチャーの背景、起動中の画像、アイコンを新しく描きました。実績にはゲーム本来の画像が表示されます。",
+    L"Jouable à la souris|Le curseur va tout de suite sur la case sous le pointeur, et un clic déploie une unité. La rangée d'unités et les menus se choisissent aussi à la souris. Les boutons affichés suivent les touches ou la manette utilisées, et l'écran tactile marche aussi.\n"
+    L"Avance rapide continue|L'avance rapide du jeu (RB) reste active sans tenir le bouton : F, le clic du milieu ou un bouton choisi.\n"
+    L"Bien plus léger|Le jeu utilise environ dix fois moins de processeur : moins de chaleur et plus d'autonomie sur un portable ou un Steam Deck.\n"
+    L"Remplir l'écran|Sur un écran d'autres proportions, comme le 16:10 du Steam Deck, les fonds s'élargissent et l'image remplit l'écran sans bandes noires. Se désactive dans Paramètres, Image.\n"
+    L"De nouvelles images|Un nouveau fond pour le lanceur, une image au démarrage et de nouvelles icônes. Les succès montrent leurs images d'origine.",
+    L"Play with the mouse|The cursor goes straight to the square under the pointer, and a click deploys a unit. The row of units and the menus work with the mouse too. The buttons shown follow the keys or controller in use, and the touch screen works too.\n"
+    L"Fast forward kept on|The game's fast forward (RB) stays on without holding the button: F, the middle click or a chosen button.\n"
+    L"Much lighter|The game uses about ten times less processor time: less heat and a longer battery on a laptop or a Steam Deck.\n"
+    L"Fill the screen|On a screen of other proportions, such as the Steam Deck's 16:10, the backgrounds widen and the picture fills the screen without black bands. It can be turned off in Settings, Picture.\n"
+    L"New pictures|A new backdrop for the launcher, a picture while the game starts and new icons. The achievements show their own pictures.",
+    L"Se juega con el ratón|El cursor va enseguida a la casilla bajo el puntero, y un clic despliega una unidad. La fila de unidades y los menús también se eligen con el ratón. Los botones mostrados siguen las teclas o el mando en uso, y la pantalla táctil también funciona.\n"
+    L"Avance rápido fijo|El avance rápido del juego (RB) sigue activo sin sujetar el botón: F, el clic central o un botón elegido.\n"
+    L"Mucho más ligero|El juego usa unas diez veces menos procesador: menos calor y más batería en un portátil o un Steam Deck.\n"
+    L"Llenar la pantalla|En una pantalla de otras proporciones, como el 16:10 de Steam Deck, los fondos se ensanchan y la imagen llena la pantalla sin bandas negras. Se desactiva en Ajustes, Imagen.\n"
+    L"Imágenes nuevas|Un fondo nuevo para el lanzador, una imagen al iniciar el juego e iconos nuevos. Los logros muestran sus propias imágenes.",
+    L"Jogável com o mouse|O cursor vai na hora para a casa sob o ponteiro, e um clique posiciona uma unidade; os menus também. Os botões mostrados seguem as teclas ou o controle, e a tela de toque funciona.\n"
+    L"Avanço rápido fixo|O avanço rápido do jogo (RB) fica ligado sem segurar o botão: F, o clique do meio ou um botão escolhido.\n"
+    L"Muito mais leve|O jogo usa cerca de dez vezes menos processador: menos calor e mais bateria num notebook ou num Steam Deck.\n"
+    L"Preencher a tela|Numa tela de outras proporções, como o 16:10 do Steam Deck, os fundos se alargam e a imagem preenche a tela sem faixas pretas. Pode ser desligado em Configurações, Imagem.\n"
+    L"Imagens novas|Um novo fundo para o lançador, uma imagem ao iniciar o jogo e ícones novos. As conquistas mostram suas próprias imagens.",
+    L"Mit der Maus spielbar|Der Cursor springt sofort auf das Feld unter dem Zeiger, ein Klick setzt eine Einheit ein; die Menüs auch. Die Tastenbilder folgen Tastatur oder Controller, und der Touchscreen geht.\n"
+    L"Dauerhafter Vorlauf|Der Vorlauf des Spiels (RB) bleibt an, ohne die Taste zu halten: F, die mittlere Maustaste oder eine gewählte Taste.\n"
+    L"Viel leichter|Das Spiel braucht etwa zehnmal weniger Prozessorzeit: weniger Wärme und mehr Akku auf einem Laptop oder Steam Deck.\n"
+    L"Bildschirm füllen|Auf einem Bildschirm mit anderem Seitenverhältnis, etwa 16:10 beim Steam Deck, werden die Hintergründe breiter und das Bild füllt den Bildschirm ohne schwarze Balken. Abschaltbar unter Einstellungen, Bild.\n"
+    L"Neue Bilder|Ein neuer Hintergrund für den Launcher, ein Bild beim Spielstart und neue Symbole. Die Erfolge zeigen ihre eigenen Bilder.",
+    L"Si gioca con il mouse|Il cursore va subito sulla casella sotto il puntatore, e un clic schiera un'unità. La fila di unità e i menu si scelgono anche con il mouse. I pulsanti mostrati seguono i tasti o il controller in uso, e funziona anche lo schermo tattile.\n"
+    L"Avanti veloce fisso|L'avanti veloce del gioco (RB) resta attivo senza tenere il pulsante: F, il clic centrale o un pulsante scelto.\n"
+    L"Molto più leggero|Il gioco usa circa dieci volte meno processore: meno calore e più batteria su un portatile o uno Steam Deck.\n"
+    L"Riempire lo schermo|Su uno schermo di altre proporzioni, come il 16:10 di Steam Deck, gli sfondi si allargano e l'immagine riempie lo schermo senza bande nere. Si disattiva in Impostazioni, Immagine.\n"
+    L"Nuove immagini|Un nuovo sfondo per il launcher, un'immagine all'avvio del gioco e nuove icone. Gli obiettivi mostrano le loro immagini." };
 
 // ---- The game ----
 
@@ -386,6 +479,302 @@ bool Start()
     return true;
 }
 
+// The mouse (DlGame.mouse_in_game), added to the controller's buttons: left click is A, right click B.
+// When the pointer moves (the controller and the keyboard work as before in between): in a stage, the map's
+// cursor goes at once to the point under it (GameStateRequestCursor: the game's own checks redone); in the
+// row of units to deploy, in a deployed unit's menu and before a stage in a menu's list, the choice goes
+// to the unit or the row under it, by the controller's arrows held until it is there; a click on a row of
+// the title's turning menu turns it there (one tap a row) and chooses it. The wheel taps the arrows of the
+// menus.
+uint16_t MouseButtons(uint16_t buttons)
+{
+    constexpr uint16_t kUp = 0x0001, kDown = 0x0002, kLeft = 0x0004, kRight = 0x0008, kArrows = 0x000F, kA = 0x1000, kB = 0x2000;
+    constexpr int kTapHold = 3, kTapLength = 6; // a wheel's tap: three pictures held, three released
+    static int target = -1;            // what is being reached: 1 a unit of the row, 2 a row of a menu (a
+                                       // unit's, or before a stage); -1 none
+    static int targetX, targetY;       // that unit or row (targetX)
+    static int tapPhase;               // pictures into the current tap: arrows held, then released
+    static int clickFrames;            // A to press once there (a click while on the way)
+    static int stillFrames;            // pictures since the choice last moved
+    static int lastX = -1, lastY = -1; // where they were then
+    static int wheelTaps;              // notches of the wheel still to tap (up: positive)
+    static int sideTaps;               // taps of left or right still to make (right: positive)
+    static int rowTaps;                // taps of up or down still to make (up: positive)
+
+    double mouseX = 0, mouseY = 0;
+    unsigned mouse = 0;
+    int wheel = 0;
+    bool overPicture = dl_mouse(&mouseX, &mouseY, &mouse, &wheel);
+    // CD_MOUSE_AT=<seconds>,<x>,<y>[,<buttons>][;<seconds>,...]: the pointer there, on the 1280 x 720
+    // picture, from that many seconds of play on, until the next (tests: DarkLauncher sees only a real
+    // pointer)
+    static const char* mouseAt = getenv("CD_MOUSE_AT");
+    static ULONGLONG playStart = GetTickCount64();
+    double atX = 0, atY = 0;
+    for (const char* at = mouseAt; at != nullptr; at = strchr(at, ';') ? strchr(at, ';') + 1 : nullptr)
+    {
+        double seconds, x, y;
+        unsigned buttons = 0;
+        if (sscanf(at, "%lf,%lf,%lf,%u", &seconds, &x, &y, &buttons) >= 3 && GetTickCount64() - playStart >= ULONGLONG(seconds * 1000))
+        {
+            overPicture = true;
+            mouseX = -1, mouseY = -1; // (set below, once the picture's place is known)
+            atX = x, atY = y;
+            mouse = buttons;
+        }
+    }
+    // the debug mode (CD_DEBUG, debug_script.h): its buttons, and its pointer
+    static const bool debug = DebugScriptActive();
+    if (debug)
+    {
+        DebugInput input = DebugScriptStep();
+        buttons |= input.buttons;
+        wheel += input.wheel;
+        if (input.pointer)
+        {
+            overPicture = true;
+            mouseX = -1, mouseY = -1;
+            atX = input.x, atY = input.y;
+            mouse = input.mouse;
+        }
+    }
+
+    // The console's 1280 x 720 within the picture: drawn at a number of halves of it, with the columns
+    // or lines added on both sides to fill the screen (DlBridgeFill)
+    double scale = DlBridgeHalves() / 2.0;
+    double sideX = (g_pictureWidth / scale - kWidth) / 2, sideY = (g_pictureHeight / scale - kHeight) / 2;
+    if ((mouseAt != nullptr || debug) && overPicture && mouseX < 0)
+    {
+        static bool wiggle; // a hand's slight move each picture, as a real pointer gives (CD_MOUSE_AT)
+        wiggle = !wiggle && !debug;
+        mouseX = (atX + sideX + (wiggle ? 0.01 : 0)) * scale;
+        mouseY = (atY + sideY) * scale;
+    }
+
+    int stageMode = GameStateNow().pack != 0 ? GameStateMode() : -1; // -1: not in a stage
+    // the row of units to deploy: the stage's mode 1 on its screen 11 (W2's summons, screen 17, are mode 1 too)
+    bool unitRow = stageMode == 1 && GameStateStageScreen() == 11;
+    // the game's fast forward kept on: RB held on the map (CD_TURBO=<seconds>: on from then, tests)
+    static const char* turboTest = getenv("CD_TURBO");
+    static bool turboTested;
+    if (turboTest != nullptr && !turboTested && stageMode >= 0 && GetTickCount64() - playStart >= strtoul(turboTest, nullptr, 10) * 1000ull)
+        g_fastForward = turboTested = true;
+    if (stageMode < 0)
+        g_fastForward = false;
+    else if (g_fastForward && GameStateStageScreen() == 9)
+        buttons |= 0x0200;
+    if (overPicture && g_pictureWidth != 0 && g_pictureHeight != 0)
+    {
+        double x = mouseX / scale - sideX, y = mouseY / scale - sideY;
+        static double movedX = -1, movedY = -1;
+        bool moved = x != movedX || y != movedY;
+        movedX = x;
+        movedY = y;
+        int gridX, gridY, unit, row;
+        GameMenu menu = stageMode != 0 && stageMode != 1 ? GameStateMenu() : GameMenu{}; // (before a stage, or a unit's menu)
+        if (moved && stageMode == 0 && GameStateGridPoint(x, y, gridX, gridY))
+            GameStateRequestCursor(gridX, gridY); // at once, the game's checks redone (see game_state.cpp)
+        else if (moved && unitRow && (unit = GameStateUnitAt(x, y)) >= 0)
+            target = 1, targetX = unit, targetY = 0;
+        else if (moved && menu.kind == GameMenu::kList && (row = GameStateMenuRow(menu, x, y)) >= 0)
+            target = 2, targetX = row, targetY = 0;
+        // the title's turning menu: a click on another row turns it there (one tap a row), then chooses
+        static unsigned held;
+        static bool turning; // the click that turns: its A is not the game's
+        if ((mouse & 1) && !(held & 1) && menu.kind == GameMenu::kCarousel && (row = GameStateMenuRow(menu, x, y)) >= 0 && row != 2)
+        {
+            wheelTaps = 2 - row; // up: positive
+            clickFrames = 4;
+            turning = true;
+        }
+        if (!(mouse & 1))
+            turning = false;
+        if ((mouse & 4) && !(held & 4)) // the middle click: fast forward, on and off
+            g_fastForward = !g_fastForward;
+        // the best scores: a click on an arrow turns the page (the wheel too), on the first row plays its
+        // replay; elsewhere a click does nothing
+        int scores = GameStateScoresAt(x, y);
+        if (scores >= 0 && scores <= 1 && (mouse & 1) && !(held & 1))
+            sideTaps += scores == 1 ? 1 : -1;
+        if (scores != -2)
+        {
+            sideTaps -= wheel;
+            wheel = 0;
+        }
+        if (GameStateHelpSettings()) // the wheel changes the value: up, more
+        {
+            sideTaps += wheel;
+            wheel = 0;
+        }
+        // W2's summons and the rows of units above them: a click on an arrow goes a row up or down, on the
+        // summon chooses it; elsewhere on the summons a click does nothing
+        int summon = stageMode >= 0 ? GameStateSummonAt(x, y) : -2;
+        if (summon >= 0 && summon <= 1 && (mouse & 1) && !(held & 1))
+            rowTaps += summon == 0 ? 1 : -1;
+        if ((mouseAt != nullptr || debug) && (mouse & 1) && !(held & 1))
+            Log("Mouse: click at %.0f,%.0f, stage screen %d, summon %d, scores %d", x, y, GameStateStageScreen(), summon, scores);
+        held = mouse;
+        bool clickIsA = (scores == -2 || scores == 2) && (summon == -2 || summon == 2);
+        buttons |= (mouse & 1 && !turning && clickIsA ? kA : 0) | (mouse & 2 ? kB : 0);
+    }
+    if (stageMode != 0) // (on the map the arrows move the cursor)
+        wheelTaps += wheel;
+
+    // where the choice is now
+    int nowX = -1, nowY = 0;
+    if (target == 1 && unitRow)
+    {
+        UnitGrid grid = GameStateUnitGrid();
+        nowX = GameStateUnitChoice();
+        if (nowX < 0 || nowX >= grid.columns * grid.rows)
+            nowX = -1;
+    }
+    else if (target == 2 && stageMode != 0 && stageMode != 1)
+    {
+        GameMenu menu = GameStateMenu();
+        nowX = GameStateMenuChoice(menu);
+        if (menu.kind != GameMenu::kList || nowX >= menu.rows)
+            nowX = -1;
+    }
+    static int travel; // pictures on the way (tests)
+    if (target >= 0)
+    {
+        travel++;
+        stillFrames = nowX == lastX && nowY == lastY ? stillFrames + 1 : 0;
+        lastX = nowX, lastY = nowY;
+        // there, gone (another screen), the controller or the keyboard used, held by the game, or never
+        // reached (two seconds): stop
+        if (nowX < 0 || (nowX == targetX && nowY == targetY) || (buttons & kArrows) != 0 || stillFrames > 30 || travel > 120)
+        {
+            if (mouseAt != nullptr && travel > 1)
+                Log("Mouse: %s after %d pictures", nowX == targetX && nowY == targetY ? "there" : "stopped", travel);
+            travel = 0;
+            target = -1;
+            stillFrames = 0;
+            lastX = lastY = -1;
+        }
+    }
+
+    if (target >= 0)
+    {
+        if (buttons & kA)
+            clickFrames = 4;
+        buttons &= ~kA; // a click waits until the choice is there
+        if (target == 1) // the other row first (up or down), then the shorter way round the row
+        {
+            UnitGrid grid = GameStateUnitGrid();
+            int columns = grid.columns, column = targetX % columns, now = nowX % columns;
+            if (targetX / columns != nowX / columns) // (below the last row: the summons, W2 and W3)
+                buttons |= targetX / columns < nowX / columns ? kUp : kDown;
+            else
+                buttons |= (column - now + columns) % columns <= columns / 2 ? kRight : kLeft;
+        }
+        else // a menu's rows, from the top
+            buttons |= targetX < nowX ? kUp : kDown;
+    }
+    else if ((wheelTaps != 0 || sideTaps != 0 || rowTaps != 0) && (buttons & kArrows) == 0)
+    {
+        // one tap of the arrows per notch: up and down, or left and right in the row of units; then the
+        // taps of left and right asked for (the best scores' pages), then those of up and down (the arrows
+        // of W2's rows of units and summons)
+        if (tapPhase < kTapHold && wheelTaps != 0)
+            buttons |= unitRow ? (wheelTaps > 0 ? kLeft : kRight) : (wheelTaps > 0 ? kUp : kDown);
+        else if (tapPhase < kTapHold && sideTaps != 0)
+            buttons |= sideTaps > 0 ? kRight : kLeft;
+        else if (tapPhase < kTapHold)
+            buttons |= rowTaps > 0 ? kUp : kDown;
+        tapPhase = (tapPhase + 1) % kTapLength;
+        if (tapPhase == 0 && wheelTaps != 0)
+            wheelTaps -= wheelTaps > 0 ? 1 : -1;
+        else if (tapPhase == 0 && sideTaps != 0)
+            sideTaps -= sideTaps > 0 ? 1 : -1;
+        else if (tapPhase == 0)
+            rowTaps -= rowTaps > 0 ? 1 : -1;
+    }
+    else
+    {
+        tapPhase = 0;
+        wheelTaps = 0;
+        sideTaps = 0;
+        rowTaps = 0;
+        if (clickFrames > 0)
+        {
+            clickFrames--;
+            buttons |= kA;
+        }
+    }
+    return buttons;
+}
+
+// ---- The game's button prompts, as the player's device shows them ----
+
+// The game's five button pictures (32 x 32, in its guide at the bottom left and its "A Confirm, B Back"),
+// known by the hash of their texels as the renderer reads them, and the DarkLauncher button each shows.
+struct Prompt
+{
+    uint64_t hash;
+    unsigned button;
+    std::vector<uint32_t> picture; // 32 x 32, 0xAARRGGBB with straight alpha; empty: the game's own
+};
+std::mutex g_promptMutex;
+Prompt g_prompts[] =
+{
+    { 0xB64DCEADF5F4D340ull, DL_A }, { 0xF04897C7581DA771ull, DL_B }, { 0xA4D50B842EAA7173ull, DL_X },
+    { 0x0A3149442B806B77ull, DL_Y }, { 0xE805B2D795D30779ull, DL_R },
+};
+std::atomic<uint32_t> g_promptGeneration{ 1 };
+
+// DarkLauncher's picture of a button (premultiplied, any width) fitted into 32 x 32: averaged down from twice
+// the size, centred, the colours divided by their opacity again.
+std::vector<uint32_t> PromptPicture(unsigned button)
+{
+    constexpr int kSide = 32, kAsk = 64;
+    int w = 0, h = 0;
+    const uint32_t* source = dl_button_picture(button, kAsk, &w, &h);
+    if (source == nullptr || w <= 0 || h <= 0)
+        return {};
+    double scale = std::min(double(kSide) / w, double(kSide) / h);
+    int outW = std::max(1, int(w * scale + 0.5)), outH = std::max(1, int(h * scale + 0.5));
+    int left = (kSide - outW) / 2, top = (kSide - outH) / 2;
+    std::vector<uint32_t> picture(kSide * kSide, 0);
+    for (int y = 0; y < outH; y++)
+        for (int x = 0; x < outW; x++)
+        {
+            int x0 = int(x / scale), x1 = std::max(x0 + 1, std::min(w, int((x + 1) / scale)));
+            int y0 = int(y / scale), y1 = std::max(y0 + 1, std::min(h, int((y + 1) / scale)));
+            double sum[4]{};
+            int n = 0;
+            for (int sy = y0; sy < y1 && sy < h; sy++)
+                for (int sx = x0; sx < x1 && sx < w; sx++, n++)
+                    for (int c = 0; c < 4; c++)
+                        sum[c] += (source[sy * w + sx] >> (c * 8)) & 255;
+            if (n == 0)
+                continue;
+            double a = sum[3] / n;
+            uint32_t pixel = uint32_t(a + 0.5) << 24;
+            for (int c = 0; c < 3; c++)
+                pixel |= uint32_t(a > 0 ? std::min(255.0, sum[c] / n * 255 / a + 0.5) : 0) << (c * 8);
+            picture[(top + y) * kSide + left + x] = pixel;
+        }
+    return picture;
+}
+
+// From Frame: the pictures again whenever the device or the keys assigned change (the game's own on an
+// Xbox controller, which they are).
+void UpdatePrompts()
+{
+    static unsigned serial = ~0u;
+    unsigned now = dl_input_serial();
+    if (now == serial)
+        return;
+    serial = now;
+    bool own = dl_input_device() == DL_DEVICE_XBOX;
+    std::lock_guard lock(g_promptMutex);
+    for (Prompt& prompt : g_prompts)
+        prompt.picture = own ? std::vector<uint32_t>() : PromptPicture(prompt.button);
+    g_promptGeneration++;
+}
+
 int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
 {
     // DarkLauncher's buttons as the game's controller (XINPUT_GAMEPAD bits); with DL_PAD_XBOX they are
@@ -398,7 +787,8 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
     uint16_t buttons = 0;
     for (auto& entry : map)
         buttons |= (in->buttons & entry.from) ? entry.to : 0;
-    g_buttons = buttons;
+    g_buttons = MouseButtons(buttons);
+    UpdatePrompts();
 
     // Let the game make its next picture, and wait for it a little (the game is still starting, or
     // slower than the screen: the last picture is shown again).
@@ -417,7 +807,7 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
         bool shown = false;
         if (g_lastShared && g_sharedHandle != nullptr)
         {
-            shown = dl_picture_shared(g_sharedHandle, 16.0 / 9.0);
+            shown = dl_picture_shared(g_sharedHandle, 0); // square pixels: 16:9, or the screen's when filled
             if (shown)
                 g_sharedGiven = g_sharedHandle;
             else
@@ -429,10 +819,11 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
             told = int(shown);
             Log("DarkLauncher: picture given %s", shown ? "in a shared texture" : "as pixels");
         }
-        if (!shown && !g_picture.empty())
+        // (never more than the buffer DarkLauncher made for the largest picture)
+        if (!shown && !g_picture.empty() && g_pixelsWidth <= kMaxPictureWidth && g_pixelsHeight <= kMaxPictureHeight)
         {
             memcpy(pixels, g_picture.data(), g_picture.size() * 4);
-            dl_picture_size(int(g_pixelsWidth), int(g_pixelsHeight), 16.0 / 9.0);
+            dl_picture_size(int(g_pixelsWidth), int(g_pixelsHeight), 0);
         }
         uint32_t height = shown ? g_pictureHeight : g_pixelsHeight;
         // the picture is drawn larger than the console's 720 lines: the scanlines and the CRT filter
@@ -463,6 +854,8 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
         audio[i] = g_sound.front();
         g_sound.pop_front();
     }
+    if (count > 0)
+        g_soundRoom.notify_one(); // room for the mixer's next sound (DlBridgeAudio)
     return int(count);
 }
 
@@ -517,6 +910,22 @@ uint32_t DlBridgeHalves()
     return kSizeHalves[std::clamp(g_scaleSetting, 0, kSizeCount - 1)];
 }
 
+void DlBridgeFill(uint32_t& extraWidth, uint32_t& extraHeight)
+{
+    extraWidth = extraHeight = 0;
+    // the proportions of where the picture is shown (CD_ASPECT=<width / height>: another, for tests)
+    static const double testAspect = getenv("CD_ASPECT") ? atof(getenv("CD_ASPECT")) : 0;
+    double aspect = testAspect > 0 ? testAspect : dl_view_aspect();
+    if (g_fillSetting == 0 || aspect <= 0)
+        return;
+    // narrower (16:10, 4:3): lines above and below; wider (21:9): columns on both sides; even, and at most
+    // kMaxExtraWidth or kMaxExtraHeight
+    if (aspect < 16.0 / 9.0 - 0.01)
+        extraHeight = std::min(uint32_t(kWidth / aspect - kHeight + 1) & ~1u, kMaxExtraHeight);
+    else if (aspect > 16.0 / 9.0 + 0.01)
+        extraWidth = std::min(uint32_t(kHeight * aspect - kWidth + 1) & ~1u, kMaxExtraWidth);
+}
+
 void DlBridgeRumble(uint16_t left, uint16_t right)
 {
     g_motors = uint32_t(left) << 16 | right;
@@ -529,18 +938,21 @@ uint16_t DlBridgeButtons()
 
 void DlBridgeAudio(const int16_t* samples, uint32_t frames)
 {
-    for (;;)
+    // waits until DarkLauncher has taken some (Frame says so), not looking every 2 ms (500 times a second)
+    static const bool poll = getenv("CD_SPIN") != nullptr; // as before: a look every 2 ms (tests)
+    std::unique_lock lock(g_soundMutex);
+    while (g_sound.size() / 2 >= kSoundReserve)
     {
+        if (!poll)
+            g_soundRoom.wait_for(lock, std::chrono::milliseconds(20));
+        else
         {
-            std::lock_guard lock(g_soundMutex);
-            if (g_sound.size() / 2 < kSoundReserve)
-            {
-                g_sound.insert(g_sound.end(), samples, samples + frames * 2);
-                return;
-            }
+            lock.unlock();
+            Sleep(2);
+            lock.lock();
         }
-        Sleep(2);
     }
+    g_sound.insert(g_sound.end(), samples, samples + frames * 2);
 }
 
 void DlBridgeUnlock(uint32_t id)
@@ -549,17 +961,43 @@ void DlBridgeUnlock(uint32_t id)
     g_unlocks.push_back(id);
 }
 
+uint32_t DlBridgePromptGeneration()
+{
+    return g_promptGeneration;
+}
+
+bool DlBridgePrompt(uint32_t* pixels, uint32_t width, uint32_t height)
+{
+    if (width != 32 || height != 32)
+        return false;
+    uint64_t hash = 0xCBF29CE484222325ull;
+    for (uint32_t i = 0; i < width * height; i++)
+        hash = (hash ^ pixels[i]) * 0x100000001B3ull;
+    std::lock_guard lock(g_promptMutex);
+    for (const Prompt& prompt : g_prompts)
+        if (prompt.hash == hash && !prompt.picture.empty())
+        {
+            memcpy(pixels, prompt.picture.data(), width * height * 4);
+            return true;
+        }
+    return false;
+}
+
 int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
 {
     g_runGuest = runGuest;
     static DlGame game{};
-    game.width = int(kWidth * kMaxHalves / 2);
-    game.height = int(kHeight * kMaxHalves / 2);
+    game.width = int(kMaxPictureWidth);
+    game.height = int(kMaxPictureHeight);
     game.aspect = 16.0 / 9.0;
     game.fps = 60;
     game.audio_rate = kRate;
     game.subtitle = t_subtitle;
-    game.langs = DL_LANGS_ALL; // every text above is in DarkLauncher's seven languages, Italian included
+    // every text above is in seven of DarkLauncher's languages, Italian included (not yet in Chinese
+    // nor Korean, which DL_LANGS_ALL counts since DarkLauncher 2.90)
+    game.langs = (1u << DL_LANG_JP) | (1u << DL_LANG_FR) | (1u << DL_LANG_EN) | (1u << DL_LANG_ES) | (1u << DL_LANG_BR) |
+                 (1u << DL_LANG_DE) | (1u << DL_LANG_IT);
+    game.look = DL_LOOK_PIXELS; // 2D pixel art: every row of the Picture page (xBR included)
     game.start = Start;
     game.frame = Frame;
     game.setup = Setup;
@@ -568,13 +1006,17 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.status = Status;
     game.version = GAME_VERSION;
     game.news = t_news;
+    game.achievement_picture = AchievementPictureOf;
+    game.starting_picture = ArtStarting;
     // An Xbox game: its buttons in the Xbox places at first, and View held (not pressed) opens the
     // pause menu, so a short press stays the game's Back.
     game.pad_layout = DL_PAD_XBOX;
     game.pad_menu = DL_MENU_HOLD;
+    game.mouse_in_game = true; // the stage's cursor follows the mouse (see Frame)
     game.rumble = true; // DarkLauncher's Vibration switch, and dl_rumble to every kind of controller
     // a 2009 HD game made for flat screens: the tube's look is not offered; nor DarkLauncher's fast
     // forward, which cannot speed up a game that makes each picture when asked (it has its own)
+    // (the game has its own fast forward, RB held: see g_fastForward)
     game.hide = DL_HIDE_CRT | DL_HIDE_SCANLINES | DL_HIDE_TURBO;
     // --no-theme: DarkLauncher's own look (to compare)
     bool themed = true;

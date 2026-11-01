@@ -59,6 +59,8 @@ bool RendererInit();
 void RendererDraw(const HostDraw& draw);
 // Colour the frame is cleared to after each present.
 void RendererSetClearColor(float r, float g, float b, float a);
+// The debug mode's screenshot: the next picture saved as <name>.bmp in the working folder, at the internal size.
+void RendererRequestShot(const char* name);
 void RendererPresent();
 
 // State of player one's pad: the first XInput controller if one is connected,

@@ -34,6 +34,7 @@ target_compile_options(ppc
 set(RUNTIME_SOURCES
     runtime/main.cpp
     runtime/achievements.cpp
+    runtime/png.cpp
     runtime/config.cpp
     runtime/kernel.cpp
     runtime/kernel_objects.cpp
@@ -54,6 +55,10 @@ set(RUNTIME_SOURCES
 # controls and the sound output of the game; the game's side is runtime/darklauncher.cpp.
 option(CD_DARKLAUNCHER "Run the game inside DarkLauncher (OFF: its own window and start screen)" ON)
 set(KIT ${CMAKE_CURRENT_SOURCE_DIR}/../kit/launcher)
+# The project's pictures for DarkLauncher (resources/art), built into the program by runtime/art.cpp
+set(ART_DIR ${CMAKE_CURRENT_SOURCE_DIR}/resources/art)
+file(GLOB_RECURSE ART_FILES CONFIGURE_DEPENDS ${ART_DIR}/*.png)
+set_source_files_properties(runtime/art.cpp PROPERTIES COMPILE_DEFINITIONS "CD_ART_DIR=\"${ART_DIR}\"" OBJECT_DEPENDS "${ART_FILES}")
 
 if(WIN32)
     enable_language(RC)
@@ -61,7 +66,7 @@ if(WIN32)
     if(CD_DARKLAUNCHER)
         file(GLOB DARKLAUNCHER_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../kit/launcher/*.c)
         set_source_files_properties(${DARKLAUNCHER_SOURCES} PROPERTIES COMPILE_OPTIONS "-std=c11;-Wno-missing-braces")
-        list(APPEND PLATFORM_SOURCES runtime/darklauncher.cpp ${DARKLAUNCHER_SOURCES})
+        list(APPEND PLATFORM_SOURCES runtime/darklauncher.cpp runtime/art.cpp runtime/debug_script.cpp ${DARKLAUNCHER_SOURCES})
     endif()
     add_executable(crystal_defenders ${RUNTIME_SOURCES} ${PLATFORM_SOURCES})
     if(CD_DARKLAUNCHER)
@@ -123,7 +128,7 @@ else()
         target_include_directories(darklauncher PRIVATE ${KIT}/linux/include ${KIT} ${CMAKE_CURRENT_SOURCE_DIR}/..)
         target_compile_options(darklauncher PRIVATE -std=gnu11 -Wno-missing-braces -Wno-unused-parameter)
         target_link_libraries(darklauncher PUBLIC PkgConfig::SDL PkgConfig::TEXT OpenGL::GL m)
-        list(APPEND PLATFORM_SOURCES runtime/darklauncher.cpp)
+        list(APPEND PLATFORM_SOURCES runtime/darklauncher.cpp runtime/art.cpp runtime/debug_script.cpp)
     endif()
     add_executable(crystal_defenders ${RUNTIME_SOURCES} ${PLATFORM_SOURCES})
     target_include_directories(crystal_defenders BEFORE PRIVATE runtime/linux runtime)

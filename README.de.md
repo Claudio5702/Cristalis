@@ -16,7 +16,7 @@ experimentell.
 Bilder, Töne, Musik und Texte werden aus Ihrer eigenen Kopie des Spiels gelesen. Das Repository
 enthält auch keinen Code des Spiels: Der übersetzte Code wird beim Bauen des Programms aus einer
 `default.xex` erzeugt, und die Programme auf der [Release-Seite](https://github.com/Claudio5702/Cristalis/releases/latest) werden so gebaut.
-**Version 1.10, eine Beta**: bisher von wenigen gespielt.
+**Version 1.11**: bis zum Ende gespielt, aber bisher auf wenigen Rechnern; [melde jedes Problem](https://github.com/Claudio5702/Cristalis/issues).
 
 **Sie brauchen Ihre eigene Kopie von Crystal Defenders (Xbox 360).** Crystal Defenders gehört Square
 Enix; dieses Projekt steht in keiner Verbindung zu Square Enix und wird von Square Enix nicht
@@ -66,11 +66,23 @@ wenn nicht.
   (Bahamut Lagoon Recomp) entwickelten Launcher: ein Einstellungsbildschirm vor dem Spiel und ein
   Pausenmenü im Spiel, in sieben Sprachen, mit Tastatur, Controller oder Maus. Sein Aussehen folgt
   der künstlerischen Gestaltung des Spiels: das Blau seiner Fenster, das Gold seiner Kristalle, ein
-  Sternenhimmel. DarkLauncher zeichnet alles selbst; nichts stammt aus den Dateien des Spiels.
+  Land voller Kristalle in Pixel-Art unter ziehenden Wolken und ein kleiner Ritter als Programmsymbol.
+  Diese Bilder wurden für das Projekt gemalt; nichts stammt aus den Dateien des Spiels. Die Erfolge
+  zeigen ihre eigenen Bilder, gelesen aus deiner Kopie des Spiels.
 - **Die sechs Sprachen des Spiels** (Französisch, Englisch, Deutsch, Spanisch, Italienisch,
   Japanisch), in den Einstellungen gewählt; das Spiel startet in der neuen Sprache neu.
 - **Anzeige über die Grafikkarte**: das Spiel in 1280×720, 1920×1080, 2560×1440 oder 3840×2160
   gezeichnet, dann scharf, geglättet oder mit weichen Kanten in jeder Fenstergröße; HDR (Windows).
+- **Mit der Maus spielbar**: Der Cursor springt sofort auf das Feld unter dem Mauszeiger, ein Klick
+  setzt eine Einheit ein; Einheitenreihe, Menüs und Pause folgen dem Zeiger, und die Tastenhilfe zeigt
+  die benutzte Tastatur, Maus oder den Controller.
+- **Füllt den Bildschirm**: Auf einem Bildschirm mit anderem Seitenverhältnis (16:10 des Steam Deck,
+  21:9 ...) werden die Hintergründe breiter und der Rest bleibt in der Mitte, ohne schwarze Balken
+  (Einstellungen, Bild).
+- **Dauerhafter Vorlauf**: Der Vorlauf des Spiels (RB, gehalten) bleibt von einem Druck zum
+  nächsten an: F, die mittlere Maustaste oder eine in der Steuerung gewählte Controller-Taste.
+- **Leicht**: etwa ein Zehntel eines Prozessorkerns bei 60 Bildern pro Sekunde; ein Finger auf
+  einem Touchscreen (Steam Deck, Tablet) dient als Maus.
 - **Erfolge auf dem Computer gespeichert**, mit einer Meldung über dem Spiel und einer Liste in den
   Einstellungen.
 - **Das Offline-Verhalten der Konsole auf Wunsch**: der Hinweis „Nicht mit Xbox LIVE verbunden" und
@@ -185,7 +197,7 @@ zu erzwingen. Die Windows-Version läuft auch über Proton.
 Wie das Projekt funktioniert, wie man es baut, den Code des Spiels neu übersetzt, prüft und das
 Installationsprogramm erstellt: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (auf Englisch).
 
-Was sich in jeder Version geändert hat (jetzt 1.10): [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
+Was sich in jeder Version geändert hat (jetzt 1.11): [CHANGELOG.md](CHANGELOG.md) (auf Englisch).
 
 ## Häufige Fragen
 
@@ -231,5 +243,7 @@ Dokumentation wurden von ihm geschrieben, nach den Wünschen und Tests des Autor
 - [Xenia](https://xenia.jp): seine Dokumentation der Xbox 360, als Referenz genutzt.
 - [llvm-mingw](https://github.com/mstorsjo/llvm-mingw): der Compiler des Programms und des
   Installationsprogramms.
+- [FLUX.2 [klein] 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) (Black Forest Labs, Apache 2.0), lokal in ComfyUI ausgeführt: die Bilder des Launchers und
+  das Symbol, mit KI erstellt; Prompt und Einstellungen liegen jeweils daneben in `recomp/resources`.
 
 Und natürlich Square Enix, die Crystal Defenders geschaffen haben.

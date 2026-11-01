@@ -22,5 +22,8 @@ struct AchievementEntry
 std::vector<AchievementEntry> AchievementsList();
 // The same with the texts of one of the game's languages (an Xbox language id).
 std::vector<AchievementEntry> AchievementsIn(uint32_t language);
+// An achievement's own picture from the player's copy of the game: 0xAARRGGBB, colours multiplied by
+// their opacity; empty when there is none.
+std::vector<uint32_t> AchievementPicture(uint32_t id, int& width, int& height);
 // For the log, which is UTF-8.
 std::string Utf8(const std::wstring& wide);

@@ -1,0 +1,64 @@
+# W3, first stage: the row of units (two rows of six) with the mouse, a unit deployed on the brick, the
+# pause menu and its "Back to the main screen?" question with the mouse.
+tapuntil 1000 title 1 90
+wait 1
+tapuntil 1000 title 12 20
+wait 1
+tap 0002
+wait 1
+tap 0002
+wait 1
+tapuntil 1000 title 4 20
+wait 1
+tap 1000
+wait 1
+tapuntil 1000 pack 3 30
+until stage 3 30
+tapuntil 1000 stage 9 20
+gold 999
+# the row: hover the second row's third unit (index 8), the first row's last (5), the first (0)
+clickuntil 440 170 stage 11 5
+move 640 380
+wait 1
+peek 40065D30
+move 883 255
+wait 1
+peek 40065D30
+move 397 255
+wait 1
+peek 40065D30
+clickuntil 397 255 stage 9 5
+wait 1
+# deployed on the brick: the first spot taken
+clickuntil 440 170 gold <999 3
+clickuntil 760 370 gold <999 3
+clickuntil 500 240 gold <999 3
+wait 1
+shot e03_deployed
+# the pause menu: Start, hover its rows, Quit (entry 3), its question: hover No, Yes, then back
+tapuntil 0010 stage 15 5
+wait 1
+move 650 193
+wait 1
+peek 40065CF0
+move 650 236
+wait 1
+peek 40065CF0
+clickuntil 650 236 stage 25 5
+shot e04_howto
+peek 400663B8
+click 943 375
+wait 1
+click 943 375
+wait 1
+shot e05_page3
+click 336 375
+wait 1
+shot e06_page2
+rclick 640 375
+until stage 15 5
+# the quit question: the pause menu's last row
+move 650 451
+wait 1
+peek 40065CF0
+log end

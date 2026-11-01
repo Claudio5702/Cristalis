@@ -47,8 +47,41 @@ bool dl_unlocked(const char *id) {
   return k >= 0 && ach_time[k];
 }
 
+// ---- the achievements' pictures (DlGame.achievement_picture, 2.63): asked once each, and a grey copy
+// for the ones not unlocked yet (darker, its opacity kept)
+static const u32 *pic[ACH_MAX], *pic_grey[ACH_MAX];
+static int pic_w[ACH_MAX], pic_h[ACH_MAX];
+static bool pic_tried[ACH_MAX];
+
+static const u32 *ach_pic(int k, bool grey, int *w, int *h) {
+  if (k < 0 || k >= ach_n || !dl_game->achievement_picture || !dl_start_done) return NULL;
+  if (!pic_tried[k]) {
+    pic_tried[k] = true;
+    int pw = 0, ph = 0;
+    const u32 *src = dl_game->achievement_picture(ach[k].id, &pw, &ph);
+    if (src && pw > 0 && ph > 0 && pw <= 4096 && ph <= 4096) {
+      pic[k] = src;
+      pic_w[k] = pw;
+      pic_h[k] = ph;
+      u32 *g = malloc((size_t)pw * ph * 4);
+      if (g)
+        for (size_t i = 0; i < (size_t)pw * ph; i++) {
+          u32 p = src[i], v = ((p >> 16 & 255) * 77 + (p >> 8 & 255) * 150 + (p & 255) * 29) >> 8;
+          v = v * 55 / 100; // (darker: not yet)
+          g[i] = (p & 0xFF000000u) | v << 16 | v << 8 | v;
+        }
+      pic_grey[k] = g;
+    }
+  }
+  if (!pic[k]) return NULL;
+  *w = pic_w[k];
+  *h = pic_h[k];
+  return grey && pic_grey[k] ? pic_grey[k] : pic[k];
+}
+
 // ---- "Achievement unlocked" over the game, for a few seconds
 static wchar_t toast_name[96];
+static int toast_k = -1; // whose (its picture), -1: none
 static DWORD toast_until;
 
 static void toast(const wchar_t *name) {
@@ -65,7 +98,7 @@ const wchar_t *dl_toast_now(void) {
 }
 
 void dl_toast_sample(void) { // --gpu-check: the first achievement's, without unlocking it
-  if (ach_n) toast(dl_tr(ach[0].name));
+  if (ach_n) { toast_k = 0; toast(dl_tr(ach[0].name)); }
 }
 
 void dl_unlock(const char *id) {
@@ -74,6 +107,7 @@ void dl_unlock(const char *id) {
   if (k < 0 || ach_time[k]) return;
   ach_time[k] = (long long)time(NULL);
   ach_write();
+  toast_k = k;
   toast(dl_tr(ach[k].name));
   dl_beep(1);
 }
@@ -87,7 +121,7 @@ static HFONT toast_font(int h, int which) { // 0 the title, 1 the name, 2 the st
     for (int k = 0; k < 3; k++)
       if (f[k]) DeleteObject(f[k]);
     int fh = toast_fh(h);
-    const wchar_t *face = dl_cfg.ui_lang == DL_LANG_JP ? L"Yu Gothic UI" : L"Verdana";
+    const wchar_t *face = dl_lang_face() ? dl_lang_face() : L"Verdana";
     f[0] = CreateFontW(-(fh * 4 / 5), 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face);
     f[1] = CreateFontW(-fh, 0, 0, 0, FW_BOLD, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, face);
     f[2] = CreateFontW(-(fh * 2), 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Segoe MDL2 Assets");
@@ -130,8 +164,13 @@ void dl_draw_toast(HDC dc, int x, int y, int h) {
   SetBkMode(dc, TRANSPARENT);
   SetTextAlign(dc, TA_LEFT | TA_TOP);
   HGDIOBJ of = SelectObject(dc, toast_font(h, 2));
-  SetTextColor(dc, RGB(255, 206, 84));
-  TextOutW(dc, x + fh / 2, y + fh / 2, L"\xE735", 1);
+  int pw, ph;
+  const u32 *p = ach_pic(toast_k, false, &pw, &ph);
+  if (p) ui_picture(dc, 255, p, pw, ph, x + fh / 2, y + fh / 2, fh * 2, fh * 2); // the achievement's picture
+  else {
+    SetTextColor(dc, RGB(255, 206, 84));
+    TextOutW(dc, x + fh / 2, y + fh / 2, L"\xE735", 1);
+  }
   SelectObject(dc, toast_font(h, 0));
   COLORREF v = ui_value();
   SetTextColor(dc, v);
@@ -152,7 +191,7 @@ static void ach_date(int k, wchar_t *out, int n) {
   struct tm *lt = localtime(&t);
   if (!lt) { out[0] = 0; return; }
   bool month_first = dl_cfg.ui_lang == DL_LANG_EN;
-  if (dl_cfg.ui_lang == DL_LANG_JP) _snwprintf(out, n, L"%04d/%02d/%02d", lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday); // year first in Japanese
+  if (dl_lang_face()) _snwprintf(out, n, L"%04d/%02d/%02d", lt->tm_year + 1900, lt->tm_mon + 1, lt->tm_mday); // year first in Japanese, Chinese and Korean
   else _snwprintf(out, n, L"%02d/%02d/%04d", month_first ? lt->tm_mon + 1 : lt->tm_mday, month_first ? lt->tm_mday : lt->tm_mon + 1, lt->tm_year + 1900);
   out[n - 1] = 0;
 }
@@ -190,7 +229,10 @@ static bool ach_preview(void *dcv, int k, double x0, double y0, double x1, doubl
     star = CreateFontW(-star_px, 0, 0, 0, FW_NORMAL, 0, 0, 0, DEFAULT_CHARSET, 0, 0, ANTIALIASED_QUALITY, 0, L"Segoe MDL2 Assets");
   }
   double cx = (x0 + x1) / 2;
-  ui_text(dc, star, cx, y0 + 6, got ? L"\xE735" : L"\xE734", got ? RGB(255, 206, 84) : ui_tint(RGB(96, 112, 168)), TA_CENTER);
+  int pw, ph;
+  const u32 *p = secret(k) ? NULL : ach_pic(k, !got, &pw, &ph); // its picture (grey until unlocked); a secret keeps the star
+  if (p) ui_picture(dc, k % 254, p, pw, ph, ui_ox + PX(cx - 30), ui_oy + PX(y0 + 4), PX(60), PX(60));
+  else ui_text(dc, star, cx, y0 + 6, got ? L"\xE735" : L"\xE734", got ? RGB(255, 206, 84) : ui_tint(RGB(96, 112, 168)), TA_CENTER);
   ui_text_fit(dc, cx, y0 + 70, secret(k) ? TX(T_ACH_SECRET) : dl_tr(ach[k].name), RGB(255, 255, 255), TA_CENTER, x1 - x0 - 8);
   wchar_t date[48], line[96];
   if (got) {

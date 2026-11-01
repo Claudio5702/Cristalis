@@ -14,8 +14,8 @@ per questo gioco. Una versione per Linux è sperimentale.
 **Non è inclusa alcuna risorsa del gioco**, né in questo repository né nelle release: immagini,
 suoni, musica e testi vengono letti dalla tua copia del gioco. Il repository non contiene nemmeno
 codice del gioco: il codice tradotto viene generato da un `default.xex` quando si compila il
-programma, e i programmi della [pagina delle release](https://github.com/Claudio5702/Cristalis/releases/latest) sono compilati così. **Versione 1.10,
-una beta**: finora giocata da poche persone.
+programma, e i programmi della [pagina delle release](https://github.com/Claudio5702/Cristalis/releases/latest) sono compilati così. **Versione 1.11**:
+giocata fino alla fine, ma finora su poche macchine; [segnala ogni problema](https://github.com/Claudio5702/Cristalis/issues).
 
 **Ti serve la tua copia di Crystal Defenders (Xbox 360).** Crystal Defenders appartiene a Square
 Enix; questo progetto non è affiliato a Square Enix né approvato da essa.
@@ -62,12 +62,23 @@ segnala se non lo è.
 - **Il gioco in [DarkLauncher](kit/launcher)**, il launcher creato
   per Kahna (Bahamut Lagoon Recomp): una schermata delle impostazioni prima del gioco e un menu di
   pausa durante la partita, in sette lingue, con tastiera, controller o mouse. Il suo aspetto segue
-  la direzione artistica del gioco: il blu delle sue finestre, l'oro dei suoi cristalli, una notte
-  stellata. DarkLauncher disegna tutto da sé; nulla è preso dai file del gioco.
+  la direzione artistica del gioco: il blu delle sue finestre, l'oro dei suoi cristalli, una terra di
+  cristalli in pixel art sotto nuvole in movimento, e un piccolo cavaliere come icona del programma.
+  Queste immagini sono state dipinte per il progetto; nulla è preso dai file del gioco. Gli obiettivi
+  mostrano le loro immagini, lette dalla tua copia del gioco.
 - **Le sei lingue del gioco** (francese, inglese, tedesco, spagnolo, italiano, giapponese), scelte
   nelle impostazioni; il gioco si riavvia nella nuova lingua.
 - **Immagine tramite la scheda grafica**: il gioco disegnato a 1280×720, 1920×1080, 2560×1440 o
   3840×2160, poi nitido, sfumato o con bordi ammorbiditi a qualsiasi dimensione della finestra; HDR (Windows).
+- **Si gioca con il mouse**: il cursore va subito sulla casella sotto il puntatore e un clic schiera
+  un'unità; la fila di unità, i menu e la pausa seguono il puntatore, e la guida dei pulsanti mostra i
+  tasti, il mouse o il controller in uso.
+- **Riempie lo schermo**: su uno schermo di altre proporzioni (il 16:10 di Steam Deck, 21:9...), gli
+  sfondi del gioco si allargano e il resto resta al centro, senza bande nere (Impostazioni, Immagine).
+- **Avanti veloce fisso**: l'avanti veloce del gioco (RB, tenuto premuto) resta attivo da una
+  pressione all'altra: F, il clic centrale o un pulsante del controller scelto nei Comandi.
+- **Leggero**: circa un decimo di un core del processore a 60 immagini al secondo; un dito su uno
+  schermo tattile (Steam Deck, tablet) fa da mouse.
 - **Obiettivi salvati sul computer**, con un avviso sopra il gioco e un elenco nelle impostazioni.
 - **Il comportamento offline della console, su richiesta**: l'avviso «Non connesso a Xbox LIVE» e
   la scelta del dispositivo di memorizzazione sono disattivati per impostazione predefinita e si
@@ -181,7 +192,7 @@ compatibilità. La versione per Windows gira anche con Proton.
 Come funziona il progetto, come compilarlo, tradurre di nuovo il codice del gioco, verificarlo e
 creare il programma di installazione: [docs/DEVELOPERS.md](docs/DEVELOPERS.md) (in inglese).
 
-Cosa è cambiato in ogni versione (ora 1.10): [CHANGELOG.md](CHANGELOG.md) (in inglese).
+Cosa è cambiato in ogni versione (ora 1.11): [CHANGELOG.md](CHANGELOG.md) (in inglese).
 
 ## Domande frequenti
 
@@ -225,5 +236,7 @@ documentazione sono stati scritti da esso, secondo le richieste e le prove dell'
 - [Xenia](https://xenia.jp): la sua documentazione della Xbox 360, usata come riferimento.
 - [llvm-mingw](https://github.com/mstorsjo/llvm-mingw): il compilatore del programma e del programma
   di installazione.
+- [FLUX.2 [klein] 4B](https://huggingface.co/black-forest-labs/FLUX.2-klein-4B) (Black Forest Labs, Apache 2.0), eseguito in locale in ComfyUI: le immagini del launcher e
+  l'icona, fatte con l'IA; il prompt e le impostazioni di ognuna sono accanto, in `recomp/resources`.
 
 E naturalmente Square Enix, che ha creato Crystal Defenders.

@@ -749,13 +749,17 @@ static const struct { const wchar_t *face; const char *family; float wide, wide_
 };
 
 // Windows' faces turned into fontconfig's: the face itself when Linux has it, otherwise its stand-in
-// (*wide: how much narrower it is drawn), guessed from the name for a face not in the list.
-static const char *family_of(const wchar_t *face, bool bold, char own[128], bool *japanese, double *wide) {
-  *japanese = false;
+// (*wide: how much narrower it is drawn), guessed from the name for a face not in the list. *cjk: the
+// face of the Japanese (CJK_JP), Chinese or Korean texts, drawn with Noto Sans CJK.
+enum { CJK_NONE, CJK_JP, CJK_ZH, CJK_KO };
+static const char *family_of(const wchar_t *face, bool bold, char own[128], int *cjk, double *wide) {
+  *cjk = CJK_NONE;
   *wide = 1;
   if (!face || !*face) return "sans-serif";
-  if (!wcscmp(face, L"Yu Gothic UI")) { *japanese = true; return "Noto Sans CJK JP"; }
-  if (!wcscmp(face, L"Yu Mincho")) { *japanese = true; return "Noto Serif CJK JP"; }
+  if (!wcscmp(face, L"Yu Gothic UI")) { *cjk = CJK_JP; return "Noto Sans CJK JP"; }
+  if (!wcscmp(face, L"Yu Mincho")) { *cjk = CJK_JP; return "Noto Serif CJK JP"; }
+  if (!wcscmp(face, L"Microsoft YaHei UI")) { *cjk = CJK_ZH; return "Noto Sans CJK SC"; }
+  if (!wcscmp(face, L"Malgun Gothic")) { *cjk = CJK_KO; return "Noto Sans CJK KR"; }
   if (snprintf(own, 128, "%ls", face) > 0 && has_family(own)) return own;
   for (size_t i = 0; i < sizeof stand_ins / sizeof *stand_ins; i++)
     if (!wcscmp(face, stand_ins[i].face)) {
@@ -784,10 +788,12 @@ HFONT CreateFontW(int height, int width, int escapement, int orientation, int we
     o->ascent = o->avg = o->em;
     return o;
   }
-  bool jp = false, got_bold = false, got_italic = false, bold = weight >= 600;
+  int cjk;
+  bool got_bold = false, got_italic = false, bold = weight >= 600;
   char own[128];
   double wide;
-  const char *family = family_of(face, bold, own, &jp, &wide);
+  const char *family = family_of(face, bold, own, &cjk, &wide);
+  bool jp = cjk == CJK_JP;
   o->face = face_for(family, bold, italic, &got_bold, &got_italic);
   if (!o->face) return o;
   o->bold = bold;
@@ -807,6 +813,11 @@ HFONT CreateFontW(int height, int width, int escapement, int orientation, int we
   if (jp) { // and its lines closer, as Yu Gothic UI's (Noto Sans CJK leaves room for every script's accents)
     o->ascent = (int)ceil(o->em * 1.04);
     o->descent = (int)ceil(o->em * 0.28);
+  } else if (cjk) { // Microsoft YaHei UI and Malgun Gothic: their characters on full squares as Noto Sans CJK's (their
+                    // Latin letters wider), their punctuation too (no 'palt'), their lines as theirs
+    o->palt_tried[0] = true;
+    o->ascent = (int)ceil(o->em * (cjk == CJK_ZH ? 1.02 : 1.09));
+    o->descent = (int)ceil(o->em * (cjk == CJK_ZH ? 0.26 : 0.25));
   }
   TT_OS2 *os2 = FT_Get_Sfnt_Table(o->face, FT_SFNT_OS2);
   o->avg = (int)((os2 && os2->xAvgCharWidth > 0 ? os2->xAvgCharWidth * (double)o->em / o->face->units_per_EM : o->em * 0.5) * o->sx + 0.5);
@@ -1093,8 +1104,14 @@ int GetTextFaceW(HDC dc, int n, wchar_t *out) {
   return (int)wcslen(out);
 }
 
-// Lines broken between words (and between Japanese characters) to fit the box's width, from its top.
+// Lines broken between words (and between Japanese, Chinese and Korean characters, as GDI does) to fit
+// the box's width, from its top; never before a closing mark nor after an opening one (as GDI).
 static bool breaks_anywhere(wchar_t c) { return c >= 0x2E80; }
+static bool cjk_break(const wchar_t *s, int at) {
+  wchar_t a = s[at - 1], b = s[at];
+  if (!breaks_anywhere(a) && !breaks_anywhere(b)) return false;
+  return !(b && wcschr(L"、。，．：；！？）」』》〉】”’・ー…", b)) && !(a && wcschr(L"（「『《〈【“‘", a));
+}
 
 int DrawTextW(HDC dc, const wchar_t *s, int n, RECT *r, UINT format) {
   HGDIOBJ f = font_of(dc);
@@ -1111,7 +1128,7 @@ int DrawTextW(HDC dc, const wchar_t *s, int n, RECT *r, UINT format) {
       if (w + a > room && end > k && (format & DT_WORDBREAK)) break;
       w += a;
       end++;
-      if (end < n && (s[end] == L' ' || breaks_anywhere(s[end]) || breaks_anywhere(s[end - 1]))) last_break = end;
+      if (end < n && (s[end] == L' ' || cjk_break(s, end))) last_break = end;
     }
     int stop = end;
     if (end < n && s[end] != L'\n' && last_break > k) stop = last_break; // back to the last place a line may end
