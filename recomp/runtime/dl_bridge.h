@@ -32,6 +32,9 @@ uint16_t DlBridgeButtons();
 void DlBridgeAudio(const int16_t* samples, uint32_t frames);
 // An achievement the game has just unlocked (its id in the game), passed on to DarkLauncher's thread.
 void DlBridgeUnlock(uint32_t id);
+// DarkLauncher's Achievements page opened over the paused game (the game's "Achievements"), from any
+// thread; closed() called once the game runs again. False: it could not (none declared, one waiting).
+bool DlBridgeShowAchievements(void (*closed)());
 // The game's button pictures (A, B, X, Y and RB in its prompts, 32 x 32) as DarkLauncher draws them for the
 // player's device (keys, mouse, PlayStation symbols; on an Xbox controller the game's own): the number
 // changes whenever they do, and DlBridgePrompt replaces a picture of the game's it recognises (by its

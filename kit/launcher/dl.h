@@ -11,7 +11,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "2.98"
+#define DL_VERSION "2.100"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -394,6 +394,18 @@ typedef struct DlAchievement {
 void dl_achievements(const DlAchievement *list, int count);
 // Unlocks one, once: "Achievement unlocked" and its name over the game for a few seconds, with a sound.
 void dl_unlock(const char *id);
+// Opens the Achievements page over the game (2.99, asked for Cristalis, whose own pause menu has
+// "Achievements"), from any thread: at DarkLauncher's next turn in play (or its pause menu) the game is
+// paused, as by the setup screen, and the page shows; when the player leaves it (Back, Esc, B) play goes
+// on, and closed() is called from DarkLauncher's loop once the game runs again (may be NULL). false: the
+// game has no achievements (dl_achievements), or one is waiting to open already.
+bool dl_show_achievements(void (*closed)(void));
+// The digit keys 1 to 9 for the game, without rows on the Controls page (asked for Cristalis: a unit of
+// its row chosen at once): pressed(digit) is called from DarkLauncher's loop when one is pressed in play,
+// the top row's or the keypad's (the top row's by its place, as on an AZERTY keyboard too), not again
+// while it is held, not in DarkLauncher's menus, and not when the player gave that key to something else
+// (a button, a shortcut, one of dl_function's: theirs first). NULL: none.
+void dl_digits(void (*pressed)(int digit));
 bool dl_unlocked(const char *id);
 
 // ---- packs and mods (optional): folders, or files of the game's kinds, that the player drops into a

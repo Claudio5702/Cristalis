@@ -85,6 +85,9 @@ int g_scaleSetting = 0;        // an index in kSizeHalves: 1280 x 720, 1920 x 10
 // The game's own fast forward is RB held on the map; this keeps it held for the player, from one press
 // of its function (dl_function in Setup) or of the middle button to the next, or until the stage ends.
 std::atomic<bool> g_fastForward;
+// A digit key pressed in play (1..9, DarkLauncher's dl_digits; 0 none): in the row of units, that unit
+// chosen, counted along the rows (the debug mode's "digit <n>" too)
+std::atomic<int> g_digit;
 int g_fillSetting = 1;       // the picture at the screen's proportions, the game's backgrounds stretched (DlBridgeFill)
 int g_languageSetting = 0;     // 0: Windows, then kGameLanguages
 int g_liveNotice = 0, g_storageChoice = 0;
@@ -352,6 +355,7 @@ void Setup()
     // the game's fast forward kept on (F, a controller button chosen on the Controls page, the middle
     // click, the pause menu)
     dl_function(t_fastForward, t_hFastForward, "key_fast", 'F', "_fast", [] { g_fastForward = !g_fastForward; }, true);
+    dl_digits([](int digit) { g_digit = digit; });
     dl_setting("fill_screen", &g_fillSetting, 0, 1, false);
     dl_setting("game_language", &g_languageSetting, 0, kGameLanguageCount, true);
     dl_setting("live_notice", &g_liveNotice, 0, 1, false);
@@ -417,13 +421,34 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"マウスの修正|ユニットのメニューは、ユニットの位置によって上か下に出ますが、どちらでもポインターで正しく選べるようになりました。ユニットの列はポインターにすぐ追いつきます。",
-    L"Souris corrigée|Le menu d'une unité, affiché en haut ou en bas selon sa place, se choisit maintenant au bon endroit. La rangée d'unités suit le pointeur tout de suite.",
-    L"Mouse fixes|A unit's menu, shown high or low depending on where the unit stands, is now pointed at in the right place. The row of units follows the pointer at once.",
-    L"Ratón corregido|El menú de una unidad, arriba o abajo según dónde esté, ya se elige en el sitio correcto. La fila de unidades sigue al puntero enseguida.",
-    L"Mouse corrigido|O menu de uma unidade, em cima ou embaixo conforme onde ela está, agora é escolhido no lugar certo. A fileira de unidades segue o ponteiro na hora.",
-    L"Maus korrigiert|Das Menü einer Einheit, je nach ihrer Lage oben oder unten, wird jetzt an der richtigen Stelle gewählt. Die Reihe der Einheiten folgt dem Zeiger sofort.",
-    L"Mouse corretto|Il menu di un'unità, in alto o in basso a seconda di dove si trova, ora si sceglie nel punto giusto. La fila di unità segue subito il puntatore.",
+    L"メニューがすばやく|ポーズメニューやヘルプ、リプレイのメニューまで、ポインターにすぐ追いつきます。\n"
+    L"数字キー|ユニットの列で 1〜9 キーを押すと、そのユニットを選べます。\n"
+    L"タッチ操作|指でも遊びやすくなりました。画面の「戻る」に触れると B ボタンと同じです。\n"
+    L"実績と更新|ポーズメニューの「実績」でランチャーの実績ページが開きます。新しいバージョンはホーム画面に表示されます。",
+    L"Des menus plus rapides|Le menu pause, l'aide et même le menu des replays suivent le pointeur tout de suite.\n"
+    L"Touches chiffres|Dans la rangée d'unités, les touches 1 à 9 choisissent l'unité directement.\n"
+    L"Écran tactile|Le jeu se joue mieux au doigt : toucher « Retour » à l'écran fait comme le bouton B.\n"
+    L"Succès et mises à jour|« Succès » dans le menu pause ouvre la page des succès du lanceur. Une nouvelle version s'affiche sur l'accueil, sous « Jouer ».",
+    L"Quicker menus|The pause menu, the help and even a replay's menu now follow the pointer at once.\n"
+    L"Digit keys|In the row of units, keys 1 to 9 choose that unit straight away.\n"
+    L"Touch screens|The game plays better with a finger: touching \"Back\" on the screen works as the B button.\n"
+    L"Achievements and updates|\"Achievements\" in the pause menu opens the launcher's achievements page. A new version shows on the home page, under \"Play\".",
+    L"Menús más rápidos|El menú de pausa, la ayuda e incluso el menú de las repeticiones siguen al puntero enseguida.\n"
+    L"Teclas numéricas|En la fila de unidades, las teclas 1 a 9 eligen esa unidad directamente.\n"
+    L"Pantallas táctiles|El juego se juega mejor con el dedo: tocar «Atrás» en la pantalla equivale al botón B.\n"
+    L"Logros y actualizaciones|«Logros» en el menú de pausa abre la página de logros del lanzador. Una versión nueva aparece en el inicio, bajo «Jugar».",
+    L"Menus mais rápidos|O menu de pausa, a ajuda e até o menu dos replays agora seguem o ponteiro na hora.\n"
+    L"Teclas numéricas|Na fileira de unidades, as teclas 1 a 9 escolhem essa unidade direto.\n"
+    L"Telas de toque|O jogo fica melhor com o dedo: tocar \"Voltar\" na tela vale como o botão B.\n"
+    L"Conquistas e atualizações|\"Conquistas\" no menu de pausa abre a página de conquistas do lançador. Uma versão nova aparece no início, abaixo de \"Jogar\".",
+    L"Schnellere Menüs|Das Pausenmenü, die Hilfe und sogar das Menü der Wiederholungen folgen dem Zeiger jetzt sofort.\n"
+    L"Zifferntasten|In der Reihe der Einheiten wählen die Tasten 1 bis 9 die Einheit direkt.\n"
+    L"Touchscreens|Das Spiel lässt sich besser mit dem Finger spielen: „Zurück“ auf dem Bildschirm wirkt wie die B-Taste.\n"
+    L"Erfolge und Updates|„Erfolge“ im Pausenmenü öffnet die Erfolgsseite des Launchers. Eine neue Version erscheint auf der Startseite unter „Spielen“.",
+    L"Menu più rapidi|Il menu di pausa, l'aiuto e persino il menu dei replay ora seguono subito il puntatore.\n"
+    L"Tasti numerici|Nella fila di unità, i tasti da 1 a 9 scelgono subito quell'unità.\n"
+    L"Schermi tattili|Il gioco si gioca meglio con il dito: toccare «Indietro» sullo schermo vale come il pulsante B.\n"
+    L"Obiettivi e aggiornamenti|«Obiettivi» nel menu di pausa apre la pagina degli obiettivi del launcher. Una nuova versione compare nella home, sotto «Gioca».",
 };
 
 // ---- The game ----
@@ -436,6 +461,7 @@ DWORD WINAPI GuestThread(void*)
 
 bool Start()
 {
+    Log("Cristalis %s on DarkLauncher %s", GAME_VERSION, DL_VERSION);
     ApplySettings();
     // Achievements earned before, as the runtime records them: DarkLauncher learns them (it says
     // nothing for those it already knows).
@@ -503,6 +529,8 @@ uint16_t MouseButtons(uint16_t buttons)
         DebugInput input = DebugScriptStep();
         buttons |= input.buttons;
         wheel += input.wheel;
+        if (input.digit > 0)
+            g_digit = input.digit;
         if (input.pointer)
         {
             overPicture = true;
@@ -536,6 +564,9 @@ uint16_t MouseButtons(uint16_t buttons)
         g_fastForward = false;
     else if (g_fastForward && GameStateStageScreen() == 9)
         buttons |= 0x0200;
+    static unsigned held; // the mouse's buttons at the last picture (none once the pointer, a finger, is gone)
+    if (!overPicture)
+        held = 0;
     if (overPicture && g_pictureWidth != 0 && g_pictureHeight != 0)
     {
         double x = mouseX / scale - sideX, y = mouseY / scale - sideY;
@@ -545,14 +576,18 @@ uint16_t MouseButtons(uint16_t buttons)
         movedY = y;
         int gridX, gridY, unit, row;
         GameMenu menu = stageMode != 0 && stageMode != 1 ? GameStateMenu() : GameMenu{}; // (before a stage, or a unit's menu)
-        if (moved && stageMode == 0 && GameStateGridPoint(x, y, gridX, gridY))
+        // in a stage, the game's own "Back" (its word, under "Confirm", right of the map): a click or a
+        // finger there is B, for a touch screen without buttons
+        bool back = stageMode >= 0 && x >= 964 && x <= 1040 && y >= 540 && y <= 576;
+        if (back)
+            ; // (not a square of the map)
+        else if (moved && stageMode == 0 && GameStateGridPoint(x, y, gridX, gridY))
             GameStateRequestCursor(gridX, gridY); // at once, the game's checks redone (see game_state.cpp)
         else if (moved && unitRow && (unit = GameStateUnitAt(x, y)) >= 0)
             target = 1, targetX = unit, targetY = 0;
         else if (moved && menu.kind == GameMenu::kList && (row = GameStateMenuRow(menu, x, y)) >= 0)
             target = 2, targetX = row, targetY = 0;
         // the title's turning menu: a click on another row turns it there (one tap a row), then chooses
-        static unsigned held;
         static bool turning; // the click that turns: its A is not the game's
         if ((mouse & 1) && !(held & 1) && menu.kind == GameMenu::kCarousel && (row = GameStateMenuRow(menu, x, y)) >= 0 && row != 2)
         {
@@ -587,11 +622,18 @@ uint16_t MouseButtons(uint16_t buttons)
         if ((mouseAt != nullptr || debug) && (mouse & 1) && !(held & 1))
             Log("Mouse: click at %.0f,%.0f, stage screen %d, summon %d, scores %d", x, y, GameStateStageScreen(), summon, scores);
         held = mouse;
-        bool clickIsA = (scores == -2 || scores == 2) && (summon == -2 || summon == 2);
-        buttons |= (mouse & 1 && !turning && clickIsA ? kA : 0) | (mouse & 2 ? kB : 0);
+        bool clickIsA = !back && (scores == -2 || scores == 2) && (summon == -2 || summon == 2);
+        buttons |= (mouse & 1 && !turning && clickIsA ? kA : 0) | ((mouse & 2) || (back && (mouse & 1)) ? kB : 0);
     }
     if (stageMode != 0) // (on the map the arrows move the cursor)
         wheelTaps += wheel;
+    // a digit key: that unit of the row chosen, as the pointer would
+    if (int digit = g_digit.exchange(0); digit > 0 && unitRow)
+    {
+        UnitGrid grid = GameStateUnitGrid();
+        if (digit <= grid.columns * grid.rows)
+            target = 1, targetX = digit - 1, targetY = 0;
+    }
 
     // where the choice is now
     int nowX = -1, nowY = 0;
@@ -655,7 +697,20 @@ uint16_t MouseButtons(uint16_t buttons)
             }
         }
         else // a menu's rows, from the top
+        {
             arrow = targetX < nowX ? kUp : kDown;
+            // further than the next row: the choice put at once on the row before it (the greyed ones
+            // passed over, as the arrows do), then the game's own last step, as in the row of units
+            GameMenu menu = GameStateMenu();
+            int step = targetX < nowX ? 1 : -1, before = targetX + step;
+            while (before != nowX && menu.greyed[before])
+                before += step;
+            if (before != nowX)
+            {
+                GameStateSetMenuRow(menu, before);
+                arrow = 0;
+            }
+        }
         buttons |= arrow;
     }
     else if ((wheelTaps != 0 || sideTaps != 0 || rowTaps != 0) && (buttons & kArrows) == 0)
@@ -842,6 +897,23 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
     }
     if (count > 0)
         g_soundRoom.notify_one(); // room for the mixer's next sound (DlBridgeAudio)
+
+    // for the player's reports, once a minute in a stage: how many pictures DarkLauncher asked for (60 a
+    // second as the console) and how much sound the game had waiting (a lag would show here)
+    static ULONGLONG paceStart = GetTickCount64();
+    static int pacePictures;
+    static size_t paceSoundMost;
+    pacePictures++;
+    paceSoundMost = std::max(paceSoundMost, waiting);
+    if (GetTickCount64() - paceStart >= 60000)
+    {
+        double seconds = (GetTickCount64() - paceStart) / 1000.0;
+        if (GameStateNow().pack != 0)
+            Log("Pace: %.1f pictures a second, sound waiting %zu ms at most", pacePictures / seconds, paceSoundMost / 48);
+        paceStart = GetTickCount64();
+        pacePictures = 0;
+        paceSoundMost = 0;
+    }
     return int(count);
 }
 
@@ -945,6 +1017,11 @@ void DlBridgeUnlock(uint32_t id)
 {
     std::lock_guard lock(g_unlockMutex);
     g_unlocks.push_back(id);
+}
+
+bool DlBridgeShowAchievements(void (*closed)())
+{
+    return dl_show_achievements(closed);
 }
 
 uint32_t DlBridgePromptGeneration()

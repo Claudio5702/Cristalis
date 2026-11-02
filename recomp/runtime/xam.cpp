@@ -6,6 +6,9 @@
 #include "kernel_objects.h"
 #include "renderer.h"
 #include "xex_header.h"
+#ifdef CD_DARKLAUNCHER
+#include "dl_bridge.h"
+#endif
 
 #include <deque>
 #include <mutex>
@@ -260,10 +263,19 @@ static void ShowNothing(PPCContext& ctx, const char* what)
     ctx.r3.u64 = X_ERROR_SUCCESS;
 }
 
-// The achievements screen of the console, as a plain Windows message box.
+// The achievements screen of the console: DarkLauncher's Achievements page over the paused game, or else
+// a plain Windows message box.
 GUEST_IMPORT(XamShowAchievementsUI)
 {
     PostNotification(XN_SYS_UI, 1);
+#ifdef CD_DARKLAUNCHER
+    if (getenv("CD_HEADLESS") == nullptr && DlBridgeShowAchievements([] { PostNotification(XN_SYS_UI, 0); }))
+    {
+        Log("Achievements UI: DarkLauncher's page");
+        ctx.r3.u64 = X_ERROR_SUCCESS;
+        return;
+    }
+#endif
     std::thread([]
     {
         std::wstring title;

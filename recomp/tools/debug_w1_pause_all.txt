@@ -31,37 +31,16 @@ rclick 640 420
 wait 1
 rclick 640 420
 wait 1
-jumpif stage 15 back_
-classement
-label back_
-classement
+jumpif stage 15 back_classement
+label back_classement
 tapuntil 2000 stage 9 5
 tapuntil 0010 stage 15 5
 wait 1
 move 650 322
 wait 1
 peek 40065CF0
-click 650 322
-wait 2
-shot q_succes
-log succes opened
-peek 40053D6C
-peek 40065CF0
-peek 40065CF4
-move 640 330
-wait 1
-move 640 420
-wait 1
-shot q_succes_hover
-peek 40065CF0
-rclick 640 420
-wait 1
-rclick 640 420
-wait 1
-jumpif stage 15 back_
-succes
-label back_
-succes
+# (not clicked: since 1.11.2 Achievements opens DarkLauncher's page, which only the real keys close; tried
+# by hand, and with Esc posted to the window)
 tapuntil 2000 stage 9 5
 tapuntil 0010 stage 15 5
 wait 1
@@ -85,10 +64,8 @@ rclick 640 420
 wait 1
 rclick 640 420
 wait 1
-jumpif stage 15 back_
-sauver
-label back_
-sauver
+jumpif stage 15 back_sauver
+label back_sauver
 tapuntil 2000 stage 9 5
 tapuntil 0010 stage 15 5
 wait 1
@@ -112,10 +89,8 @@ rclick 640 420
 wait 1
 rclick 640 420
 wait 1
-jumpif stage 15 back_
-ennemi
-label back_
-ennemi
+jumpif stage 15 back_ennemi
+label back_ennemi
 tapuntil 2000 stage 9 5
 tapuntil 0010 stage 15 5
 wait 1
@@ -139,10 +114,8 @@ rclick 640 420
 wait 1
 rclick 640 420
 wait 1
-jumpif stage 15 back_
-reessayer
-label back_
-reessayer
+jumpif stage 15 back_reessayer
+label back_reessayer
 tapuntil 2000 stage 9 5
 tapuntil 0010 stage 15 5
 wait 1
@@ -166,10 +139,8 @@ rclick 640 420
 wait 1
 rclick 640 420
 wait 1
-jumpif stage 15 back_
-quitter
-label back_
-quitter
+jumpif stage 15 back_quitter
+label back_quitter
 tapuntil 2000 stage 9 5
 tapuntil 0010 stage 15 5
 wait 1

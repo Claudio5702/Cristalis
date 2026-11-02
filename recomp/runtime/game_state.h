@@ -77,3 +77,5 @@ bool GameStateBottomBarShown();
 // The row at a point (-1: none; in a carousel the middle one is 2), and the list's choice (-1: a carousel).
 int GameStateMenuRow(const GameMenu& menu, double x, double y);
 int GameStateMenuChoice(const GameMenu& menu);
+// A list's choice put at once on a row (its highlight follows; the game's own sound and moves do not)
+void GameStateSetMenuRow(const GameMenu& menu, int row);

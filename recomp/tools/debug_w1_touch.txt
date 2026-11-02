@@ -1,0 +1,57 @@
+# W1: played with a finger only (touch: down at once, no hover), the digit keys and the game's own "Back".
+tapuntil 1000 title 1 60
+wait 1
+tapuntil 1000 title 12 20
+wait 1
+tapuntil 1000 title 4 20
+wait 1
+tap 1000
+wait 1
+tapuntil 1000 pack 1 30
+until stage 3 30
+tapuntil 1000 stage 9 20
+gold 999
+log t1 touch an empty square: the row of units
+touch 560 220
+wait 1
+log t2 touch Back
+touch 1000 558
+wait 1
+log t3 touch an empty square again
+touch 560 220
+wait 1
+log t4 touch the black mage
+touch 494 257
+wait 1
+log t5 touch a square to deploy
+touch 560 220
+wait 1
+log t6 touch the unit: its menu
+touch 560 220
+wait 1
+shot t6
+log t7 touch Level +
+touch 545 480
+wait 1.5
+shot t7
+peek 40065D7C
+log t8 touch Back
+touch 1000 558
+wait 1
+log t9 touch digits in the row
+touch 720 380
+wait 1
+digit 5
+wait 1
+peek 40065D30
+touch 1000 558
+wait 1
+log t10 pause, touch Help
+tapuntil 0010 stage 15 5
+wait 1
+touch 650 236
+wait 1
+log t11 touch Back
+touch 1000 558
+wait 1
+log end

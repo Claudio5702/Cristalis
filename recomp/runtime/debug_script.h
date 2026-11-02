@@ -16,6 +16,8 @@
 //   move <x> <y>, click <x> <y>, rclick, mclick   the pointer on the 1280 x 720 picture; a click holds the
 //                                                 button 4 pictures and lets go 4; hide takes it away
 //   wheel <notches>                               the mouse's wheel (up: positive)
+//   digit <1..9>                                  a digit key (in the row of units, that unit)
+//   touch <x> <y>                                 a finger: down at once there (no hover), then lifted
 //   clickuntil <x> <y> title|stage|pack|mode <n> [<s>]  left clicks there until that state
 //   gold <n> [keep]                               the stage's gold (keep: every picture, in a stage)
 //   poke <hex address> <value>                    a 32-bit word of the game's memory
@@ -35,6 +37,7 @@ struct DebugInput
     unsigned mouse = 0;     // bit 0 left, 1 right, 2 middle
     uint16_t buttons = 0;   // the controller's, added
     int wheel = 0;          // notches of the mouse's wheel (up: positive)
+    int digit = 0;          // a digit key pressed (1..9), as DarkLauncher's dl_digits gives it
 };
 
 bool DebugScriptActive();

@@ -723,6 +723,9 @@ void dl_pad_poll(void) {
 #undef FN_PRESSED
 }
 
+static void (*digits_pressed)(int digit);
+void dl_digits(void (*pressed)(int digit)) { digits_pressed = pressed; }
+
 // A key pressed while the game is played: the program's shortcuts. True when it was one.
 bool dl_game_key(int vk) {
   if (vk == VK_ESCAPE) { dl_pause_open(); return true; }
@@ -736,5 +739,13 @@ bool dl_game_key(int vk) {
   if (vk == dl_hot_vk[HK_FULL] && !dl_over) { dl_toggle_fullscreen(); return true; }
   for (int k = 0; k < dl_func_n; k++)
     if (dl_funcs[k].key && vk == dl_funcs[k].key) { dl_funcs[k].run(); return true; }
+  // dl_digits: 1 to 9, the top row's (VK '1'..'9') or the keypad's (VK_NUMPAD1..9), when no button has it
+  int digit = vk >= '1' && vk <= '9' ? vk - '0' : vk >= 0x61 && vk <= 0x69 ? vk - 0x60 : 0;
+  if (digit && digits_pressed) {
+    for (int k = 0; k <= DL_BTNS; k++)
+      if (dl_key_vk[k] == vk) return false;
+    digits_pressed(digit);
+    return true;
+  }
   return false;
 }

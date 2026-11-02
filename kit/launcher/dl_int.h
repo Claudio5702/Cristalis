@@ -114,6 +114,8 @@ extern bool dl_running;
 extern bool dl_start_done;   // the game's start() has run (the theme's pictures may be asked for)
 extern bool dl_safe;         // this run is in safe mode (the last one did not close normally)
 void dl_safe_restart(void);  // the player's settings back, then the program started again
+int dl_ach_page(void);       // dl_achieve.c: the Achievements page, -1 without achievements
+void dl_shows_follow(void);  // dl_menu.c, each turn: dl_show_achievements asked from the game
 void dl_settings_sibling(char *out, const char *ext); // the settings file's path with another extension (MAX_PATH)
 bool dl_packs_key(int vk);   // Page Up / Page Down on the Packs page (dl_packs.c); true: used
 extern bool dl_no_mouse;
@@ -266,7 +268,7 @@ typedef struct {
 extern DlPage dl_pages[DL_MAX_PAGES];
 extern int dl_page_n;
 
-enum { SEC_PAGE, SEC_PLAY, SEC_FOLDER, SEC_DEFAULTS, SEC_RESET, SEC_QUIT };
+enum { SEC_PAGE, SEC_PLAY, SEC_FOLDER, SEC_DEFAULTS, SEC_RESET, SEC_QUIT, SEC_UPDATE };
 typedef struct {
   int kind, page;
   unsigned icon;
@@ -299,6 +301,8 @@ void dl_update_open(void);       // its page in the browser
 void dl_update_install(void);    // "Update": downloads the release's file, checks it, installs it and starts again
 void dl_net_newer(void);         // dl_menu.c: a newer version found, its rows join the Internet page
 const wchar_t *dl_update_install_show(int v); // beside that row: the progress, "ready", "failed"...
+bool dl_update_installable(void); // the release has a file for this system: "Update" installs it (else its page)
+void dl_update_sample(void);      // --ui-audit: a newer version as if one were found (9.9), to draw its entry
 void dl_discord_changed(void);   // the Discord switch moved
 bool dl_news_open(void);       // the game's news, the first time its version starts; false: none to show
 void dl_welcome_open(void);    // the first start's pages (language, controls, display)

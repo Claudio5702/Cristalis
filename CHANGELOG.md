@@ -7,6 +7,36 @@ changes (2.0) for a change of the whole. Each
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
 
+## 1.11.2
+
+- **Every menu follows the pointer at once**: as the row of units in 1.11.1, the pause menu, its help
+  and questions, a power crystal's menu, the menus before a stage and Mastery's demos no longer wait
+  for the game's repeat of a held arrow: the choice is put at once on the row before the one pointed
+  at (the greyed ones passed over, as the arrows do), and the game makes the last step itself (its
+  highlight, its text, its sound). Seven rows away took about half a second, now 2 to 9 pictures.
+- **The achievements page (DarkLauncher 2.99)**: "Achievements" in the game's pause menu
+  (`XamShowAchievementsUI`) opens DarkLauncher's Achievements page over the paused game, instead of a
+  Windows message box outside the picture (in full screen, on a Steam Deck, it could not be seen); the
+  game goes on when the page is left. Without DarkLauncher the message box stays.
+- **"Update" in sight (DarkLauncher 2.99)**: when a newer version is out, the launcher's home page shows
+  "Update" right under "Play" (until now in Settings, Internet only, after a note shown once).
+- **Digit keys (DarkLauncher 2.100, `dl_digits`)**: in the row of units, 1 to 9 choose that unit,
+  counted along the rows (the top row and the keypad, AZERTY too; a key the player bound to something
+  else keeps its use).
+- **Touch screens**: a finger, unlike a mouse, comes down where it touches without hovering first, and
+  is gone once lifted; tried with the debug mode's new `touch` (down at once, then lifted), which found
+  that the press after a lift was not seen as new (no page turned, no row of W2 changed): the buttons
+  held are forgotten once the pointer is gone. The game's own "Back" (its word under "Confirm", right of
+  the map) is now B for a click or a finger, for a tablet with no buttons.
+- **A more telling log, for reports**: `crystal_defenders.log` now says the versions (Cristalis and
+  DarkLauncher), the graphics card and its driver (Windows), each screen's size and refresh rate
+  (Windows), and once a minute in a stage the pictures DarkLauncher asked for each second and the most
+  sound the game had waiting (a lag of the sound behind the game would show there). Asked by a player's
+  report of a second's lag on an i7 8700K with an RTX 4060 Ti, whose log said none of it.
+- **A replay's pause menu**: in Mastery's demos, Y opens a pause menu of their own (next wave, the one
+  before, the enemy, back to Mastery), the pause menu's entries 10 to 14, smaller and lower: the mouse
+  and a finger reach it too.
+
 ## 1.11.1
 
 - **A unit's menu with the mouse**: the game draws a deployed unit's menu (and a power crystal's, W2)

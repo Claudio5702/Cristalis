@@ -439,6 +439,18 @@ void dl_net_newer(void) {
   done = true;
   dl_page_insert(PG_NET, dl_pages[PG_NET].n, &net_open_row);
   if (UPDATE_GITHUB[0] != 0 && UPDATE_ASSET[0] != 0) dl_page_insert(PG_NET, dl_pages[PG_NET].n, &net_install_row); // the release's file, installed
+  // "Update" in the bar too, under Play (2.99, asked for Cristalis: the note at the start was missed, and
+  // the row on the Internet page was not found): it installs the release's file, or opens its page
+  int at = 0;
+  while (at < dl_sec_top && dl_secs[at].kind != SEC_PLAY) at++;
+  at = at < dl_sec_top ? at + 1 : 0;
+  if (dl_sec_n < DL_MAX_SECTIONS && dl_sec_top > 0) {
+    memmove(&dl_secs[at + 1], &dl_secs[at], sizeof dl_secs[0] * (size_t)(dl_sec_n - at));
+    dl_secs[at] = (DlSection){SEC_UPDATE, -1, 0xE896, dl_texts[T_UPD_INSTALL], dl_texts[dl_update_installable() ? T_H_UPD_INSTALL : T_H_UPD_OPEN]};
+    dl_sec_n++;
+    dl_sec_top++;
+    if (dl_side >= at) dl_side++; // (the entry chosen stays the same)
+  }
   dl_dirty = true;
 }
 
@@ -1083,7 +1095,44 @@ static void open_page(int page) {
   start_rows_follow();
 }
 
+// dl_show_achievements: asked from any thread, done at the loop's next turn; the page opened over the
+// game goes back to play, and closed() is called once the game runs again (whatever way the player took)
+static volatile LONG show_ach;
+static void (*show_ach_closed)(void);
+static bool ach_from_game, ach_closing;
+
+bool dl_show_achievements(void (*closed)(void)) {
+  if (dl_ach_page() < 0 || show_ach) return false;
+  show_ach_closed = closed;
+  InterlockedExchange(&show_ach, 1);
+  return true;
+}
+
+static void open_page(int page);
+
+void dl_shows_follow(void) {
+  if (ach_closing && dl_mode == M_GAME) { // play goes on: the game told
+    ach_closing = false;
+    if (show_ach_closed) show_ach_closed();
+  }
+  if (!show_ach || (dl_mode != M_GAME && dl_mode != M_PAUSE) || !dl_started) return;
+  InterlockedExchange(&show_ach, 0);
+  dl_menu_open(); // the setup screen over the paused game, its bar on Achievements
+  for (int k = 0; k < dl_sec_n; k++)
+    if (dl_secs[k].kind == SEC_PAGE && dl_secs[k].page == dl_ach_page()) dl_side = k;
+  stack_n = 0;
+  open_page(dl_ach_page());
+  ach_from_game = ach_closing = true;
+  dl_dirty = true;
+}
+
 static void page_back(void) {
+  if (!stack_n && ach_from_game && dl_cur == dl_ach_page()) { // opened by the game: back to it
+    ach_from_game = false;
+    dl_play();
+    return;
+  }
+  ach_from_game = false;
   if (stack_n) {
     int from = dl_cur;
     dl_cur = stack[--stack_n];
@@ -1155,6 +1204,7 @@ static void side_act(void) {
     case SEC_DEFAULTS: dl_defaults(false); start_rows_follow(); break;
     case SEC_RESET: dl_restart(); break;
     case SEC_QUIT: dl_running = false; break;
+    case SEC_UPDATE: if (dl_update_installable()) dl_update_install(); else dl_update_open(); break;
   }
 }
 
@@ -1324,6 +1374,12 @@ static void draw_side(HDC dc) {
       lx = SIDE_X0 + 28;
     }
     const wchar_t *label = dl_secs[k].kind == SEC_PLAY && !dl_started && dl_session_exists() ? TX(T_CONTINUE) : dl_tr(dl_secs[k].label);
+    wchar_t update[96];
+    if (dl_secs[k].kind == SEC_UPDATE) { // "Update 1.4", then its progress, "ready" or "failed"
+      _snwprintf(update, 95, L"%ls %ls", label, dl_update_installable() ? dl_update_install_show(0) : L"");
+      update[95] = 0;
+      label = update;
+    }
     ui_text_fit(dc, lx, y, label, c, TA_LEFT, SIDE_X1 - lx - 4);
   }
 }
@@ -1512,7 +1568,7 @@ void dl_draw_menu(HDC wdc) {
     const DlSection *s = &dl_secs[dl_side];
     help = s->kind == SEC_PLAY && dl_started ? TX(T_H_RESUME) : s->kind == SEC_PLAY && dl_session_exists() ? dl_session_help() : dl_tr(s->help);
     static wchar_t with_update[1100];
-    if (s->kind == SEC_PLAY && dl_update_text()) { // a newer version: told under "Play"
+    if (s->kind == SEC_PLAY && dl_update_text()) { // a newer version: told under "Play" ("Update" has it in its label)
       _snwprintf(with_update, 1099, L"%ls\n\n%ls", help, dl_update_text());
       with_update[1099] = 0;
       help = with_update;
@@ -1795,6 +1851,23 @@ int dl_audit(void) {
       if (r == 1 && dl_menu_bits) {
         GetClientRect(dl_hwnd, &rc);
         snprintf(path, sizeof path, "%s" DL_SEP "%d_pause.png", dl_audit_dir, l);
+        dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
+      }
+    }
+  }
+  if (DL_UPDATE_ON) { // a newer version found (2.99): "Update" under Play, selected, in each language
+    dl_update_sample();
+    dl_net_newer();
+    if (ROW_Y0 + dl_sec_top * ROW_H > PANEL_BOTTOM - 6 - (dl_sec_n - dl_sec_top) * ROW_H) ui_audit_note("navigation bar too full with Update", L"");
+    dl_mode = M_SIDE;
+    for (int l = 0; l < DL_LANGS; l++) {
+      if (!dl_lang_ok(l)) continue;
+      dl_cfg.ui_lang = l;
+      for (dl_side = 0; dl_side < dl_sec_n && dl_secs[dl_side].kind != SEC_UPDATE; dl_side++) {}
+      dl_draw_menu(wdc);
+      if (dl_menu_bits) {
+        GetClientRect(dl_hwnd, &rc);
+        snprintf(path, sizeof path, "%s" DL_SEP "%d_update.png", dl_audit_dir, l);
         dl_save_png(path, dl_menu_bits, rc.right, rc.bottom);
       }
     }

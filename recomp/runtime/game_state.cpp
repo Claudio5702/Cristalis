@@ -178,9 +178,13 @@ GameMenu GameStateMenu()
         // The pause menu (sub_820C04F8 opens it, sub_820C0650 draws it; in a replay sub_820C0880 and another
         // drawing): +0x12900 the entry chosen, +0x12904 the rows; of fifteen entries, each hidden when its word
         // at +0x128C4 is set (no row), and greyed (passed over by the arrows) when its word at +0x12888 is.
-        if (screen == 15 && Load32(kReplay) == 0)
+        // In a replay (Mastery's demos; Y opens it) the same menu shows its own entries (10 next wave, 11
+        // the one before, 12 the enemy, 14 back to Mastery), smaller and lower (found with the debug mode).
+        if (screen == 15)
         {
-            GameMenu menu{ GameMenu::kList, kMenuChoice, 0, 460, 840, 150, 43 };
+            bool replay = Load32(kReplay) != 0;
+            GameMenu menu{ GameMenu::kList, kMenuChoice, 0, replay ? 470.0 : 460.0, replay ? 800.0 : 840.0, replay ? 194.0 : 150.0,
+                replay ? 43.3 : 43.0 };
             menu.entries = true;
             for (int entry = 0; entry < 15; entry++)
                 if (Load32(0x400533F0 + 0x128C4 + entry * 4) == 0)
@@ -188,6 +192,8 @@ GameMenu GameStateMenu()
                     menu.greyed[menu.rows] = Load32(0x400533F0 + 0x12888 + entry * 4) != 0;
                     menu.entry[menu.rows++] = entry;
                 }
+            if (menu.rows != int(Load32(kMenuChoice + 4)))
+                return {}; // (not the rows the game counts: no pointing)
             return menu;
         }
         // A question, Yes then No (sub_820C00D0 opens one: two rows, +0x12900 the choice from the top): 22
@@ -316,6 +322,17 @@ int GameStateMenuChoice(const GameMenu& menu)
         if (menu.entry[row] == choice)
             return row;
     return -1;
+}
+
+void GameStateSetMenuRow(const GameMenu& menu, int row)
+{
+    if (menu.kind != GameMenu::kList || row < 0 || row >= menu.rows)
+        return;
+    uint32_t choice = Load32(menu.choiceAddress);
+    if (menu.paged)
+        Store32(menu.choiceAddress, choice - choice % menu.rows + row);
+    else
+        Store32(menu.choiceAddress, uint32_t(menu.entries ? menu.entry[row] : row));
 }
 
 // The cursor moved at once (the mouse), as the game's own move does it (sub_820BDA48, read with Ghidra on

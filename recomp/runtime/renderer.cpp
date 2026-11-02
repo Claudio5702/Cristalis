@@ -719,6 +719,31 @@ bool RendererInit()
     g_context->VSSetShader(vertexShader, nullptr, 0);
     g_context->RSSetState(g_rasterStates[0]);
     Log("Renderer: Direct3D 11 device and %ux%u window ready", kHostWidth, kHostHeight);
+    // for the player's reports: the graphics card and its driver, and each screen's refresh rate
+    IDXGIDevice* dxgiDevice = nullptr;
+    IDXGIAdapter* adapter = nullptr;
+    DXGI_ADAPTER_DESC adapterDesc{};
+    LARGE_INTEGER driver{};
+    if (SUCCEEDED(g_device->QueryInterface(__uuidof(IDXGIDevice), reinterpret_cast<void**>(&dxgiDevice))) &&
+        SUCCEEDED(dxgiDevice->GetAdapter(&adapter)) && SUCCEEDED(adapter->GetDesc(&adapterDesc)))
+    {
+        adapter->CheckInterfaceSupport(__uuidof(IDXGIDevice), &driver);
+        Log("Renderer: graphics card %ls (driver %u.%u.%u.%u)", adapterDesc.Description, HIWORD(driver.HighPart),
+            LOWORD(driver.HighPart), HIWORD(driver.LowPart), LOWORD(driver.LowPart));
+    }
+    if (adapter != nullptr)
+        adapter->Release();
+    if (dxgiDevice != nullptr)
+        dxgiDevice->Release();
+    DISPLAY_DEVICEW screen{ sizeof(screen) };
+    for (DWORD i = 0; EnumDisplayDevicesW(nullptr, i, &screen, 0); i++, screen = { sizeof(screen) })
+    {
+        DEVMODEW mode{};
+        mode.dmSize = sizeof(mode);
+        if ((screen.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP) && EnumDisplaySettingsW(screen.DeviceName, ENUM_CURRENT_SETTINGS, &mode))
+            Log("Renderer: screen %lu: %lux%lu at %lu Hz%s", i + 1, mode.dmPelsWidth, mode.dmPelsHeight, mode.dmDisplayFrequency,
+                (screen.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE) ? " (main)" : "");
+    }
     return true;
 }
 

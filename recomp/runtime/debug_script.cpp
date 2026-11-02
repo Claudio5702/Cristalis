@@ -146,6 +146,7 @@ DebugInput DebugScriptStep()
     DebugInput input = g_pointer;
     input.mouse = 0;
     input.wheel = 0;
+    input.digit = 0;
     // a few commands a picture at most, those that take none run straight on
     for (int budget = 0; budget < 16 && g_next < g_commands.size(); budget++)
     {
@@ -248,8 +249,23 @@ DebugInput DebugScriptStep()
                 input.mouse = button;
             done = button == 0 ? g_picture >= 1 : g_picture >= 9;
         }
+        else if (verb == "touch")
+        {
+            // a finger: the pointer there and the button down in the same picture (no hover before), held 4
+            // pictures, then lifted and gone (DarkLauncher's dl_mouse gives a touch as the left button)
+            double x = 0, y = 0;
+            words >> x >> y;
+            input = g_pointer;
+            input.x = x, input.y = y;
+            input.pointer = g_picture < 4;
+            input.mouse = g_picture < 4 ? 1 : 0;
+            g_pointer.pointer = false;
+            done = g_picture >= 8;
+        }
         else if (verb == "wheel")
             words >> input.wheel;
+        else if (verb == "digit")
+            words >> input.digit;
         else if (verb == "hide")
             g_pointer.pointer = false, input.pointer = false;
         else if (verb == "gold")
@@ -324,7 +340,7 @@ DebugInput DebugScriptStep()
         g_picture = 0;
         if (g_next == g_commands.size())
             LogState("script done");
-        if (verb == "tap" || verb == "click" || verb == "rclick" || verb == "mclick" || verb == "move" || verb == "wheel")
+        if (verb == "tap" || verb == "click" || verb == "rclick" || verb == "mclick" || verb == "move" || verb == "wheel" || verb == "digit" || verb == "touch")
             break; // (one input a picture)
     }
     return input;

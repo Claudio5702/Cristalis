@@ -1,0 +1,40 @@
+# Mastery's first demo (a replay, W1): Y opens its own pause menu (next wave, the one before greyed, the enemy,
+# back to Mastery), hovered with the mouse, then left with a finger. Needs a save where Mastery lists demos.
+tapuntil 1000 title 1 60
+wait 1
+tap 0002
+wait 1
+tapuntil 1000 title 9 10
+wait 2
+peek 4005FAD4
+shot m01_mastery
+tap 1000
+wait 4
+log after A
+peek 4005FAA0
+shot m02
+until pack 1 15
+wait 6
+log in a stage?
+tapuntil 1000 stage 9 10
+wait 2
+tapuntil 8000 stage 15 10
+wait 1
+move 630 324
+wait 1
+peek 40065CF0
+move 630 280
+wait 1
+peek 40065CF0
+move 630 238
+wait 1
+peek 40065CF0
+move 630 194
+wait 1
+peek 40065CF0
+shot rp1
+log quit by touch
+touch 630 324
+wait 3
+peek 4005FAA0
+log end

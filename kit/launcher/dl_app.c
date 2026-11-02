@@ -1674,6 +1674,14 @@ void dl_update_install(void) {
   dl_dirty = true;
 }
 
+bool dl_update_installable(void) { return upd_asset_url[0] != 0; }
+
+void dl_update_sample(void) {
+  snprintf(upd_version, sizeof upd_version, "9.9");
+  snprintf(upd_asset_url, sizeof upd_asset_url, "http://127.0.0.1/sample");
+  upd_state = 2;
+}
+
 const wchar_t *dl_update_install_show(int v) {
   (void)v;
   static wchar_t out[32];
@@ -2245,6 +2253,7 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (!bench_secs) dl_online_follow();
     mark_follow();
     dl_others_follow();
+    dl_shows_follow();
     if (!bench_secs) settings_follow();
     prof(PR_FOLLOW);
     // rewind: its key held while playing goes back, a step every 90 ms
@@ -2560,6 +2569,7 @@ unsigned dl_over_turn(void) {
   dl_online_follow();
   mark_follow();
   dl_others_follow();
+  dl_shows_follow();
   settings_follow();
   bool menus = dl_mode != M_GAME;
   unsigned f = menus ? DL_OVER_MENU : 0;

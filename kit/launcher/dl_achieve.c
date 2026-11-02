@@ -246,10 +246,15 @@ static bool ach_preview(void *dcv, int k, double x0, double y0, double x1, doubl
 
 static const DlList ach_list = {ach_open, ach_count, ach_row, ach_help, NULL, NULL, NULL, NULL, ach_preview};
 
+static int ach_page = -1;
+
 void dl_achievements(const DlAchievement *list, int count) {
   if (ach || !list || count <= 0) return;
   ach = list;
   ach_n = count > ACH_MAX ? ACH_MAX : count;
   ach_read();
-  dl_section(dl_list_page(dl_texts[T_TAB_ACH], &ach_list), 0xE734, dl_texts[T_ACH], dl_texts[T_H_ACH]);
+  ach_page = dl_list_page(dl_texts[T_TAB_ACH], &ach_list);
+  dl_section(ach_page, 0xE734, dl_texts[T_ACH], dl_texts[T_H_ACH]);
 }
+
+int dl_ach_page(void) { return ach_page; }

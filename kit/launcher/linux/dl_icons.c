@@ -127,6 +127,10 @@ static bool icon_shapes(unsigned code) {
       outline(box, 6);
       line(0.12, 0.3, 0.5, 0.46), line(0.5, 0.46, 0.88, 0.3), line(0.5, 0.46, 0.5, 0.88);
       break;
+    case 0xE896: // Update: an arrow down to a line (Segoe's "Download")
+      line(0.5, 0.12, 0.5, 0.64), line(0.28, 0.42, 0.5, 0.64), line(0.72, 0.42, 0.5, 0.64);
+      line(0.16, 0.86, 0.84, 0.86);
+      break;
     case 0xE71D: // other games (Segoe's "All apps"): a list, a small square before each line
       for (int k = 0; k < 3; k++) {
         double y = 0.24 + k * 0.26;
