@@ -395,10 +395,10 @@ static void empty_text(HDC dc, double x0, double y0, double x1, double y1) {
 
 // save states: the ten slots, then the game's automatic ones
 #define SV_MAX (DL_SLOTS + 8)
-#define NAME_MAX 28
+#define SLOT_NAME_MAX 28
 static bool sv_used[SV_MAX];
 static FILETIME sv_time[SV_MAX];
-static wchar_t sv_name[DL_SLOTS][NAME_MAX + 1], edit_buf[NAME_MAX + 1];
+static wchar_t sv_name[DL_SLOTS][SLOT_NAME_MAX + 1], edit_buf[SLOT_NAME_MAX + 1];
 static int edit_slot = -1; // slot whose name is being typed (F2)
 
 // ---- the keyboard on screen, for a slot's name with a controller (X): three rows of the page of keys
@@ -460,7 +460,7 @@ static int saves_count(void) { return states_count() + 1 + (more_page >= 0); }
 
 // A slot's name is kept beside it in "<state>.name" (UTF-8).
 static void name_read(int n, wchar_t *out) {
-  char p[MAX_PATH], s[NAME_MAX * 4 + 1];
+  char p[MAX_PATH], s[SLOT_NAME_MAX * 4 + 1];
   dl_slot_path(p, n, ".name");
   out[0] = 0;
   FILE *f = fopen(p, "rb");
@@ -468,12 +468,12 @@ static void name_read(int n, wchar_t *out) {
   size_t len = fread(s, 1, sizeof s - 1, f);
   fclose(f);
   s[len] = 0;
-  if (!MultiByteToWideChar(CP_UTF8, 0, s, -1, out, NAME_MAX + 1)) out[0] = 0;
-  out[NAME_MAX] = 0;
+  if (!MultiByteToWideChar(CP_UTF8, 0, s, -1, out, SLOT_NAME_MAX + 1)) out[0] = 0;
+  out[SLOT_NAME_MAX] = 0;
 }
 
 static void name_write(int n, const wchar_t *name) {
-  char p[MAX_PATH], s[NAME_MAX * 4 + 1];
+  char p[MAX_PATH], s[SLOT_NAME_MAX * 4 + 1];
   dl_slot_path(p, n, ".name");
   int len = name[0] ? WideCharToMultiByte(CP_UTF8, 0, name, -1, s, sizeof s, NULL, NULL) : 0;
   if (len <= 1) { DeleteFileA(p); return; } // no name any more
@@ -638,6 +638,8 @@ static void saves_erase(int k) {
 }
 static void list_moved(void) { confirm = -1; }
 
+bool dl_saves_typing(void) { return edit_slot >= 0 && !osk; }
+
 // Naming a slot: F2 on a slot in use, then the keys of the name, Enter to keep it, Esc to cancel.
 bool dl_saves_key(int vk) {
   if (edit_slot < 0) {
@@ -709,7 +711,7 @@ static void osk_press(void) {
 
 void dl_saves_char(wchar_t c) {
   int len = lstrlenW(edit_buf);
-  if (edit_slot < 0 || c < 32 || c == 127 || len >= NAME_MAX) return;
+  if (edit_slot < 0 || c < 32 || c == 127 || len >= SLOT_NAME_MAX) return;
   edit_buf[len] = c;
   edit_buf[len + 1] = 0;
   dl_dirty = true;

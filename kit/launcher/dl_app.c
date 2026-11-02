@@ -49,6 +49,59 @@ void dl_relaunch(void) {
   dl_running = false;
 }
 
+static bool first_start; // no settings file yet: the first start's pages
+
+// Started again after the game file was chosen (Android): to the first start's pages if they were not
+// shown yet (the settings file is written when this run ends), or as an ordinary start.
+void dl_relaunch_start(void) {
+  snprintf(relaunch_where, sizeof relaunch_where, "%s", first_start ? "welcome" : "");
+  relaunch = true;
+  dl_running = false;
+}
+
+// ---- the player's files through the system's picker (dl.h: Android only)
+#ifdef __ANDROID__
+static void (*pick_done)(int result, const char *dest);
+static char pick_dest[MAX_PATH];
+#endif
+
+bool dl_pick_files(int kind, const char *dest, void (*done)(int result, const char *dest)) {
+#ifdef __ANDROID__
+  if (pick_done || kind < DL_PICK_FILE || kind > DL_PICK_FOLDER || !dest) return false;
+  char dir[MAX_PATH];
+  GetModuleFileNameA(NULL, dir, MAX_PATH);
+  char *cut = strrchr(dir, DL_SEPC);
+  if (cut) cut[1] = 0;
+  else dir[0] = 0;
+  snprintf(pick_dest, sizeof pick_dest, "%s%s", dir, dest);
+  if (!dl_win32_pick(kind, pick_dest)) return false;
+  pick_done = done;
+  return true;
+#else
+  (void)kind, (void)dest, (void)done;
+  return false;
+#endif
+}
+
+void dl_pick_follow(void) {
+#ifdef __ANDROID__
+  static int told_mb = -1;
+  if (!pick_done) return;
+  long long bytes;
+  int s = dl_win32_pick_state(&bytes);
+  int mb = (int)(bytes >> 20);
+  if (s == 2) { // the picker, then the copy: how much, once a megabyte more is there
+    if (bytes > 0 && mb != told_mb) { told_mb = mb; dl_notef(TX(T_PICK_COPYING), mb); }
+    return;
+  }
+  void (*done)(int, const char *) = pick_done;
+  pick_done = NULL;
+  told_mb = -1;
+  if (s == DL_PICK_FAILED) dl_note(TX(T_PICK_FAIL));
+  if (done) done(s == 3 ? DL_PICK_FAILED : s, pick_dest);
+#endif
+}
+
 // ---------------------------------------------------------------- settings file
 // Each value: its name in the file, its limits, its default, and what "Defaults" does with it
 // (0: kept, as the language and the window's place; 1: a picture setting; 2: any other).
@@ -63,8 +116,6 @@ static void add_setting(const char *name, int *value, int lo, int hi, int group)
 }
 
 void dl_setting(const char *name, int *value, int lo, int hi, bool keep) { add_setting(name, value, lo, hi, keep ? 0 : 2); }
-
-static bool first_start; // no settings file yet: the first start's pages
 
 static void settings_load(void) {
   FILE *f = fopen(ini_path, "r");
@@ -583,7 +634,12 @@ static void console_detect(void) {
       return;
     }
   }
-#ifndef _WIN32
+#ifdef __ANDROID__
+  if (dl_win32_has_pad()) { // a handheld with its controller (the AYN Thor): its buttons in the footer
+    dl_console = true;
+    console_why = "a controller";
+  }
+#elif !defined _WIN32
   const char *d = getenv("XDG_CURRENT_DESKTOP");
   if ((d && strstr(d, "gamescope")) || getenv("GAMESCOPE_WAYLAND_DISPLAY")) {
     dl_console = true;
@@ -759,6 +815,7 @@ static void play_outside(void) {
 
 void dl_play(void) {
   if (DL_OUTSIDE) { play_outside(); return; }
+  if (!bench_secs && !play_now && !dl_audit_dir && !gpu_check_dir && dl_rom_needed()) { dl_rom_page_open(); return; } // (Android: the game file first)
   if (dl_start_pending()) { // a row the game takes at start has changed: started again, then played
     snprintf(relaunch_where, sizeof relaunch_where, "play");
     relaunch = true;
@@ -877,6 +934,38 @@ static int audio_queued(void) {
   return n;
 }
 
+// DlGame.log (3.01): once play starts, then once a minute in play, a line for the game's log about how
+// the pictures and the sound go: a lag a player reports shows its cause (the sound waiting, the screen,
+// the sync). Nothing drawn, nothing allocated; a few calls a minute. The first line 5 s into play (the
+// graphics card and the sound settled), the gaps counted from 2 s (not the one as the sound starts).
+static int ahead_use_now(void);
+static void diag_follow(bool play, int queued, bool pace, bool by_game, int steps, int gaps) {
+  static DWORD since, next;
+  static bool was_play, counted, told;
+  static int gaps_at;
+  DWORD t = GetTickCount();
+  if (!play) { was_play = false; return; }
+  if (!was_play) { was_play = true; counted = false; since = t; next = t + 5000; }
+  if (!counted && t - since >= 2000) { counted = true; gaps_at = gaps; }
+  if ((int)(t - next) < 0) return;
+  bool first = !told;
+  told = true;
+  next = t + 60000;
+  int rate = dl_game->audio_rate > 0 ? dl_game->audio_rate : 48000;
+  int sound_ms = wave_out ? (int)(((long long)queued * ABUF_FRAMES + ring_n) * 1000 / rate) : -1;
+  char line[400];
+  snprintf(line, sizeof line,
+           "DarkLauncher %s: %s%d pictures a second, sound waiting %d ms (%s, %d gaps%s), screen %d Hz, sync %s, tearing %s, %s, "
+           "smooth motion %d, pace by %s, run-ahead %d of %d, drawing %s, picture %dx%d%s",
+           DL_VERSION, first ? "play, " : "", dl_fps_shown, sound_ms, wave_out ? "device" : "no sound", gaps - gaps_at, " since the last line",
+           dl_screen_hz(), dl_cfg.vsync ? "on" : "off", dl_gpu_tearing() ? "allowed" : "no", dl_cfg.fullscreen || dl_console ? "full screen" : "window",
+           steps, by_game ? "the game" : pace ? "the sound" : steps > 1 ? "the screen" : "the clock", ahead_use_now(), dl_cfg.ahead,
+           dl_gpu_ready() ? "graphics card" : "processor (GDI)", dl_pic_w, dl_pic_h, dl_pic_shared ? " (shared)" : "");
+  gaps_at = gaps;
+  if (dl_game->log) dl_game->log(line);
+  else fprintf(stderr, "%s\n", line);
+}
+
 // In the menus (the game runs behind them before it is started), the sound is kept further ahead than
 // in play: drawing the setup screen again takes tens of milliseconds on a large screen (50 to 80 at 4K),
 // more than the 50 ms waiting in play, and the music behind the menus ran dry at every move. About
@@ -969,9 +1058,23 @@ bool dl_save_png(const char *path, const u32 *px, int w, int h) {
 }
 
 // ---------------------------------------------------------------- window procedure
+// Android (DL_WM_BACKGROUND): in the background the program may be ended without a word, so what a close
+// keeps is kept at once (the session, the settings) and the running mark removed, as after a normal close
+// (a crash would have left it); a game being played comes back paused. Back in front: the mark again.
+static void background(bool away) {
+  if (bench_secs || dl_audit_dir || gpu_check_dir) return;
+  if (!away) { run_mark_write(); return; }
+  dl_rumble_stop();
+  if (dl_mode == M_GAME) dl_pause_open();
+  dl_session_keep();
+  settings_save();
+  run_mark_clear();
+}
+
 static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
   if (dl_no_mouse && ((msg >= WM_MOUSEMOVE && msg <= WM_MBUTTONUP) || msg == WM_MOUSEWHEEL || msg == WM_MOUSELEAVE)) return 0;
   switch (msg) {
+    case DL_WM_BACKGROUND: background(wp != 0); return 0;
     case WM_MOUSEMOVE: {
       static LPARAM last = -1; // (Windows also sends one when nothing moved: the window changed under it)
       if (lp != last && last != -1) {
@@ -988,13 +1091,17 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       }
 #endif
       mouse_inside = true;
-      if (dl_mode != M_GAME) dl_menu_mouse((short)LOWORD(lp), (short)HIWORD(lp), false);
+      if (dl_mode != M_GAME && (wp & DL_MK_TOUCH)) dl_menu_touch(1, (short)LOWORD(lp), (short)HIWORD(lp));
+      else if (dl_mode != M_GAME) dl_menu_mouse((short)LOWORD(lp), (short)HIWORD(lp), false);
       return 0;
     }
     case WM_MOUSELEAVE:
       mouse_inside = false;
       return 0;
-    case WM_LBUTTONUP: mouse_button(1, false); return 0;
+    case WM_LBUTTONUP:
+      mouse_button(1, false);
+      if (dl_mode != M_GAME && (wp & DL_MK_TOUCH)) dl_menu_touch(2, (short)LOWORD(lp), (short)HIWORD(lp));
+      return 0;
     case WM_RBUTTONUP: mouse_button(2, false); return 0;
     case WM_MBUTTONDOWN: mouse_button(4, true); return 0;
     case WM_MBUTTONUP: mouse_button(4, false); return 0;
@@ -1009,6 +1116,13 @@ static LRESULT CALLBACK wnd_proc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
       return 0x00010001; // (TABLET_DISABLE_PRESSANDHOLD: no right click at its release; TABLET_DISABLE_FLICKS)
 #endif
     case WM_LBUTTONDOWN:
+      if (wp & DL_MK_TOUCH) { // a finger: no key or controller, the footer without keys (dl_menu_touch)
+        mouse_x = (short)LOWORD(lp), mouse_y = (short)HIWORD(lp), mouse_inside = true;
+        mouse_button(1, true);
+        if (dl_mode != M_GAME) dl_menu_touch(0, (short)LOWORD(lp), (short)HIWORD(lp));
+        else dl_touch_used = true;
+        return 0;
+      }
       dl_input_used(DL_IN_KEYS);
       if (dl_mode == M_GAME && dl_game->mouse_in_game) dl_mouse_used();
       if (dl_console || dl_game->mouse_in_game) dl_pointer_hide(false), mouse_moved = GetTickCount(); // (the mouse in use: its pointer stays)
@@ -1756,6 +1870,8 @@ bool dl_picture_unused(void) { return pic_unused; }
 static int ahead_level = -1, ahead_want = -1, ahead_n, ahead_calm, ahead_lowered, ahead_raised;
 static double ahead_sum;
 
+static int ahead_use_now(void) { return ahead_want > 0 ? ahead_level : 0; }
+
 static int ahead_use(int want) {
   if (want != ahead_want) { ahead_want = want; ahead_level = want; ahead_n = 0; ahead_sum = 0; ahead_calm = 0; }
   return ahead_level;
@@ -1897,6 +2013,24 @@ static void wait_ms(double ms, bool to_the_moment) {
 // The graphics card path drawn into its back buffer and read back into PNG files (nothing is taken
 // from the screen): the setup screen, the Picture page, the game with each filter, "Try it full
 // size". Returns 0 when every picture was made, 3 when the graphics card could not be used.
+// Before the checks draw (--gpu-check, --ui-audit): on Android the window is the whole screen, which
+// Android gives it once a first picture has been shown, so pictures until its size has settled (five
+// seconds at most). Elsewhere the window has its size at once.
+void dl_window_settle(void) {
+#ifdef __ANDROID__
+  DWORD until = GetTickCount() + 5000;
+  for (RECT was = {0}, now; GetTickCount() < until; was = now) {
+    MSG msg;
+    while (PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE)) DispatchMessageW(&msg);
+    if (dl_gpu_ready()) dl_gpu_show(true, false);
+    else ReleaseDC(dl_hwnd, GetDC(dl_hwnd)); // (the window's own picture shown)
+    Sleep(250);
+    GetClientRect(dl_hwnd, &now);
+    if (now.right == was.right && now.bottom == was.bottom) break;
+  }
+#endif
+}
+
 static int gpu_check(void) {
   dl_no_fade = true; // the pictures as they are at once
   static s16 tmp[8192];
@@ -1911,6 +2045,7 @@ static int gpu_check(void) {
     Sleep(20);
   }
   if (!dl_gpu_ready()) { printf("gpu check: the graphics card cannot be used\n"); return 3; }
+  dl_window_settle();
   int fresh = 0;
   for (int k = 0; k < 90 && dl_game->frame; k++) {
     pic_same = false;
@@ -2069,6 +2204,8 @@ static int prepare(const DlGame *game, int argc, char **argv) {
 // news of a new version; or straight into the game (--play, --bench).
 static void first_page(void) {
   if (start_crashed) dl_safe_page_open();
+  else if (!strncmp(start_back, "welcome", 7)) dl_welcome_open(); // the game file chosen (Android): on to the first start's pages
+  else if (!bench_secs && !play_now && dl_rom_needed()) dl_rom_page_open();
   else if (!strncmp(start_back, "play", 4)) { if (!dl_session_resume()) dl_play(); } // as "Play": the session first
   else if (start_back[0] && dl_menu_back(start_back)) {}
   else if (first_start && !bench_secs && !play_now) dl_welcome_open();
@@ -2253,6 +2390,13 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (!bench_secs) dl_online_follow();
     mark_follow();
     dl_others_follow();
+    dl_pick_follow();
+#ifdef __ANDROID__
+    { // Android's keyboard while a slot's name is typed with it
+      static bool typing;
+      if (dl_saves_typing() != typing) dl_win32_text_input(typing = !typing);
+    }
+#endif
     dl_shows_follow();
     if (!bench_secs) settings_follow();
     prof(PR_FOLLOW);
@@ -2305,6 +2449,9 @@ int dl_run(const DlGame *game, int argc, char **argv) {
     if (steps > 1) pace = false;
     audio_stretch = steps > 1 && wave_out && queued < 3 ? 8 : 0;
     if (bench_frames > 120 && wave_out && queued == 0 && run) bench_gaps++; // the sound card ran dry
+    static int play_gaps; // (for DlGame.log: the sound card ran dry in play)
+    if (wave_out && queued == 0 && run && dl_mode == M_GAME && dl_started) play_gaps++;
+    if (!bench_secs) diag_follow(dl_mode == M_GAME && dl_started && run, queued, pace, by_game, steps, play_gaps);
     QueryPerformanceCounter(&now);
     if (run && (steps > 1 || (pace ? queued < ahead : now.QuadPart >= next.QuadPart))) {
       DlInput in[2] = {{0}}; // the players' (in[1]: DlGame.players 2)

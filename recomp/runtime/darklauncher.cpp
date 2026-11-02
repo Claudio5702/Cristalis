@@ -421,30 +421,37 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
+    L"音と操作の遅れを修正|しばらく遊ぶと音と操作が 1 秒近く遅れることがありました。直りました。\n"
     L"メニューがすばやく|ポーズメニューやヘルプ、リプレイのメニューまで、ポインターにすぐ追いつきます。\n"
     L"数字キー|ユニットの列で 1〜9 キーを押すと、そのユニットを選べます。\n"
     L"タッチ操作|指でも遊びやすくなりました。画面の「戻る」に触れると B ボタンと同じです。\n"
     L"実績と更新|ポーズメニューの「実績」でランチャーの実績ページが開きます。新しいバージョンはホーム画面に表示されます。",
+    L"Plus de retard|Après quelques minutes, le son et les commandes pouvaient prendre près d'une seconde de retard. C'est corrigé.\n"
     L"Des menus plus rapides|Le menu pause, l'aide et même le menu des replays suivent le pointeur tout de suite.\n"
     L"Touches chiffres|Dans la rangée d'unités, les touches 1 à 9 choisissent l'unité directement.\n"
     L"Écran tactile|Le jeu se joue mieux au doigt : toucher « Retour » à l'écran fait comme le bouton B.\n"
     L"Succès et mises à jour|« Succès » dans le menu pause ouvre la page des succès du lanceur. Une nouvelle version s'affiche sur l'accueil, sous « Jouer ».",
+    L"No more lag|After a few minutes the sound and the controls could fall almost a second behind. Fixed.\n"
     L"Quicker menus|The pause menu, the help and even a replay's menu now follow the pointer at once.\n"
     L"Digit keys|In the row of units, keys 1 to 9 choose that unit straight away.\n"
     L"Touch screens|The game plays better with a finger: touching \"Back\" on the screen works as the B button.\n"
     L"Achievements and updates|\"Achievements\" in the pause menu opens the launcher's achievements page. A new version shows on the home page, under \"Play\".",
+    L"Sin retraso|Tras unos minutos, el sonido y los controles podían ir casi un segundo por detrás. Corregido.\n"
     L"Menús más rápidos|El menú de pausa, la ayuda e incluso el menú de las repeticiones siguen al puntero enseguida.\n"
     L"Teclas numéricas|En la fila de unidades, las teclas 1 a 9 eligen esa unidad directamente.\n"
     L"Pantallas táctiles|El juego se juega mejor con el dedo: tocar «Atrás» en la pantalla equivale al botón B.\n"
     L"Logros y actualizaciones|«Logros» en el menú de pausa abre la página de logros del lanzador. Una versión nueva aparece en el inicio, bajo «Jugar».",
+    L"Sem atraso|Depois de alguns minutos, o som e os controles podiam ficar quase um segundo atrasados. Corrigido.\n"
     L"Menus mais rápidos|O menu de pausa, a ajuda e até o menu dos replays agora seguem o ponteiro na hora.\n"
     L"Teclas numéricas|Na fileira de unidades, as teclas 1 a 9 escolhem essa unidade direto.\n"
     L"Telas de toque|O jogo fica melhor com o dedo: tocar \"Voltar\" na tela vale como o botão B.\n"
     L"Conquistas e atualizações|\"Conquistas\" no menu de pausa abre a página de conquistas do lançador. Uma versão nova aparece no início, abaixo de \"Jogar\".",
+    L"Keine Verzögerung mehr|Nach ein paar Minuten konnten Ton und Steuerung fast eine Sekunde hinterherhinken. Behoben.\n"
     L"Schnellere Menüs|Das Pausenmenü, die Hilfe und sogar das Menü der Wiederholungen folgen dem Zeiger jetzt sofort.\n"
     L"Zifferntasten|In der Reihe der Einheiten wählen die Tasten 1 bis 9 die Einheit direkt.\n"
     L"Touchscreens|Das Spiel lässt sich besser mit dem Finger spielen: „Zurück“ auf dem Bildschirm wirkt wie die B-Taste.\n"
     L"Erfolge und Updates|„Erfolge“ im Pausenmenü öffnet die Erfolgsseite des Launchers. Eine neue Version erscheint auf der Startseite unter „Spielen“.",
+    L"Niente più ritardo|Dopo qualche minuto suono e comandi potevano restare indietro di quasi un secondo. Risolto.\n"
     L"Menu più rapidi|Il menu di pausa, l'aiuto e persino il menu dei replay ora seguono subito il puntatore.\n"
     L"Tasti numerici|Nella fila di unità, i tasti da 1 a 9 scelgono subito quell'unità.\n"
     L"Schermi tattili|Il gioco si gioca meglio con il dito: toccare «Indietro» sullo schermo vale come il pulsante B.\n"
@@ -885,10 +892,13 @@ int Frame(const DlInput* in, uint32_t* pixels, int16_t* audio, int audioMax)
         g_unlocks.clear();
     }
 
-    // The sound of one picture (800 frames at 60 per second); a little more when too much waits.
+    // The sound of one picture (800 frames at 60 per second), never more: the mixer keeps its reserve
+    // full, so "a little more when much waits" (816, until 1.11.2) gave 2 % too much at every picture,
+    // and with DarkLauncher paced by the clock (not by the sound) it piled up there: almost a second of
+    // lag of the sound and of what the player sees after a minute (its 3.01 log showed it)
     std::lock_guard lock(g_soundMutex);
     size_t waiting = g_sound.size() / 2;
-    size_t count = std::min<size_t>(waiting, waiting > 2 * kSoundReserve / 3 ? 816 : 800);
+    size_t count = std::min<size_t>(waiting, 800);
     count = std::min<size_t>(count, size_t(audioMax));
     for (size_t i = 0; i < count * 2; i++)
     {
@@ -1068,6 +1078,8 @@ int DarkLauncherMain(int argc, char* argv[], void (*runGuest)())
     game.report = Report;
     game.status = Status;
     game.version = GAME_VERSION;
+    // DarkLauncher's own lines (3.01: once a minute in play, its sound waiting, the screen, the sync)
+    game.log = [](const char* line) { Log("DarkLauncher: %s", line); };
     game.news = t_news;
     game.achievement_picture = AchievementPictureOf;
     game.starting_picture = ArtStarting;

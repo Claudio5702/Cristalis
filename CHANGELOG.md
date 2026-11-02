@@ -9,6 +9,14 @@ on DarkLauncher's "What's new" page.
 
 ## 1.11.2
 
+- **No more lag of the sound and the controls (DarkLauncher 3.01)**: a player saw the sound and his
+  inputs come more than a second late (i7 8700K, RTX 4060 Ti). DarkLauncher 3.01's new log line (its
+  sound waiting, once a minute) showed it here too, in a window on a 240 Hz screen: 202 ms of sound
+  waiting at the start, 898 ms a minute later. The cause was ours: the game gave DarkLauncher a little
+  more than a picture's sound (816 frames, not 800) whenever its mixer had much waiting, which it always
+  has, so 2 % too much sound at every picture; with DarkLauncher paced by the clock rather than by the
+  sound, it piled up there. Now exactly a picture's sound: 112 ms waiting after three minutes, still at
+  60 pictures a second without a gap in the sound (all cores and two).
 - **Every menu follows the pointer at once**: as the row of units in 1.11.1, the pause menu, its help
   and questions, a power crystal's menu, the menus before a stage and Mastery's demos no longer wait
   for the game's repeat of a held arrow: the choice is put at once on the row before the one pointed
@@ -32,7 +40,8 @@ on DarkLauncher's "What's new" page.
   DarkLauncher), the graphics card and its driver (Windows), each screen's size and refresh rate
   (Windows), and once a minute in a stage the pictures DarkLauncher asked for each second and the most
   sound the game had waiting (a lag of the sound behind the game would show there). Asked by a player's
-  report of a second's lag on an i7 8700K with an RTX 4060 Ti, whose log said none of it.
+  report of a second's lag on an i7 8700K with an RTX 4060 Ti, whose log said none of it. DarkLauncher
+  3.01 adds its own line (`DlGame.log`): its sound waiting and gaps, the screen, the sync, the pace.
 - **A replay's pause menu**: in Mastery's demos, Y opens a pause menu of their own (next wave, the one
   before, the enemy, back to Mastery), the pause menu's entries 10 to 14, smaller and lower: the mouse
   and a finger reach it too.

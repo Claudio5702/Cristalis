@@ -28,16 +28,61 @@ __attribute__((constructor)) static void utf8_locale(void) {
   if (!l || (!strstr(l, "UTF-8") && !strstr(l, "utf8"))) setlocale(LC_CTYPE, "C.UTF-8");
 }
 
+#ifdef __ANDROID__
+#include <android/log.h>
+// Android keeps no program's output: what it prints (the reports of --ui-audit, the errors) goes to the
+// system's log, line by line ("adb logcat -s DarkLauncher").
+static int log_pipe[2];
+static void *log_thread(void *arg) {
+  (void)arg;
+  char line[1024];
+  FILE *in = fdopen(log_pipe[0], "r");
+  while (in && fgets(line, sizeof line, in)) {
+    line[strcspn(line, "\n")] = 0;
+    __android_log_write(ANDROID_LOG_INFO, "DarkLauncher", line);
+  }
+  return NULL;
+}
+__attribute__((constructor)) static void android_log(void) {
+  pthread_t t;
+  if (pipe(log_pipe)) return;
+  setvbuf(stdout, NULL, _IOLBF, 0);
+  setvbuf(stderr, NULL, _IONBF, 0);
+  dup2(log_pipe[1], 1);
+  dup2(log_pipe[1], 2);
+  if (!pthread_create(&t, NULL, log_thread, NULL)) pthread_detach(t);
+}
+#endif
+
+#define DL_WM_BACKGROUND (0x8000 + 0x44) // dl_int.h's: Android puts the program in the background (1) or back (0)
+#define DL_MK_TOUCH 0x8000 // dl_int.h's: a mouse message made by a finger on a touch screen
 void dl_pads_added(SDL_JoystickID id); // dl_pads.c
 void dl_pads_removed(SDL_JoystickID id);
+
+#ifdef __ANDROID__
+static bool SDLCALL android_life(void *data, SDL_Event *e);
+static bool activity_call(const char *name, const char *sig, int i, const char *s, unsigned char *ret);
+#endif
 
 static bool sdl_up(void) {
   static int state = -1;
   if (state < 0) {
     // the typed text of a keyboard (a slot's name) without SDL's screen keyboard: in Steam's Game Mode it
     // opened Steam's own as soon as the window was there; DarkLauncher has its own (X on a slot)
+#ifdef __ANDROID__ // (Android: its keyboard, shown only while a name is typed, dl_win32_text_input)
+    SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "1");
+#else
     SDL_SetHint(SDL_HINT_ENABLE_SCREEN_KEYBOARD, "0");
+#endif
+#ifdef __ANDROID__ // landscape, as the manifest says (SDL would let a resizable window turn); the back button
+    // is Esc (key_message), not the end of the activity
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+#endif
     state = SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMEPAD);
+#ifdef __ANDROID__
+    if (state) SDL_AddEventWatch(android_life, NULL);
+#endif
   }
   return state;
 }
@@ -244,6 +289,16 @@ BOOL GetModuleHandleExA(DWORD flags, const char *addr, HMODULE *out) {
 
 DWORD GetModuleFileNameA(HMODULE m, char *out, DWORD n) {
   if (m && m == module_base) { snprintf(out, n, "%s", module_file); return (DWORD)strlen(out); }
+#ifdef __ANDROID__
+  // the program is Android's app_process: its "file" is one in the app's own folder, so that the
+  // settings, saves and screenshots made beside it go there
+  if (!m) {
+    const char *dir = SDL_GetAndroidInternalStoragePath();
+    if (!dir) { out[0] = 0; return 0; }
+    snprintf(out, n, "%s/main", dir);
+    return (DWORD)strlen(out);
+  }
+#endif
   if (!exe_of(getpid(), out, n)) { out[0] = 0; return 0; }
   return (DWORD)strlen(out);
 }
@@ -370,6 +425,10 @@ const wchar_t *GetCommandLineW(void) { return L""; }
 BOOL CreateProcessW(const wchar_t *exe, const wchar_t *cmd, void *pa, void *ta, BOOL inherit, DWORD flags, void *env, const wchar_t *dir,
                     STARTUPINFOW *si, PROCESS_INFORMATION *pi) {
   (void)exe, (void)cmd, (void)pa, (void)ta, (void)inherit, (void)flags, (void)env, (void)dir, (void)si;
+#ifdef __ANDROID__ // the activity starts it again once main() has returned (DarkLauncherRestart.java)
+  memset(pi, 0, sizeof *pi);
+  return activity_call("requestRestart", "()V", 0, NULL, NULL);
+#endif
   static char buf[8192];
   FILE *f = fopen("/proc/self/cmdline", "rb");
   if (!f) return FALSE;
@@ -670,6 +729,9 @@ static const Key keys[] = {
     {SDL_SCANCODE_KP_4, 0x64, 0x4B}, {SDL_SCANCODE_KP_5, 0x65, 0x4C}, {SDL_SCANCODE_KP_6, 0x66, 0x4D}, {SDL_SCANCODE_KP_7, 0x67, 0x47}, {SDL_SCANCODE_KP_8, 0x68, 0x48},
     {SDL_SCANCODE_KP_9, 0x69, 0x49}, {SDL_SCANCODE_KP_0, 0x60, 0x52}, {SDL_SCANCODE_KP_PERIOD, 0x6E, 0x53}, {SDL_SCANCODE_NUMLOCKCLEAR, 0x90, 0x45},
     {SDL_SCANCODE_SCROLLLOCK, 0x91, 0x46},
+#ifdef __ANDROID__
+    {SDL_SCANCODE_AC_BACK, VK_ESCAPE, 0x01}, // Android's back button or gesture (after Esc: VK_ESCAPE stays Esc's)
+#endif
 };
 #define KEYS ((int)(sizeof keys / sizeof keys[0]))
 
@@ -906,6 +968,82 @@ static void post(UINT msg, WPARAM wp, LPARAM lp) {
   queue[(q_head + q_n++) % 256] = (MSG){the, msg, wp, lp};
 }
 
+#ifdef __ANDROID__
+void dl_win32_text_input(bool on) {
+  if (!the) return;
+  if (on) SDL_StartTextInput(the->win);
+  else SDL_StopTextInput(the->win);
+}
+
+bool dl_win32_has_pad(void) { return sdl_up() && SDL_HasGamepad(); }
+
+// ---- the player's files through Android's picker (DarkLauncherActivity.java: pickFiles, then its copy
+// thread calls nativePickProgress and nativePicked)
+#include <jni.h>
+static _Atomic int pick_state = 3;           // 2 picking or copying; then the result, taken once; 3 idle
+static _Atomic long long pick_bytes;
+
+// A static method of the activity's class (found through the activity: FindClass on a thread of the C
+// code sees only the system's classes).
+static bool activity_call(const char *name, const char *sig, int i, const char *s, unsigned char *ret) {
+  JNIEnv *env = (JNIEnv *)SDL_GetAndroidJNIEnv();
+  jobject act = (jobject)SDL_GetAndroidActivity();
+  if (!env || !act) return false;
+  jclass cls = (*env)->GetObjectClass(env, act);
+  jmethodID m = cls ? (*env)->GetStaticMethodID(env, cls, name, sig) : NULL;
+  bool ok = m != NULL;
+  if (m && s) {
+    jstring js = (*env)->NewStringUTF(env, s);
+    jboolean r = (*env)->CallStaticBooleanMethod(env, cls, m, (jint)i, js);
+    if (ret) *ret = r;
+    (*env)->DeleteLocalRef(env, js);
+  } else if (m) (*env)->CallStaticVoidMethod(env, cls, m);
+  if ((*env)->ExceptionCheck(env)) { (*env)->ExceptionClear(env); ok = false; }
+  if (cls) (*env)->DeleteLocalRef(env, cls);
+  (*env)->DeleteLocalRef(env, act);
+  return ok;
+}
+
+bool dl_win32_pick(int kind, const char *dest) {
+  if (pick_state == 2) return false; // one at a time
+  jboolean shown = JNI_FALSE;
+  pick_bytes = 0;
+  pick_state = 2;
+  if (!activity_call("pickFiles", "(ILjava/lang/String;)Z", kind, dest, &shown) || !shown) {
+    pick_state = 3;
+    return false;
+  }
+  return true;
+}
+
+int dl_win32_pick_state(long long *bytes) {
+  if (bytes) *bytes = pick_bytes;
+  int s = pick_state;
+  if (s != 2 && s != 3) pick_state = 3;
+  return s;
+}
+
+JNIEXPORT void JNICALL Java_org_darklauncher_DarkLauncherActivity_nativePickProgress(JNIEnv *env, jclass cls, jlong bytes) {
+  (void)env, (void)cls;
+  pick_bytes = bytes;
+}
+
+JNIEXPORT void JNICALL Java_org_darklauncher_DarkLauncherActivity_nativePicked(JNIEnv *env, jclass cls, jint result, jobjectArray names, jlong bytes) {
+  (void)env, (void)cls, (void)names;
+  pick_bytes = bytes;
+  pick_state = result > 0 ? 1 : result < 0 ? -1 : 0;
+}
+
+// Android puts the program in the background: SDL's thread waits as soon as the event is sent, before the
+// queue is read, so the window procedure is called at once from SDL's event watch (on that same thread)
+static bool SDLCALL android_life(void *data, SDL_Event *e) {
+  (void)data;
+  if (proc && the && (e->type == SDL_EVENT_DID_ENTER_BACKGROUND || e->type == SDL_EVENT_DID_ENTER_FOREGROUND))
+    proc(the, DL_WM_BACKGROUND, e->type == SDL_EVENT_DID_ENTER_BACKGROUND, 0);
+  return true;
+}
+#endif
+
 WORD RegisterClassW(const WNDCLASSW *wc) {
   proc = wc->lpfnWndProc;
   return 1;
@@ -918,16 +1056,24 @@ HWND CreateWindowW(LPCWSTR cls, LPCWSTR title, DWORD style, int x, int y, int w,
   wide_to_utf8(title, -1, t, sizeof t);
   Win *win = calloc(1, sizeof *win);
   int cw = w - FRAME_L - FRAME_R, ch = h - FRAME_T - FRAME_B;
+#ifdef __ANDROID__ // OpenGL ES 3.0 (dl_gl.c), the whole screen without Android's bars
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+  SDL_WindowFlags full = SDL_WINDOW_FULLSCREEN;
+#else
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
   SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+  SDL_WindowFlags full = 0;
+#endif
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-  win->win = SDL_CreateWindow(t, cw, ch, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_OPENGL);
+  win->win = SDL_CreateWindow(t, cw, ch, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | SDL_WINDOW_OPENGL | full);
   if (win->win && !(win->gl = SDL_GL_CreateContext(win->win))) { // no OpenGL 3.3: a window without it
     SDL_DestroyWindow(win->win);
-    win->win = SDL_CreateWindow(t, cw, ch, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN);
+    win->win = SDL_CreateWindow(t, cw, ch, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN | full);
   }
-  if (!win->win) { free(win); return NULL; }
+  if (!win->win) { fprintf(stderr, "no window: %s\n", SDL_GetError()); free(win); return NULL; }
   if (x == CW_USEDEFAULT) SDL_SetWindowPosition(win->win, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED); // (a window of the game's own: --over)
   else SDL_SetWindowPosition(win->win, x + FRAME_L, y + FRAME_T);
   if (win->gl) SDL_GL_MakeCurrent(win->win, win->gl);
@@ -941,7 +1087,9 @@ HWND CreateWindowW(LPCWSTR cls, LPCWSTR title, DWORD style, int x, int y, int w,
   }
   win->style = (LONG)style;
   win->focused = true;
+#ifndef __ANDROID__
   SDL_StartTextInput(win->win);
+#endif
   the = win;
   return win;
 }
@@ -1045,8 +1193,10 @@ LONG SetWindowLongW(HWND h, int index, LONG value) {
   if (!w || index != GWL_STYLE) return 0;
   LONG old = w->style;
   w->style = value;
+#ifndef __ANDROID__ // (Android: always the whole screen)
   bool was = old & WS_OVERLAPPEDWINDOW, now = value & WS_OVERLAPPEDWINDOW;
   if (was != now && !w->foreign) SDL_SetWindowFullscreen(w->win, !now);
+#endif
   return old;
 }
 
@@ -1171,17 +1321,19 @@ static void event_post(const SDL_Event *e) {
         if (w[k] >= 32) post(WM_CHAR, (WPARAM)w[k], 1);
       break;
     }
-    case SDL_EVENT_MOUSE_MOTION: post(WM_MOUSEMOVE, 0, (LPARAM)(((int)(e->motion.x * d) & 0xFFFF) | ((int)(e->motion.y * d) & 0xFFFF) << 16)); break;
+    case SDL_EVENT_MOUSE_MOTION:
+      post(WM_MOUSEMOVE, e->motion.which == SDL_TOUCH_MOUSEID ? DL_MK_TOUCH : 0, (LPARAM)(((int)(e->motion.x * d) & 0xFFFF) | ((int)(e->motion.y * d) & 0xFFFF) << 16));
+      break;
     case SDL_EVENT_MOUSE_BUTTON_DOWN: {
       LPARAM lp = (LPARAM)(((int)(e->button.x * d) & 0xFFFF) | ((int)(e->button.y * d) & 0xFFFF) << 16);
-      if (e->button.button == SDL_BUTTON_LEFT) post(WM_LBUTTONDOWN, 1, lp);
+      if (e->button.button == SDL_BUTTON_LEFT) post(WM_LBUTTONDOWN, 1 | (e->button.which == SDL_TOUCH_MOUSEID ? DL_MK_TOUCH : 0), lp);
       else if (e->button.button == SDL_BUTTON_RIGHT) post(WM_RBUTTONDOWN, 2, lp);
       else if (e->button.button == SDL_BUTTON_MIDDLE) post(WM_MBUTTONDOWN, 16, lp);
       break;
     }
     case SDL_EVENT_MOUSE_BUTTON_UP: { // (dl_mouse: the buttons held in play)
       LPARAM lp = (LPARAM)(((int)(e->button.x * d) & 0xFFFF) | ((int)(e->button.y * d) & 0xFFFF) << 16);
-      if (e->button.button == SDL_BUTTON_LEFT) post(WM_LBUTTONUP, 0, lp);
+      if (e->button.button == SDL_BUTTON_LEFT) post(WM_LBUTTONUP, e->button.which == SDL_TOUCH_MOUSEID ? DL_MK_TOUCH : 0, lp);
       else if (e->button.button == SDL_BUTTON_RIGHT) post(WM_RBUTTONUP, 0, lp);
       else if (e->button.button == SDL_BUTTON_MIDDLE) post(WM_MBUTTONUP, 0, lp);
       break;
@@ -1318,7 +1470,16 @@ DWORD MsgWaitForMultipleObjects(DWORD n, const HANDLE *hs, BOOL all, DWORD ms, D
       if (!e) break;
       continue;
     }
+#ifdef __ANDROID__
+    // a plain sleep: SDL's wait for events kept the processor busy there (on the AYN Thor, three quarters
+    // of a core in play, the main thread at 8 % with this); the window's events are read at the loop's
+    // next turn, within the picture's time. Ended 2 ms early (1 ms, and a picture in fifty came late on
+    // the Thor): SDL_DelayPrecise does the rest
+    SDL_DelayNS(left - 2000000);
+    continue;
+#else
     if (SDL_WaitEventTimeout(NULL, (Sint32)((left - 1000000) / 1000000))) return WAIT_OBJECT_0 + n;
+#endif
   }
   if (e) {
     audio_follow();

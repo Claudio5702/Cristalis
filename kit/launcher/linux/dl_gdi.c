@@ -8,11 +8,14 @@
 #include <stdio.h>
 #include <strings.h>
 #include <sys/stat.h>
+#ifndef __ANDROID__
 #include <fontconfig/fontconfig.h>
+#endif
 #include <ft2build.h>
 #include FT_FREETYPE_H
 #include FT_SYNTHESIS_H
 #include FT_TRUETYPE_TABLES_H
+#include FT_MULTIPLE_MASTERS_H
 
 enum { OBJ_BRUSH = 1, OBJ_PEN, OBJ_FONT, OBJ_BITMAP, OBJ_RGN };
 #define FALLBACKS 3
@@ -684,9 +687,64 @@ static FT_Library ft;
 
 static bool ft_ready(void) {
   static int state = -1;
+#ifdef __ANDROID__
+  if (state < 0) state = !FT_Init_FreeType(&ft);
+#else
   if (state < 0) state = !FT_Init_FreeType(&ft) && FcInit();
+#endif
   return state;
 }
+
+#ifdef __ANDROID__
+// Android has no fontconfig: the families DarkLauncher asks for are files of /system/fonts (as its
+// fonts.xml names them). Roboto is a variable font (its weight and slant set on its axes); Noto Sans CJK
+// holds Japanese, Korean, simplified and traditional Chinese at indexes 0 to 3.
+static const struct { const char *family, *file, *bold, *italic, *bold_italic; int index; } android_fonts[] = {
+  {"sans-serif", "Roboto-Regular.ttf"}, {"Noto Sans Symbols", "NotoSansSymbols-Regular-Subsetted.ttf"},
+  {"serif", "NotoSerif-Regular.ttf", "NotoSerif-Bold.ttf", "NotoSerif-Italic.ttf", "NotoSerif-BoldItalic.ttf"},
+  {"monospace", "DroidSansMono.ttf"},
+  {"Noto Sans CJK JP", "NotoSansCJK-Regular.ttc", .index = 0}, {"Noto Sans CJK KR", "NotoSansCJK-Regular.ttc", .index = 1},
+  {"Noto Sans CJK SC", "NotoSansCJK-Regular.ttc", .index = 2}, {"Noto Serif CJK JP", "NotoSerifCJK-Regular.ttc", .index = 0},
+};
+
+// A variable font's axis set (FreeType's 16.16 values), when it has it.
+static bool set_axis(FT_MM_Var *mm, FT_Fixed *at, FT_UInt axes, unsigned long tag, double v) {
+  for (FT_UInt k = 0; k < axes; k++)
+    if (mm->axis[k].tag == tag) { at[k] = (FT_Fixed)(v * 65536); return true; }
+  return false;
+}
+
+static FT_Face face_for(const char *family, bool bold, bool italic, bool *got_bold, bool *got_italic) {
+  size_t i = 0, n = sizeof android_fonts / sizeof *android_fonts;
+  while (i < n && strcasecmp(android_fonts[i].family, family)) i++;
+  if (i == n) i = 0; // a face Android lacks: Roboto
+  const char *file = android_fonts[i].file;
+  bool b = false, it = false;
+  if (bold && italic && android_fonts[i].bold_italic) file = android_fonts[i].bold_italic, b = it = true;
+  else if (bold && android_fonts[i].bold) file = android_fonts[i].bold, b = true;
+  else if (italic && android_fonts[i].italic) file = android_fonts[i].italic, it = true;
+  char path[256];
+  snprintf(path, sizeof path, "/system/fonts/%s", file);
+  FT_Face f = NULL;
+  if (FT_New_Face(ft, path, android_fonts[i].index, &f)) f = NULL;
+  FT_MM_Var *mm;
+  if (f && FT_HAS_MULTIPLE_MASTERS(f) && !FT_Get_MM_Var(f, &mm)) {
+    FT_Fixed at[16];
+    FT_UInt axes = mm->num_axis < 16 ? mm->num_axis : 16;
+    for (FT_UInt k = 0; k < axes; k++) at[k] = mm->axis[k].def;
+    if (set_axis(mm, at, axes, FT_MAKE_TAG('w', 'g', 'h', 't'), bold ? 700 : 400)) b = bold;
+    if (set_axis(mm, at, axes, FT_MAKE_TAG('i', 't', 'a', 'l'), italic ? 1 : 0)) it = italic;
+    FT_Set_Var_Design_Coordinates(f, axes, at);
+    FT_Done_MM_Var(ft, mm);
+  }
+  if (got_bold) *got_bold = b;
+  if (got_italic) *got_italic = it;
+  return f;
+}
+
+// A family of the game's own is not looked for on Android yet: its stand-in is taken.
+static bool has_family(const char *family) { (void)family; return false; }
+#else
 
 static FT_Face face_for(const char *family, bool bold, bool italic, bool *got_bold, bool *got_italic) {
   FcPattern *p = FcPatternCreate();
@@ -727,6 +785,7 @@ static bool has_family(const char *family) {
   if (m) FcPatternDestroy(m);
   return same;
 }
+#endif
 
 // What stands in for Windows' faces Linux lacks: one of the same look, as wide as the Windows face, so
 // that the texts fitted on Windows fit here too. The widths are a text in the seven languages in the

@@ -550,6 +550,216 @@ void dl_menu_init(void) {
   if (!DL_NOFRAME) add_section(SEC_PAGE, PG_SHOTS, 0xE722, dl_texts[T_SHOTS], dl_texts[T_H_SHOTS]); // the game outside takes its own
 }
 
+// ---- the game file (a project with SETUP_ROM, on Android): the player's own copy, chosen with Android's
+// picker and copied into "rom.pick" next to the program, checked as the installer does (SETUP_ROM_CRCS),
+// then moved into "rom" (a file not expected only when the player keeps it: Continue); asked at the first
+// start (and whenever "rom" has none of SETUP_ROM_EXTS), then the program starts again
+#if defined(__ANDROID__) && SETUP_ROM
+#include <sys/stat.h>
+#include <unistd.h>
+#define DL_ROM_PAGE 1
+static int rom_page = -1;
+static wchar_t rom_state[400]; // under the help: what the last choice gave
+static bool rom_waiting;       // a file chosen in "rom.pick" that is not the version expected
+
+static bool same_nocase(const char *a, const char *b) {
+  for (; *a && *b; a++, b++)
+    if ((*a | 0x20) != (*b | 0x20)) return false;
+  return !*a && !*b;
+}
+
+// The program's folder, with its separator at the end.
+static void rom_base(char *dir) {
+  GetModuleFileNameA(NULL, dir, MAX_PATH);
+  char *cut = strrchr(dir, DL_SEPC);
+  if (cut) cut[1] = 0;
+  else dir[0] = 0;
+}
+
+// A file of <program>/<sub> with one of SETUP_ROM_EXTS (case ignored), its name in found; or false.
+static bool rom_find(const char *sub, char *found) {
+  static const char *const exts[] = {SETUP_ROM_EXTS, NULL};
+  char dir[MAX_PATH], pat[MAX_PATH * 2];
+  rom_base(dir);
+  snprintf(pat, sizeof pat, "%s%s%c*", dir, sub, DL_SEPC);
+  WIN32_FIND_DATAA fd;
+  HANDLE h = FindFirstFileA(pat, &fd);
+  if (h == INVALID_HANDLE_VALUE) return false;
+  bool ok = false;
+  do {
+    const char *dot = strrchr(fd.cFileName, '.');
+    for (int k = 0; dot && exts[k] && !ok; k++)
+      if (same_nocase(dot + 1, exts[k])) { ok = true; snprintf(found, MAX_PATH, "%s", fd.cFileName); }
+  } while (!ok && FindNextFileA(h, &fd));
+  FindClose(h);
+  return ok;
+}
+
+bool dl_rom_needed(void) {
+  char name[MAX_PATH];
+  return !rom_find("rom", name);
+}
+
+// The files of "rom.pick": moved into "rom" (keep), or removed.
+static void rom_pick_files(bool keep) {
+  char dir[MAX_PATH], pat[MAX_PATH * 2], from[MAX_PATH * 2], to[MAX_PATH * 2];
+  rom_base(dir);
+  snprintf(to, sizeof to, "%srom", dir);
+  if (keep) mkdir(to, 0755);
+  snprintf(pat, sizeof pat, "%srom.pick%c*", dir, DL_SEPC);
+  WIN32_FIND_DATAA fd;
+  HANDLE h = FindFirstFileA(pat, &fd);
+  if (h == INVALID_HANDLE_VALUE) return;
+  do {
+    if (fd.cFileName[0] == '.') continue;
+    snprintf(from, sizeof from, "%srom.pick%c%s", dir, DL_SEPC, fd.cFileName);
+    snprintf(to, sizeof to, "%srom%c%s", dir, DL_SEPC, fd.cFileName);
+    if (!keep || rename(from, to)) unlink(from);
+  } while (FindNextFileA(h, &fd));
+  FindClose(h);
+}
+
+// The installer's check (setup.c): the file's CRC32, without a copier's 512-byte header. 1: one of those
+// expected, -1: none of them, 0: no list.
+static int rom_check(const char *path, unsigned *crc) {
+  *crc = 0;
+#ifdef SETUP_ROM_CRCS
+  static const unsigned known[] = {SETUP_ROM_CRCS};
+  static unsigned table[256];
+  if (!table[1])
+    for (unsigned i = 0; i < 256; i++) {
+      unsigned v = i;
+      for (int k = 0; k < 8; k++) v = v & 1 ? 0xEDB88320u ^ (v >> 1) : v >> 1;
+      table[i] = v;
+    }
+  FILE *f = fopen(path, "rb");
+  if (!f) return -1;
+  fseek(f, 0, SEEK_END);
+  long n = ftell(f);
+  fseek(f, n % 1024 == 512 && n > 512 ? 512 : 0, SEEK_SET);
+  unsigned c = 0xFFFFFFFFu;
+  unsigned char buf[65536];
+  for (size_t got; (got = fread(buf, 1, sizeof buf, f)) > 0;)
+    for (size_t i = 0; i < got; i++) c = table[(c ^ buf[i]) & 255] ^ (c >> 8);
+  fclose(f);
+  *crc = ~c;
+  for (size_t k = 0; k < sizeof known / sizeof known[0]; k++)
+    if (known[k] == *crc) return 1;
+  return -1;
+#else
+  (void)path;
+  return 0;
+#endif
+}
+
+// A .zip among the files chosen (in dir): its first file of SETUP_ROM_EXTS taken out beside it, with the
+// installer's unzip.h (stored or deflated, its CRC checked; 9 MB at most), the .zip removed then.
+#if __has_include("../setup/unzip.h")
+#include "../setup/unzip.h"
+static void rom_unzip(const char *dir) {
+  static const char *const exts[] = {SETUP_ROM_EXTS, NULL};
+  char want[64] = "", pat[MAX_PATH * 2], path[MAX_PATH * 2], name[260];
+  for (int k = 0; exts[k]; k++) // ".sfc.smc": zip_find_ext takes extensions of three letters
+    if (strlen(exts[k]) == 3 && strlen(want) + 4 < sizeof want) strcat(strcat(want, "."), exts[k]);
+  snprintf(pat, sizeof pat, "%s%c*", dir, DL_SEPC);
+  WIN32_FIND_DATAA fd;
+  HANDLE h = want[0] ? FindFirstFileA(pat, &fd) : INVALID_HANDLE_VALUE;
+  if (h == INVALID_HANDLE_VALUE) return;
+  do {
+    const char *dot = strrchr(fd.cFileName, '.');
+    if (!dot || !same_nocase(dot + 1, "zip")) continue;
+    snprintf(path, sizeof path, "%s%c%s", dir, DL_SEPC, fd.cFileName);
+    FILE *f = fopen(path, "rb");
+    if (!f) continue;
+    fseek(f, 0, SEEK_END);
+    long n = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *zip = n > 0 && n < 256L * 1024 * 1024 ? malloc((size_t)n) : NULL;
+    size_t size = 0;
+    uint8_t *rom = zip && fread(zip, 1, (size_t)n, f) == (size_t)n ? zip_find_ext(zip, (size_t)n, want, 0, &size, name, sizeof name) : NULL;
+    fclose(f);
+    free(zip);
+    if (!rom) continue;
+    char to[MAX_PATH * 2];
+    snprintf(to, sizeof to, "%s%c%s", dir, DL_SEPC, name);
+    FILE *o = fopen(to, "wb");
+    bool ok = o && fwrite(rom, 1, size, o) == size;
+    if (o && fclose(o)) ok = false;
+    free(rom);
+    if (ok) unlink(path);
+    else unlink(to);
+    break;
+  } while (FindNextFileA(h, &fd));
+  FindClose(h);
+}
+#else
+static void rom_unzip(const char *dir) { (void)dir; }
+#endif
+
+static void rom_picked(int result, const char *dest) {
+  char name[MAX_PATH], path[MAX_PATH * 2];
+  rom_state[0] = 0;
+  rom_waiting = false;
+  dl_dirty = true;
+  if (result == DL_PICK_CANCELLED) lstrcpynW(rom_state, TX(T_ROM_CANCEL), 400);
+  if (result == DL_PICK_FAILED) lstrcpynW(rom_state, TX(T_PICK_FAIL), 400);
+  if (result != DL_PICKED) return;
+  if (!rom_find("rom.pick", name)) rom_unzip(dest); // a game file still in its .zip: taken out, as the installer does
+  if (!rom_find("rom.pick", name)) { // none of the files chosen is a game file
+    rom_pick_files(false);
+    lstrcpynW(rom_state, TX(T_ROM_NONE), 400);
+    return;
+  }
+  snprintf(path, sizeof path, "%s%c%s", dest, DL_SEPC, name);
+  unsigned crc;
+  if (rom_check(path, &crc) < 0) { // another version, or a damaged file: the player chooses
+    _snwprintf(rom_state, 399, TX(T_ROM_BAD), crc);
+    rom_state[399] = 0;
+    rom_waiting = true;
+    return;
+  }
+  rom_pick_files(true);
+  dl_note(TX(T_ROM_OK));
+  dl_relaunch_start(); // the game finds its file at its start
+}
+
+static void rom_choose(void) {
+  rom_state[0] = 0;
+  rom_waiting = false;
+  rom_pick_files(false); // what an earlier choice left
+  if (!dl_pick_files(DL_PICK_FILES, "rom.pick", rom_picked)) lstrcpynW(rom_state, TX(T_PICK_FAIL), 400);
+  dl_dirty = true;
+}
+
+static void rom_go(void) {
+  char name[MAX_PATH];
+  if (rom_waiting) rom_pick_files(true); // kept, though not the version expected
+  rom_waiting = false;
+  if (!rom_find("rom", name)) { dl_note(TX(T_ROM_NONE)); return; }
+  dl_relaunch_start();
+}
+
+static const wchar_t *rom_more(void) {
+  static wchar_t out[420];
+  if (!rom_state[0]) return L"";
+  _snwprintf(out, 419, L"\n\n%ls", rom_state);
+  out[419] = 0;
+  return out;
+}
+
+static const DlRow rom_rows[] = {
+    {DL_ACTION, dl_texts[T_ROM_CHOOSE], dl_texts[T_H_ROM_CHOOSE], NULL, 0, NULL, NULL, rom_choose, 0, rom_more},
+    {DL_ACTION, dl_texts[T_ROM_GO], dl_texts[T_H_ROM_GO], NULL, 0, NULL, NULL, rom_go, 0, rom_more},
+};
+
+void dl_rom_page_open(void) {
+  if (rom_page >= 0) dl_open_page(rom_page);
+}
+#else
+bool dl_rom_needed(void) { return false; }
+void dl_rom_page_open(void) {}
+#endif
+
 // ---- safe mode: a page shown at the start of a run after one that did not close normally (dl_app.c)
 static int safe_page = -1;
 static void safe_keep(void) { dl_mode = M_SIDE; dl_side = 0; }
@@ -981,6 +1191,9 @@ void dl_menu_finish(void) {
   if (DL_NOFRAME) hdr_row = crt_row = false; // no Picture page: only the menus' software display
   safe_rows[0].help = dl_texts[hdr_row ? (crt_row ? T_H_SAFE_KEEP : T_H_SAFE_KEEP_HDR) : (crt_row ? T_H_SAFE_KEEP_CRT : T_H_SAFE_KEEP_SOFT)];
   safe_page = dl_page(dl_texts[T_SAFE_TAB], safe_rows, sizeof safe_rows / sizeof safe_rows[0]);
+#ifdef DL_ROM_PAGE
+  rom_page = dl_page(dl_texts[T_ROM_TAB], rom_rows, sizeof rom_rows / sizeof rom_rows[0]);
+#endif
   if (dl_audit_dir) dl_page_insert(safe_page, 1, &safe_load_row);
   // the game's own first-start page (DlGame.welcome_*), made last so that the ids of every other page
   // stay as they were
@@ -1621,7 +1834,9 @@ void dl_draw_menu(HDC wdc) {
   } else hy0 = vy0;
   draw_help(dc, vx0, hy0, 630, PANEL_BOTTOM, help);
 
-  if (dl_input_kind == DL_IN_KEYS) {
+  if (dl_touch_used) {
+    // a finger: no keys to tell
+  } else if (dl_input_kind == DL_IN_KEYS) {
     ui_text(dc, f_small, 17, 382, TX(T_FOOTER), RGB(0, 0, 0), TA_LEFT);
     ui_text(dc, f_small, 16, 381, TX(T_FOOTER), RGB(255, 255, 255), TA_LEFT);
   } else pad_footer(dc);
@@ -1706,6 +1921,37 @@ void dl_menu_mouse(int mx, int my, bool click) {
   else row_adjust(0, true);
 }
 
+// A finger in the menus: put down, it only shows the row under it; moved up or down by more than half a
+// row, it scrolls (the selection one row further for each row's height it moves, as the wheel: a finger
+// going up goes down the list) and is no tap; lifted where it stayed, it is a click there, or after
+// 0.6 s held F2 (a slot's name, as X on a controller).
+void dl_menu_touch(int phase, int x, int y) {
+  static bool down, drag;
+  static int x0, y0, last;
+  static DWORD at;
+  double step = ROW_H * ui_s;
+  if (phase == 0) {
+    down = true, drag = false;
+    x0 = x, y0 = last = y;
+    at = GetTickCount();
+    dl_touch_used = true;
+    dl_dirty = true;
+    dl_menu_mouse(x, y, false);
+    return;
+  }
+  if (!down) return;
+  if (phase == 1) {
+    if (!drag && abs(y - y0) > step / 2) drag = true;
+    while (drag && last - y >= step) { dl_key(VK_DOWN); last -= (int)step; }
+    while (drag && y - last >= step) { dl_key(VK_UP); last += (int)step; }
+    return;
+  }
+  down = false;
+  if (drag) return;
+  if (GetTickCount() - at >= 600) dl_key(VK_F2);
+  else dl_menu_mouse(x0, y0, true);
+}
+
 void dl_menu_reread(void) { list_read = -1; }
 
 void dl_open_page(int page) {
@@ -1759,6 +2005,7 @@ bool dl_menu_back(const char *where) {
 // texts that do not fit and saves one picture of each page
 int dl_audit(void) {
   SetWindowPos(dl_hwnd, NULL, 0, 0, 1280 + 16, 800 + 39, SWP_NOMOVE | SWP_NOZORDER);
+  dl_window_settle();
   HDC wdc = GetDC(dl_hwnd);
   int keep = dl_cfg.ui_lang;
   char path[MAX_PATH];

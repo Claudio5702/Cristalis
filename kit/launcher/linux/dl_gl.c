@@ -1,4 +1,4 @@
-// The picture through the graphics card on Linux (OpenGL 3.3), as dl_gpu.c does it with Direct3D 11 on
+// The picture through the graphics card on Linux (OpenGL 3.3; OpenGL ES 3.0 on Android), as dl_gpu.c does it with Direct3D 11 on
 // Windows: the game's picture through a shader (the filters, the smoothing of pixel-art edges, the
 // scanlines, the CRT look, the colour-blind filter, the game's own scene() in GLSL), the setup screen as
 // a layer drawn by GDI on black then on white, over the animated sky (the theme's colour and style), the
@@ -61,9 +61,15 @@ static bool gl_load(void) {
 }
 
 // ---- the shaders: the parts of the game's shader, then the game's scene() (DlGame.shader_glsl), then
-// the rest; the same as dl_gpu.c's HLSL
+// the rest; the same as dl_gpu.c's HLSL. Their first lines: OpenGL's 3.3, or OpenGL ES 3.0's with the
+// precision of numbers (a game's scene() is written for both).
+#ifdef __ANDROID__
+#define GLSL_FIRST "#version 300 es\nprecision highp float;\nprecision highp int;\n"
+#else
+#define GLSL_FIRST "#version 330 core\n"
+#endif
 static const char gl_vs[] =
-    "#version 330 core\n"
+    GLSL_FIRST
     "out vec2 uv;\n"
     "void main() {\n"
     "  vec2 t = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);\n"
@@ -71,7 +77,7 @@ static const char gl_vs[] =
     "}\n";
 
 static const char gl_head[] =
-    "#version 330 core\n"
+    GLSL_FIRST
     "in vec2 uv;\n"
     "out vec4 frag;\n"
     "uniform sampler2D tex, t1, t2, t3, t4, t5, t6, t7;\n"
@@ -204,26 +210,26 @@ static const char gl_tail[] =
 
 // what GDI drew (the setup screen, the frame rate...): colours already multiplied by their opacity
 static const char gl_ui[] =
-    "#version 330 core\n"
+    GLSL_FIRST
     "in vec2 uv; out vec4 frag; uniform sampler2D tex;\n"
     "void main() { frag = textureLod(tex, uv, 0.0); }\n";
 
 // the setup screen's soft change of page (2.84, as ps_fade in dl_gpu.c): the page before (fadeOld) and
 // the new one mixed before they go over the sky
 static const char gl_fade[] =
-    "#version 330 core\n"
+    GLSL_FIRST
     "in vec2 uv; out vec4 frag; uniform sampler2D tex, fadeOld; uniform float fadeT;\n"
     "void main() { frag = mix(textureLod(fadeOld, uv, 0.0), textureLod(tex, uv, 0.0), clamp(fadeT, 0.0, 1.0)); }\n";
 
 // the window's own picture (the graphics card off): as it is
 static const char gl_copy[] =
-    "#version 330 core\n"
+    GLSL_FIRST
     "in vec2 uv; out vec4 frag; uniform sampler2D tex;\n"
     "void main() { frag = vec4(texelFetch(tex, ivec2(uv * vec2(textureSize(tex, 0))), 0).rgb, 1.0); }\n";
 
 // the sky behind the setup screen, as ps_sky in dl_gpu.c: the theme's tint, its other skies, animated
 static const char gl_sky[] =
-    "#version 330 core\n"
+    GLSL_FIRST
     "in vec2 uv; out vec4 frag;\n"
     "uniform vec2 origin; uniform vec4 game[8];\n"
     "vec3 dl_to_hsl(vec3 c) {\n"
@@ -416,7 +422,11 @@ void dl_gpu_follow(bool now) { (void)now; } // no HDR yet on Linux
 // Texture 'which' at the given size and format, filled (format: DL_TEX_*).
 static bool upload_as(int which, int format, const void *data, int w, int h) {
   static const GLint inner[3] = {GL_RGBA8, GL_R8, GL_RGBA32F};
+#ifdef __ANDROID__ // OpenGL ES has no BGRA: the pixels go as RGBA, red and blue swapped back by the texture
+  static const GLenum fmt[3] = {GL_RGBA, GL_RED, GL_RGBA}, type[3] = {GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, GL_FLOAT};
+#else
   static const GLenum fmt[3] = {GL_BGRA, GL_RED, GL_RGBA}, type[3] = {GL_UNSIGNED_BYTE, GL_UNSIGNED_BYTE, GL_FLOAT};
+#endif
   GlTex *t = &gl.t[which];
   glActiveTexture(GL_TEXTURE0);
   if (!t->id) glGenTextures(1, &t->id);
@@ -427,6 +437,14 @@ static bool upload_as(int which, int format, const void *data, int w, int h) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+#ifdef __ANDROID__
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_R, format == DL_TEX_BGRA8 ? GL_BLUE : GL_RED);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_SWIZZLE_B, format == DL_TEX_BGRA8 ? GL_RED : GL_BLUE);
+    if (format == DL_TEX_RGBA32F) { // (floats are not filtered in OpenGL ES 3.0: such a texture would be black)
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }
+#endif
     glTexImage2D(GL_TEXTURE_2D, 0, inner[format], w, h, 0, fmt[format], type[format], data);
     t->w = w, t->h = h, t->format = format;
   } else glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, w, h, fmt[format], type[format], data);
@@ -503,6 +521,8 @@ static void game_quad(int x, int y, int w, int h, int step, int steps) {
   quad(x, y, w, h, gl.ps, -1, false);
 }
 
+bool dl_gpu_tearing(void) { return false; } // (SDL decides with the sync)
+
 int dl_gpu_steps(void) {
   int n = dl_mode == M_GAME && dl_game->gpu_steps && !dl_game->pace_by_game && gl.ok ? dl_game->gpu_steps() : 1;
   return n < 1 ? 1 : n > 8 ? 8 : n;
@@ -520,7 +540,12 @@ static bool save(const char *path, int x, int y, int w, int h, int cw, int ch) {
   if (!px || !row) { free(px); free(row); return false; }
   glPixelStorei(GL_PACK_ALIGNMENT, 1);
   glReadBuffer(GL_BACK);
+#ifdef __ANDROID__ // (RGBA only in OpenGL ES: red and blue swapped)
+  glReadPixels(x, ch - y - h, w, h, GL_RGBA, GL_UNSIGNED_BYTE, px);
+  for (size_t k = 0; k < (size_t)w * h; k++) px[k] = (px[k] & 0xFF00FF00) | (px[k] >> 16 & 0xFF) | (px[k] & 0xFF) << 16;
+#else
   glReadPixels(x, ch - y - h, w, h, GL_BGRA, GL_UNSIGNED_BYTE, px);
+#endif
   for (int k = 0; k < h / 2; k++) { // OpenGL's rows from the bottom
     memcpy(row, px + (size_t)k * w, (size_t)w * 4);
     memcpy(px + (size_t)k * w, px + (size_t)(h - 1 - k) * w, (size_t)w * 4);

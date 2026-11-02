@@ -144,12 +144,14 @@ static u32 joy_hat;      // its hat, as DL_UP..DL_RIGHT
 static bool joy_ps;      // that controller is a PlayStation one (by its name)
 static bool joy_zr;      // it has the Z and R axes (a right stick)
 int dl_input_kind;
+bool dl_touch_used;
 
 static bool input_mouse; // the mouse used last in play (dl_mouse_used): DL_DEVICE_MOUSE, the footer the keyboard's
 
 void dl_input_used(int kind) {
   if (dl_console) dl_pointer_hide(true); // a key or a controller: the pointer out of the way again
   input_mouse = false;
+  if (dl_touch_used) dl_touch_used = false, dl_dirty = true;
   if (kind == dl_input_kind) return;
   dl_input_kind = kind;
   dl_dirty = true;

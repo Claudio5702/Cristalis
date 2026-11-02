@@ -114,6 +114,12 @@ extern bool dl_running;
 extern bool dl_start_done;   // the game's start() has run (the theme's pictures may be asked for)
 extern bool dl_safe;         // this run is in safe mode (the last one did not close normally)
 void dl_safe_restart(void);  // the player's settings back, then the program started again
+void dl_pick_follow(void);   // dl_app.c, each turn: the player's files being copied (dl_pick_files)
+// The game file of a project with SETUP_ROM on Android (dl_menu.c): asked at the first start, before the
+// first start's pages; then the program starts again (dl_relaunch_start: to those pages)
+bool dl_rom_needed(void);
+void dl_rom_page_open(void);
+void dl_relaunch_start(void);
 int dl_ach_page(void);       // dl_achieve.c: the Achievements page, -1 without achievements
 void dl_shows_follow(void);  // dl_menu.c, each turn: dl_show_achievements asked from the game
 void dl_settings_sibling(char *out, const char *ext); // the settings file's path with another extension (MAX_PATH)
@@ -171,6 +177,7 @@ bool dl_joy_mode(void);
 // What the player used last in the menus: the footer shows its buttons.
 enum { DL_IN_KEYS, DL_IN_XBOX, DL_IN_PS, DL_IN_PAD, DL_IN_PS_HID }; // DL_IN_PS: by WinMM, DL_IN_PS_HID: read directly (dl_sony.c)
 extern int dl_input_kind;
+extern bool dl_touch_used; // dl_input.c: the last thing used was a finger on a touch screen (the footer then shows no keys)
 void dl_input_used(int kind);
 void dl_mouse_used(void);  // a mouse move or click in play, for a game with mouse_in_game (dl_input_device)
 // A button's picture for the game's prompts (dl_button_picture, 2.94): its shape (which: A B X Y of an
@@ -316,7 +323,25 @@ void dl_draw_preview(HDC wdc);
 void dl_key(int vk);
 void dl_menu_reread(void); // list pages read their contents again when next shown
 void dl_menu_mouse(int x, int y, bool click);
+// A finger on a touch screen in the menus (dl_menu.c): put down (0), moved (1), lifted (2). The mouse
+// messages a finger makes carry DL_MK_TOUCH in their wParam (linux/dl_win32.c: Linux and Android).
+void dl_menu_touch(int phase, int x, int y);
+#define DL_MK_TOUCH 0x8000
 int dl_audit(void);
+void dl_window_settle(void); // dl_app.c: before the checks draw (Android: the window takes the screen)
+// Android puts the program in the background (wParam 1: it may end it there without a word) or brings
+// it back (0): posted by linux/dl_win32.c, for the window procedure
+#define DL_WM_BACKGROUND (0x8000 + 0x44)
+bool dl_saves_typing(void); // dl_saves.c: a slot's name being typed on a keyboard (not the one on screen)
+#ifdef __ANDROID__
+void dl_win32_text_input(bool on); // linux/dl_win32.c: Android's keyboard shown or put away
+bool dl_win32_has_pad(void);       // linux/dl_win32.c: a controller there (the AYN Thor's own)
+// linux/dl_win32.c: Android's picker for the player's files (dl_pick_files), copied into dest by the
+// activity on a thread; dl_win32_pick_state: 2 while it goes on (*bytes copied so far), then DL_PICKED,
+// DL_PICK_CANCELLED or DL_PICK_FAILED once (and 3 while idle)
+bool dl_win32_pick(int kind, const char *dest);
+int dl_win32_pick_state(long long *bytes);
+#endif
 
 // ---- graphics card output (dl_gpu.c); GDI does everything when it is off or fails
 extern int dl_layer;              // the setup screen is being drawn as a layer: 1 on black, 2 on white
@@ -326,6 +351,7 @@ void dl_gpu_prepare(void);        // starts preparing the shaders in the backgro
 bool dl_gpu_ready(void);          // the graphics card is chosen and works (false while the shaders are prepared)
 bool dl_gpu_show(bool rebuild, bool vsync);
 int dl_gpu_steps(void);           // screen refreshes for each picture of the game played (smooth motion)
+bool dl_gpu_tearing(void);        // a picture may go to the screen at once (Windows: ALLOW_TEARING, which VRR needs)
 void dl_gpu_restart(void);        // after a change of the Display setting or of the kind of output
 bool dl_gpu_window_stale(void);   // GDI to draw in a window that has shown the flip model: make it again
 void dl_gpu_window_renewed(void); // (done)
@@ -383,6 +409,8 @@ enum {
   T_GAMES, T_TAB_GAMES, T_H_GAMES, T_GAME_INSTALLED, T_H_GAME_PLAY, T_H_GAME_PAGE, T_M_GAME_FAIL, // the author's other games (dl_games.h)
   T_H_FILTER_3D, T_H_PRESET_3D, T_H_PRESET_3D_NOCRT, // an old console's 3D (DL_LOOK_RETRO3D)
   T_M_GAME_STARTING, // another game being started (Other games)
+  T_PICK_COPYING, T_PICK_FAIL, // the player's files copied (dl_pick_files, Android)
+  T_ROM_TAB, T_ROM_CHOOSE, T_H_ROM_CHOOSE, T_ROM_GO, T_H_ROM_GO, T_ROM_NONE, T_ROM_OK, T_ROM_BAD, T_ROM_CANCEL, // the game file (Android)
   T_COUNT
 };
 extern const wchar_t *const dl_texts[T_COUNT][DL_LANGS];

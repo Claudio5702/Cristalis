@@ -11,7 +11,7 @@
 
 // The version of DarkLauncher (CHANGELOG.md): 1.01, 1.02... for improvements; the first number moves
 // (2.0) when a game has to change its code for it.
-#define DL_VERSION "2.100"
+#define DL_VERSION "3.01"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -308,6 +308,11 @@ typedef struct DlGame {
   // before the player chooses and after "Defaults"; 0: Max, as before (as fast as the computer goes,
   // which differs from one to the next). The player's choice is kept in the settings file.
   int turbo_default;
+  // ---- DarkLauncher's line for the game's log (3.01, optional): once play starts, then once a minute
+  // in play, how the pictures and the sound go (pictures a second, the sound waiting, the screen's rate,
+  // sync and tearing, smooth motion, the pace, run-ahead, the drawing path), so that a player's report of
+  // lag tells its cause. NULL: the line goes to the error output (Linux's terminal, Android's log).
+  void (*log)(const char *line);
 } DlGame;
 
 // ---- pages: lists of rows, drawn and handled by DarkLauncher
@@ -548,6 +553,21 @@ typedef struct DlTarget {
   int serial;
 } DlTarget;
 bool dl_picture_target(int w, int h, double aspect, DlTarget *t);
+
+// The player's own copy of the game's files, on a system where the game cannot read them where they are
+// (Android): its file picker opens, and what the player chooses is copied into dest, a folder of the
+// program's own (a path relative to the program's folder, made if missing): DL_PICK_FILE one file,
+// DL_PICK_FILES several (a CD's .cue with its tracks), DL_PICK_FOLDER the files of a folder and of the
+// folders in it (not the folder itself). While it copies, a note says how much; then done(result, dest)
+// is called from DarkLauncher's loop, dest as a full path: DL_PICKED, DL_PICK_CANCELLED or DL_PICK_FAILED
+// (a note says so then). false: not offered here (Windows and Linux, where the installer and the game reach
+// the player's files themselves), or a choice already going on. A game with SETUP_ROM in project.h does
+// not need it: on Android DarkLauncher asks for the game file itself at the first start (into "rom", with
+// the installer's check of SETUP_ROM_CRCS), then starts the program again, so the game must reach dl_run
+// there even without its file.
+enum { DL_PICK_FILE, DL_PICK_FILES, DL_PICK_FOLDER };
+enum { DL_PICK_FAILED = -1, DL_PICK_CANCELLED, DL_PICKED };
+bool dl_pick_files(int kind, const char *dest, void (*done)(int result, const char *dest));
 
 // Runs the program: window, setup screen, game. Returns the exit code.
 int dl_run(const DlGame *game, int argc, char **argv);

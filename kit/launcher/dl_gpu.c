@@ -885,6 +885,8 @@ static void gpu_states(void) {
 }
 
 // Screen refreshes for each picture of the game played (DlGame.gpu_steps; smooth motion).
+bool dl_gpu_tearing(void) { return gpu.ok && gpu.tearing; }
+
 int dl_gpu_steps(void) {
   int n = dl_mode == M_GAME && dl_game->gpu_steps && !dl_game->pace_by_game && gpu.ok ? dl_game->gpu_steps() : 1;
   return n < 1 ? 1 : n > 8 ? 8 : n;
