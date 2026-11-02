@@ -3,6 +3,8 @@
 #include "guest.h"
 #include "ppc_detail.h"
 
+#include <windows.h>
+
 #include <algorithm>
 #include <atomic>
 #include <cmath>
@@ -94,6 +96,11 @@ int GameStateUnitChoice()
     return int(Load32(kUnitChoiceAddress));
 }
 
+void GameStateSetUnitChoice(int unit)
+{
+    Store32(kUnitChoiceAddress, uint32_t(unit));
+}
+
 UnitGrid GameStateUnitGrid()
 {
     // W2: five units a row, its second row the last two units and the three power crystals; W3: six, and
@@ -130,8 +137,24 @@ bool GameStateHelpSettings()
     return GameStateStageScreen() == 25 && Load32(kHelpPart) == kHelpSettings;
 }
 
+bool GameStateReady()
+{
+    // the game's heap, where all these words are, once it is there (the first moments it is not: a read
+    // then is an access violation)
+    static std::atomic<bool> ready;
+    if (!ready)
+    {
+        MEMORY_BASIC_INFORMATION info;
+        ready = VirtualQuery(g_base + kScreenAddress, &info, sizeof(info)) != 0 && info.State == MEM_COMMIT &&
+            VirtualQuery(g_base + 0x400533F0 + 0x2C44C, &info, sizeof(info)) != 0 && info.State == MEM_COMMIT;
+    }
+    return ready;
+}
+
 GameMenu GameStateMenu()
 {
+    if (!GameStateReady())
+        return {};
     if (g_pack != 0)
     {
         // In a stage, a deployed unit's menu (sub_820CC160 opens it: the stage's mode 2, the map object's
@@ -142,12 +165,16 @@ GameMenu GameStateMenu()
         constexpr uint32_t kMenuChoice = 0x400533F0 + 0x12900, kUnitChoice = 0x400533F0 + 0x24718;
         constexpr uint32_t kScreen = 0x400533F0 + 0x12980, kReplay = 0x400533F0 + 0x2C44C;
         uint32_t screen = Load32(kScreen);
+        // The menu is drawn away from the unit (the cursor's square): low on the screen for a unit in the
+        // map's top half (rows up to 16), high otherwise (found with the debug mode, debug_script.h)
+        int gridX = 0, gridY = 0;
+        GameStateCursor(gridX, gridY);
+        bool low = gridY <= 16;
         if (screen == 10 && Load32(kUnitChoice + 4) == 2)
-            return { GameMenu::kList, kUnitChoice, 2, 370, 720, 303, 44 };
-        // a power crystal's menu (W2): Recharge, see the recharged range, see the range now, Quit (found
-        // with the debug mode, debug_script.h)
+            return { GameMenu::kList, kUnitChoice, 2, 370, 720, low ? 480.0 : 303.0, 44 };
+        // a power crystal's menu (W2): Recharge, see the recharged range, see the range now, Quit
         if (screen == 10 && Load32(kUnitChoice + 4) == 4)
-            return { GameMenu::kList, kUnitChoice, 4, 440, 820, 332, 42.5 };
+            return { GameMenu::kList, kUnitChoice, 4, 440, 820, low ? 332.0 : 260.0, low ? 42.5 : 43.3 };
         // The pause menu (sub_820C04F8 opens it, sub_820C0650 draws it; in a replay sub_820C0880 and another
         // drawing): +0x12900 the entry chosen, +0x12904 the rows; of fifteen entries, each hidden when its word
         // at +0x128C4 is set (no row), and greyed (passed over by the arrows) when its word at +0x12888 is.
@@ -201,6 +228,8 @@ GameMenu GameStateMenu()
 
 int GameStateScoresAt(double x, double y)
 {
+    if (!GameStateReady())
+        return -2;
     // How to Play, from the pause menu (the stage's screen 25): nine pages, an arrow on each side (found with
     // the debug mode)
     if (GameStateStageScreen() == 25 && Load32(kHelpPart) == kHelpPages)

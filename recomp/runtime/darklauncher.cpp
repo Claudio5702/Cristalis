@@ -417,41 +417,14 @@ void Status(char* out, int n)
 // What is new in this version (GAME_VERSION, project.h), one line per news: its title, then | and what
 // it is. Shown once, the first time the version starts.
 const DlText t_news = {
-    L"マウスで遊べるように|カーソルはポインターの下のマスへすぐに移動し、クリックでユニットを配置します。ユニットの列やメニューもマウスで選べます。タッチ画面でも遊べます。\n"
-    L"早送りを続ける|ゲームの早送り（RB）を、F キーやマウスの中ボタンなどで押さずに続けられます。\n"
-    L"もっと軽く|プロセッサの使用量が約 10 分の 1 になりました。ノート PC や Steam Deck で発熱が減り、電池が長持ちします。\n"
-    L"画面いっぱいに|Steam Deck の 16:10 など、別の比率の画面では背景が広がり、黒い帯なしで画面を埋めます。設定の「画面」でオフにできます。\n"
-    L"新しい画像|ランチャーの背景、起動中の画像、アイコンを新しく描きました。実績にはゲーム本来の画像が表示されます。",
-    L"Jouable à la souris|Le curseur va tout de suite sur la case sous le pointeur, et un clic déploie une unité. La rangée d'unités et les menus se choisissent aussi à la souris. Les boutons affichés suivent les touches ou la manette utilisées, et l'écran tactile marche aussi.\n"
-    L"Avance rapide continue|L'avance rapide du jeu (RB) reste active sans tenir le bouton : F, le clic du milieu ou un bouton choisi.\n"
-    L"Bien plus léger|Le jeu utilise environ dix fois moins de processeur : moins de chaleur et plus d'autonomie sur un portable ou un Steam Deck.\n"
-    L"Remplir l'écran|Sur un écran d'autres proportions, comme le 16:10 du Steam Deck, les fonds s'élargissent et l'image remplit l'écran sans bandes noires. Se désactive dans Paramètres, Image.\n"
-    L"De nouvelles images|Un nouveau fond pour le lanceur, une image au démarrage et de nouvelles icônes. Les succès montrent leurs images d'origine.",
-    L"Play with the mouse|The cursor goes straight to the square under the pointer, and a click deploys a unit. The row of units and the menus work with the mouse too. The buttons shown follow the keys or controller in use, and the touch screen works too.\n"
-    L"Fast forward kept on|The game's fast forward (RB) stays on without holding the button: F, the middle click or a chosen button.\n"
-    L"Much lighter|The game uses about ten times less processor time: less heat and a longer battery on a laptop or a Steam Deck.\n"
-    L"Fill the screen|On a screen of other proportions, such as the Steam Deck's 16:10, the backgrounds widen and the picture fills the screen without black bands. It can be turned off in Settings, Picture.\n"
-    L"New pictures|A new backdrop for the launcher, a picture while the game starts and new icons. The achievements show their own pictures.",
-    L"Se juega con el ratón|El cursor va enseguida a la casilla bajo el puntero, y un clic despliega una unidad. La fila de unidades y los menús también se eligen con el ratón. Los botones mostrados siguen las teclas o el mando en uso, y la pantalla táctil también funciona.\n"
-    L"Avance rápido fijo|El avance rápido del juego (RB) sigue activo sin sujetar el botón: F, el clic central o un botón elegido.\n"
-    L"Mucho más ligero|El juego usa unas diez veces menos procesador: menos calor y más batería en un portátil o un Steam Deck.\n"
-    L"Llenar la pantalla|En una pantalla de otras proporciones, como el 16:10 de Steam Deck, los fondos se ensanchan y la imagen llena la pantalla sin bandas negras. Se desactiva en Ajustes, Imagen.\n"
-    L"Imágenes nuevas|Un fondo nuevo para el lanzador, una imagen al iniciar el juego e iconos nuevos. Los logros muestran sus propias imágenes.",
-    L"Jogável com o mouse|O cursor vai na hora para a casa sob o ponteiro, e um clique posiciona uma unidade; os menus também. Os botões mostrados seguem as teclas ou o controle, e a tela de toque funciona.\n"
-    L"Avanço rápido fixo|O avanço rápido do jogo (RB) fica ligado sem segurar o botão: F, o clique do meio ou um botão escolhido.\n"
-    L"Muito mais leve|O jogo usa cerca de dez vezes menos processador: menos calor e mais bateria num notebook ou num Steam Deck.\n"
-    L"Preencher a tela|Numa tela de outras proporções, como o 16:10 do Steam Deck, os fundos se alargam e a imagem preenche a tela sem faixas pretas. Pode ser desligado em Configurações, Imagem.\n"
-    L"Imagens novas|Um novo fundo para o lançador, uma imagem ao iniciar o jogo e ícones novos. As conquistas mostram suas próprias imagens.",
-    L"Mit der Maus spielbar|Der Cursor springt sofort auf das Feld unter dem Zeiger, ein Klick setzt eine Einheit ein; die Menüs auch. Die Tastenbilder folgen Tastatur oder Controller, und der Touchscreen geht.\n"
-    L"Dauerhafter Vorlauf|Der Vorlauf des Spiels (RB) bleibt an, ohne die Taste zu halten: F, die mittlere Maustaste oder eine gewählte Taste.\n"
-    L"Viel leichter|Das Spiel braucht etwa zehnmal weniger Prozessorzeit: weniger Wärme und mehr Akku auf einem Laptop oder Steam Deck.\n"
-    L"Bildschirm füllen|Auf einem Bildschirm mit anderem Seitenverhältnis, etwa 16:10 beim Steam Deck, werden die Hintergründe breiter und das Bild füllt den Bildschirm ohne schwarze Balken. Abschaltbar unter Einstellungen, Bild.\n"
-    L"Neue Bilder|Ein neuer Hintergrund für den Launcher, ein Bild beim Spielstart und neue Symbole. Die Erfolge zeigen ihre eigenen Bilder.",
-    L"Si gioca con il mouse|Il cursore va subito sulla casella sotto il puntatore, e un clic schiera un'unità. La fila di unità e i menu si scelgono anche con il mouse. I pulsanti mostrati seguono i tasti o il controller in uso, e funziona anche lo schermo tattile.\n"
-    L"Avanti veloce fisso|L'avanti veloce del gioco (RB) resta attivo senza tenere il pulsante: F, il clic centrale o un pulsante scelto.\n"
-    L"Molto più leggero|Il gioco usa circa dieci volte meno processore: meno calore e più batteria su un portatile o uno Steam Deck.\n"
-    L"Riempire lo schermo|Su uno schermo di altre proporzioni, come il 16:10 di Steam Deck, gli sfondi si allargano e l'immagine riempie lo schermo senza bande nere. Si disattiva in Impostazioni, Immagine.\n"
-    L"Nuove immagini|Un nuovo sfondo per il launcher, un'immagine all'avvio del gioco e nuove icone. Gli obiettivi mostrano le loro immagini." };
+    L"マウスの修正|ユニットのメニューは、ユニットの位置によって上か下に出ますが、どちらでもポインターで正しく選べるようになりました。ユニットの列はポインターにすぐ追いつきます。",
+    L"Souris corrigée|Le menu d'une unité, affiché en haut ou en bas selon sa place, se choisit maintenant au bon endroit. La rangée d'unités suit le pointeur tout de suite.",
+    L"Mouse fixes|A unit's menu, shown high or low depending on where the unit stands, is now pointed at in the right place. The row of units follows the pointer at once.",
+    L"Ratón corregido|El menú de una unidad, arriba o abajo según dónde esté, ya se elige en el sitio correcto. La fila de unidades sigue al puntero enseguida.",
+    L"Mouse corrigido|O menu de uma unidade, em cima ou embaixo conforme onde ela está, agora é escolhido no lugar certo. A fileira de unidades segue o ponteiro na hora.",
+    L"Maus korrigiert|Das Menü einer Einheit, je nach ihrer Lage oben oder unten, wird jetzt an der richtigen Stelle gewählt. Die Reihe der Einheiten folgt dem Zeiger sofort.",
+    L"Mouse corretto|Il menu di un'unità, in alto o in basso a seconda di dove si trova, ora si sceglie nel punto giusto. La fila di unità segue subito il puntatore.",
+};
 
 // ---- The game ----
 
@@ -646,7 +619,7 @@ uint16_t MouseButtons(uint16_t buttons)
         // reached (two seconds): stop
         if (nowX < 0 || (nowX == targetX && nowY == targetY) || (buttons & kArrows) != 0 || stillFrames > 30 || travel > 120)
         {
-            if (mouseAt != nullptr && travel > 1)
+            if ((mouseAt != nullptr || debug) && travel > 1)
                 Log("Mouse: %s after %d pictures", nowX == targetX && nowY == targetY ? "there" : "stopped", travel);
             travel = 0;
             target = -1;
@@ -660,17 +633,30 @@ uint16_t MouseButtons(uint16_t buttons)
         if (buttons & kA)
             clickFrames = 4;
         buttons &= ~kA; // a click waits until the choice is there
+        uint16_t arrow;
         if (target == 1) // the other row first (up or down), then the shorter way round the row
         {
             UnitGrid grid = GameStateUnitGrid();
             int columns = grid.columns, column = targetX % columns, now = nowX % columns;
             if (targetX / columns != nowX / columns) // (below the last row: the summons, W2 and W3)
-                buttons |= targetX / columns < nowX / columns ? kUp : kDown;
+                arrow = targetX / columns < nowX / columns ? kUp : kDown;
             else
-                buttons |= (column - now + columns) % columns <= columns / 2 ? kRight : kLeft;
+            {
+                bool right = (column - now + columns) % columns <= columns / 2;
+                arrow = right ? kRight : kLeft;
+                // further than the next unit: the choice put on the one before it at once, the game's own
+                // last step then (its hand glides there, its sound), not its slow repeat of a held arrow
+                int before = (column + (right ? -1 : 1) + columns) % columns;
+                if (before != now)
+                {
+                    GameStateSetUnitChoice(targetX - column + before);
+                    arrow = 0; // (let go a picture: the arrow pressed afresh, a step at once)
+                }
+            }
         }
         else // a menu's rows, from the top
-            buttons |= targetX < nowX ? kUp : kDown;
+            arrow = targetX < nowX ? kUp : kDown;
+        buttons |= arrow;
     }
     else if ((wheelTaps != 0 || sideTaps != 0 || rowTaps != 0) && (buttons & kArrows) == 0)
     {

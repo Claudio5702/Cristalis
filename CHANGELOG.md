@@ -2,9 +2,23 @@
 
 The number is `GAME_VERSION` in `project.h`, numbered as [DarkLauncher](kit/launcher)
 does: small improvements move the second figure (1.01, 1.02...); a large novelty goes to the next ten
-(1.1, that is 1.10, then 1.11...); the first figure changes (2.0) for a change of the whole. Each
+(1.1, that is 1.10, then 1.11...); a third figure for a few fixes only (1.11.1); the first figure
+changes (2.0) for a change of the whole. Each
 version has its Git tag (`v1.0`, `v1.01`...). What is new in a version is also shown once in the game,
 on DarkLauncher's "What's new" page.
+
+## 1.11.1
+
+- **A unit's menu with the mouse**: the game draws a deployed unit's menu (and a power crystal's, W2)
+  low on the screen for a unit in the map's top half, high otherwise; the mouse assumed it was always
+  high, so its rows had to be pointed at far above them. The rows now follow where the menu is (found
+  with the debug mode: the unit's row on the map, up to 16, puts it low).
+- **The row of units follows the pointer at once**: the mouse held an arrow until the choice got
+  there, and the game repeats a held arrow only after a pause: two or three units away took 23 to 29
+  pictures. The choice is now put at once on the unit before the one pointed at, and the game makes
+  the last step itself (its hand glides, its sound, the unit's name and text): 3 to 5 pictures.
+- **The debug mode's start**: reading the game's memory before its heap existed could crash it; the
+  mouse and the debug mode now wait for it.
 
 ## 1.11
 

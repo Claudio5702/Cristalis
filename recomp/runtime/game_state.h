@@ -38,6 +38,8 @@ struct UnitGrid
 };
 UnitGrid GameStateUnitGrid();
 int GameStateUnitChoice();
+// The choice put at once on a unit (its name and text follow; the game's hand stays, until an arrow moves it)
+void GameStateSetUnitChoice(int unit);
 int GameStateUnitAt(double x, double y);
 
 // The menu shown before a stage, for the mouse: its rows on the 1280 x 720 picture.
@@ -52,6 +54,8 @@ struct GameMenu
     bool greyed[16]{};    // rows the arrows pass over: no pointing at them
     bool paged = false;   // the choice counts the rows of the pages before too
 };
+// The game's heap is there: its words may be read (not in the first moments of the program).
+bool GameStateReady();
 GameMenu GameStateMenu();
 // The help's Settings page (sound, vibration): values changed by left and right (the wheel there).
 bool GameStateHelpSettings();

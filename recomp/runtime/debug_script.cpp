@@ -83,6 +83,8 @@ std::vector<std::pair<uint32_t, uint32_t>> g_keeps; // words written at every pi
 
 int StateOf(const std::string& what)
 {
+    if (!GameStateReady())
+        return -1;
     if (what == "title")
         return int(Load32(kTitleScreen));
     if (what == "stage")
@@ -118,11 +120,12 @@ bool Reached(const std::string& what, const std::string& value)
 
 void LogState(const char* what)
 {
-    int gridX, gridY;
-    GameStateCursor(gridX, gridY);
+    int gridX = 0, gridY = 0;
+    if (GameStateReady())
+        GameStateCursor(gridX, gridY);
     Log("Debug: %s (%.1f s; pack %d, wave %d, title %d, stage %d, mode %d, gold %d, cursor %d,%d)", what,
         (GetTickCount64() - g_epoch) / 1000.0, StateOf("pack"), StateOf("wave"), StateOf("title"), StateOf("stage"), StateOf("mode"),
-        StateOf("pack") != 0 ? int(Load32(kGold)) : -1, gridX, gridY);
+        StateOf("pack") > 0 ? int(Load32(kGold)) : -1, gridX, gridY);
 }
 
 } // namespace
